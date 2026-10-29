@@ -8,8 +8,8 @@ return function(test, equal, client, pretty)
     local Income = require("src/methods/income")
     local Preferences = require("src/storage/preferences")
 
-    -- methods[1] is the steel-bar method in the generated catalogue.
-    local steel = require("data/methods").methods[1]
+    -- The steel-bar method from the bundled catalogue.
+    local steel = require("src/data/method_data").find("smelting-steel-bars.basic")
 
     -- Read evidence across nested visual panels without depending on their order.
     local function textContent(surface)
@@ -210,12 +210,12 @@ return function(test, equal, client, pretty)
         assert(problem:find("Clean torstol", 1, true), problem)
     end)
 
-    -- methods[2] is elder logs: its Perfect plus potion is priced by creation cost,
+    -- Elder logs (without spirits): its Perfect plus potion is priced by creation cost,
     -- so with every price it has a full profit. Missing ingredient prices mean no
     -- cost and no profit (never a pretend zero). The same rule applies when
     -- abyssal demon loot prices are missing.
     test("creation-cost supplies give a full profit while missing ingredient or loot prices stay unknown", function()
-        local elder = require("data/methods").methods[2].income
+        local elder = require("src/data/method_data").find("cutting-elder-logs.without-spirits").income
 
         -- 320 logs x 1,000 = 320,000 minus tax 320 x 20 = 313,600. The potion
         -- (100,000 to make) is used at 1/24 of a potion an hour.
@@ -242,7 +242,7 @@ return function(test, equal, client, pretty)
         equal(noPotion.profit, nil)
         assert(noPotion.inputs[1].message:find("No GE price for", 1, true))
 
-        local pvm = Income.calculate(require("data/methods").methods[3].income, 900, {})
+        local pvm = Income.calculate(require("src/data/method_data").find("killing-abyssal-demons.melee").income, 900, {})
 
         equal(pvm.status, "partial")
         equal(pvm.revenue, nil)
@@ -254,7 +254,7 @@ return function(test, equal, client, pretty)
     test("elder logs with wood spirits uses 260 spirits for 580 logs an hour", function()
         local spirits
 
-        for _, method in ipairs(require("data/methods").methods) do
+        for _, method in ipairs(require("src/data/method_data").methods) do
             if method.id == "cutting-elder-logs.with-spirits" then
                 spirits = method
             end
@@ -297,7 +297,7 @@ return function(test, equal, client, pretty)
     -- is known, but missing sell quotes still prevent total revenue/profit.
     test("abyssal demon potions are priced while missing loot prices still block profit", function()
         local RecipeCost = require("src/methods/recipe_cost")
-        local demons = require("data/methods").methods[3].income
+        local demons = require("src/data/method_data").find("killing-abyssal-demons.melee").income
 
         -- Every price 1,000 GP, for every GE item the supplies need.
         local quotes = {}
@@ -338,7 +338,7 @@ return function(test, equal, client, pretty)
     -- 1,000 GP each (980 after tax); salvage/coin income never uses a GE quote.
     test("shared PvM loot matches Wiki quantities and alchemy values and scales with kills", function()
         local Loot = require("src/methods/loot")
-        local method = require("data/methods").methods[3]
+        local method = require("src/data/method_data").find("killing-abyssal-demons.melee")
         local outputs = Loot.outputs(method.income)
         equal(#outputs, 16)
         local quotes, fetched = {}, {}

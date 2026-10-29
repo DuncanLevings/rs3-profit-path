@@ -1,7 +1,7 @@
 -- Draws an item's icon using the client's own item config (Obj), for the income
 -- tables and the Requirements tab. This is display only: showing an icon never
 -- means the player owns the item or can use it.
-local definitions = require("data/methods").items
+local definitions = require("src/data/method_data").items
 local ItemIcon = {}
 
 -- Check the native item's name before showing it. A bad ID must never display

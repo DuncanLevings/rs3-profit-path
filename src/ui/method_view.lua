@@ -24,7 +24,7 @@ local HEADER_HEIGHT = 48
 local PAGE_PADDING = 14
 local TABLE_GAP = 8
 
-local itemDefinitions = require("data/methods").items
+local itemDefinitions = require("src/data/method_data").items
 
 -- Which Requirements section each kind of check goes in.
 local categories = { skill = "Skills", item = "Items", gear = "Items", quest = "Quests", capability = "Other" }

@@ -366,7 +366,7 @@ return function(test, equal, client, pretty)
             TOOLBELT_MATTOCK = { id = -46000, value = 1, isVarBit = true, baseVar = { id = 1102 } },
         }
         local hatchets = { 1351, 1349, 1353, 1361, 1355, 1357, 1359, 6739, 58073, 58075, 32645, 58077, 54890, 58079, 58244, 58081, 58247 }
-        local definitions = require("data/methods").items
+        local definitions = require("src/data/method_data").items
         local calls = 0
         var = { VarPlayer = settings }
         config.Enum = {}
@@ -398,7 +398,7 @@ return function(test, equal, client, pretty)
     test("tool-belt reader uses native mappings for every listed hatchet and verified family offsets", function()
         client()
         local settings, hatchets = toolbeltClient()
-        local bindings = require("data/methods").toolbelt
+        local bindings = require("src/data/method_data").toolbelt
         local first = Toolbelt.read(bindings)
         equal(first.slots.hatchet.itemId, 1351)
         equal(first.slots.pickaxe.itemId, 45467)
@@ -417,7 +417,7 @@ return function(test, equal, client, pretty)
     test("tool-belt presence guards zero keys and unknown selections never become bronze", function()
         client()
         local settings = toolbeltClient()
-        local bindings = require("data/methods").toolbelt
+        local bindings = require("src/data/method_data").toolbelt
         settings.TOOLBELT_HATCHET.value = 0
         local absent = Toolbelt.read(bindings)
         equal(absent.slots.hatchet.status, "available")
@@ -440,7 +440,7 @@ return function(test, equal, client, pretty)
     test("tool-belt native failures and changed enums remain visible without erasing other families", function()
         client()
         toolbeltClient()
-        local bindings = require("data/methods").toolbelt
+        local bindings = require("src/data/method_data").toolbelt
         config.Enum.TOOLBELT_HATCHETS.outputValueType = 73
         local changed = Toolbelt.read(bindings)
         equal(changed.slots.hatchet.status, "unknown")
@@ -468,7 +468,7 @@ return function(test, equal, client, pretty)
         local account = Account.new(function(reason)
             equal(reason, "inventory")
             updates = updates + 1
-        end, nil, require("data/methods").toolbelt)
+        end, nil, require("src/data/method_data").toolbelt)
         local wanted = { [1351] = true, [1359] = true }
         equal(account:readOwnership(wanted).counts[1351], 1)
         local baselineReads, baselineCalls = inventoryReads, calls()
@@ -500,7 +500,7 @@ return function(test, equal, client, pretty)
             return { isValid = true, GetTotal = function() return 0 end }
         end
         local snapshot = Snapshot.new(PersistentDB)
-        local account = Account.new(function() end, snapshot, require("data/methods").toolbelt)
+        local account = Account.new(function() end, snapshot, require("src/data/method_data").toolbelt)
         account:bindProfile("First")
         equal(account:readOwnership({ [1351] = true }).counts[1351], 1)
         account:destroy()
@@ -512,7 +512,7 @@ return function(test, equal, client, pretty)
 
     test("source tool matching compares cutting power and use levels rather than combat tiers", function()
         client()
-        local evidence = { equipment = require("data/methods").equipment,
+        local evidence = { equipment = require("src/data/method_data").equipment,
             skills = { WOODCUTTING = { status = "available", level = 60 } },
             items = {
                 [6739] = { status = "available", quantity = 1, toolbelt = true },

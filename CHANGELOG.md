@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.2-dev — 2026-10-29
+
+- Store methods compactly, ahead of importing the full Wiki catalogue. `catalogue-source/methods.json` (schema 2) has one entry per Wiki page, and each version lists only what differs. Requirements can be short strings such as `skill:SMITHING:20` or `item:31455`; the build fills in their text, group wording, item icons, "(recommended)" endings, income row names and Wiki links. The source is 445 lines instead of 1,204. `catalogue.py format` tidies it into a one-row-per-line layout, which `build` and `verify` require.
+- Pack `data/methods.lua` with shared text and record shapes (17 KB instead of 50 KB). The plugin reads it through the new `src/data/method_data.lua`, which returns the same fields as before plus `find(id)`. Every method record now carries `schema` and `origin` ("bundled"): the shape players' own copies will use later.
+- No visible change: the 4 methods decode to exactly the same records as 0.7.1, checked field by field against the previous generated file, apart from an empty unresolved-requirements list now present on steel bars. `verify` round-trips every method through the plugin's own reader.
+- Validate with 111 Lua behaviour tests and 39 Python catalogue tests, plus deterministic data, syntax, manifest and repository file-policy checks.
+
 ## 0.7.1-dev — 2026-10-29
 
 - Connect quest, item and equipment-alternative requirements to shared account evidence. Add a Requirements dropdown beside Intensity, keep cards free of readiness labels and wrap filters together on narrow windows.

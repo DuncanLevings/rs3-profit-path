@@ -346,7 +346,7 @@ local function client(database)
     -- Item configs for every catalogue item.
     config.Obj = { FromID = function(itemId)
 
-        local item = require("data/methods").items[tostring(itemId)]
+        local item = require("src/data/method_data").items[tostring(itemId)]
 
         if item then
             return { id = itemId, name = item.name }

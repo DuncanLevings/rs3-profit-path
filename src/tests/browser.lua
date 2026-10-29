@@ -107,7 +107,7 @@ return function(test, equal, client, pretty)
     test("favourites survive reload and profile switches without changing saved rates", function()
         local state = client()
         local prefs = Preferences.new(PersistentDB)
-        local steel = require("data/methods").methods[1]
+        local steel = require("src/data/method_data").find("smelting-steel-bars.basic")
 
         assert(prefs:saveRate(steel, 1000))
         assert(prefs:saveFavourite(steel.id, true))
@@ -305,7 +305,7 @@ return function(test, equal, client, pretty)
     test("character bindings preserve legacy choices and separate later characters", function()
         local state = client()
         local prefs = Preferences.new(PersistentDB)
-        local steel = require("data/methods").methods[1]
+        local steel = require("src/data/method_data").find("smelting-steel-bars.basic")
         assert(prefs:saveRate(steel, 1000))
         assert(prefs:saveFavourite(steel.id, true))
         assert(prefs:bindCharacter("First"))
@@ -933,7 +933,7 @@ return function(test, equal, client, pretty)
     test("item sections share a row only when both required and recommended items exist", function()
         client()
         local library = pretty()
-        local base = require("data/methods").methods[1]
+        local base = require("src/data/method_data").find("smelting-steel-bars.basic")
         local Requirements = require("src/game/requirements")
 
         for _, counts in ipairs({ { 1, 1 }, { 1, 0 }, { 0, 1 }, { 0, 0 } }) do
@@ -1021,7 +1021,7 @@ return function(test, equal, client, pretty)
 
         assert(items)
         local Style = require("src/ui/view_style")
-        local definitions = require("data/methods").items
+        local definitions = require("src/data/method_data").items
         local graceIndex
 
         for index, slot in ipairs(items.items) do
@@ -1074,7 +1074,7 @@ return function(test, equal, client, pretty)
 
         local preferences = Preferences.new(PersistentDB)
         assert(preferences:bindCharacter("Fixture"))
-        local method = require("data/methods").methods[2]
+        local method = require("src/data/method_data").find("cutting-elder-logs.without-spirits")
         equal(preferences:loadRate(method), 100)
 
         -- Skills use the small skills-tab style icons, not the round medallions.
@@ -1143,7 +1143,7 @@ return function(test, equal, client, pretty)
         income.buttons["Save"]()
         local preferences = Preferences.new(PersistentDB)
         assert(preferences:bindCharacter("Fixture"))
-        equal(preferences:loadRate(require("data/methods").methods[1]), 1000)
+        equal(preferences:loadRate(require("src/data/method_data").find("smelting-steel-bars.basic")), 1000)
 
         -- Resolving a sprite later makes the next decoration usable.
         rsprite.Get = function(name)
@@ -1292,7 +1292,7 @@ return function(test, equal, client, pretty)
         equal(utf8, nil, "Run this regression with the client-unavailable library removed")
         client()
         local prefs = Preferences.new(PersistentDB)
-        local steel = require("data/methods").methods[1]
+        local steel = require("src/data/method_data").find("smelting-steel-bars.basic")
         local first = "First\u{00A0}Name"
         local second = "\u{00C9}toile\u{00A0}\u{96EA}"
 

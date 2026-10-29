@@ -3,6 +3,7 @@
 # bad method data. They use small hand-made fixtures, not the real 12 MB data, so
 # they run fast and each case is easy to follow. src/tools/test.py runs them.
 import copy
+import json
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
@@ -170,7 +171,7 @@ class MethodTests(unittest.TestCase):
         self.methods = {
             "schema": 1, "items": {"42": {"name": "Fixture item"}},
             "methods": [{
-                "id": "fixture-method", "source": {"revision": 123},
+                "id": "fixture-method", "schema": 1, "origin": "bundled", "source": {"revision": 123},
                 "title": "Fixture method", "category": "pvm", "source_category": "Combat",
                 "members": True, "intensity": "Low", "instructions": ["Fixture step"],
                 "location": {"text": "Fixture location", "coverage": "complete"},
@@ -533,8 +534,10 @@ class MethodTests(unittest.TestCase):
 
     def test_invalid_methods_leave_both_generated_files_unchanged(self):
         # Runs the real `build` command against temporary copies of every file, with
-        # a bad method (revision 0). It must fail without touching either output file.
-        self.methods["methods"][0]["source"]["revision"] = 0
+        # a bad method (an ID with spaces). It must fail without touching either output.
+        page = short_page()
+        page["versions"][0]["id"] = "Not a valid ID"
+        short = {"schema": 2, "items": {"42": {"name": "Fixture item"}}, "pages": [page]}
 
         # Use a known writable workspace parent; Windows sandbox temp can be read-only.
         with TemporaryDirectory(dir=catalogue.ROOT) as directory:
@@ -547,7 +550,7 @@ class MethodTests(unittest.TestCase):
             method_output = root / "methods.lua"
 
             source.write_text(catalogue.json_text(self.monsters), encoding="utf-8")
-            methods.write_text(catalogue.json_text(self.methods), encoding="utf-8")
+            methods.write_text(catalogue.source_text(short) + "\n", encoding="utf-8")
             output.write_text("old monsters", encoding="utf-8")
             method_output.write_text("old methods", encoding="utf-8")
 
@@ -556,11 +559,159 @@ class MethodTests(unittest.TestCase):
                                 OUTPUT=output, METHOD_OUTPUT=method_output,
                                 RECIPE_SOURCE=root / "no-recipes.json"), \
                     patch.object(sys, "argv", ["catalogue.py", "build"]):
-                with self.assertRaisesRegex(ValueError, "source revision"):
+                with self.assertRaisesRegex(ValueError, "Invalid/duplicate method ID"):
                     catalogue.main()
 
             self.assertEqual(output.read_text(encoding="utf-8"), "old monsters")
             self.assertEqual(method_output.read_text(encoding="utf-8"), "old methods")
+
+
+def short_page():
+    """One Wiki page in the short method source, with a single version."""
+    return {
+        "page": "Money making guide/Fixture", "revision": 123,
+        "title": "Fixture method", "category": "pvm", "source_category": "Combat",
+        "members": True, "intensity": "Low", "instructions": ["Fixture step"],
+        "location": {"text": "Fixture location", "coverage": "complete"},
+        "requirements": {"coverage": "complete", "access": ["skill:PRAYER:92"]},
+        "income": {
+            "coverage": "partial",
+            "rate": {"key": "kills_per_hour", "default": 10, "unit": "kills/hour"},
+            "inputs": [{"item_id": 42, "quantity": 2, "basis": "hour"}],
+        },
+        "versions": [{"id": "fixture-method"}],
+    }
+
+
+class ShortSourceTests(unittest.TestCase):
+    """The short method source: what the build fills in, and the packed runtime file."""
+
+    def setUp(self):
+        self.items = {"42": {"name": "Fixture item"}, "43": {"name": "Other item"}}
+
+    def expand(self, *pages):
+        return catalogue.expand_methods({"schema": 2, "items": self.items, "pages": list(pages)})
+
+    def test_short_requirements_get_their_text_icons_and_recommended_ending(self):
+        page = short_page()
+        page["requirements"]["access"].append({"kind": "any", "children": ["item:42", "item:43"]})
+        page["requirements"]["recommended"] = [
+            "skill:ATTACK:90",
+            {"kind": "all", "children": ["item:42", "item:43"]},
+            {"kind": "any", "text": "Either skill", "children": ["skill:MAGIC:80", "skill:RANGED:80"]},
+        ]
+        requirements = self.expand(page)["methods"][0]["requirements"]
+
+        access = requirements["access"]
+        self.assertEqual(access["text"], "Required")
+        self.assertEqual(access["children"][0], {"kind": "skill", "skill": "PRAYER", "level": 92, "text": "92 Prayer"})
+        self.assertEqual(access["children"][1]["text"], "Fixture item or Other item")
+        self.assertEqual(access["children"][1]["display_items"], [42, 43])
+
+        # Only the direct children of "recommended" get the ending; nested ones don't.
+        recommended = requirements["recommended"]["children"]
+        self.assertEqual(recommended[0]["text"], "90 Attack (recommended)")
+        self.assertEqual(recommended[1]["text"], "Fixture item; Other item (recommended)")
+        self.assertEqual(recommended[2]["text"], "Either skill (recommended)")
+        self.assertEqual(recommended[2]["children"][0]["text"], "80 Magic")
+        self.assertNotIn("display_items", recommended[2])
+        self.assertEqual(requirements["unresolved"], [])
+
+    def test_versions_only_store_their_differences(self):
+        page = short_page()
+        page["versions"] = [
+            {"id": "fixture.slow", "variant": "Slow", "income": {"rate": {"default": 5}}},
+            {"id": "fixture.fast", "variant": "Fast", "income": {"rate": {"default": 20}, "inputs": []}},
+        ]
+        slow, fast = self.expand(page)["methods"]
+
+        # Records merge key by key, so each keeps the page's rate key and unit.
+        self.assertEqual(slow["income"]["rate"], {"key": "kills_per_hour", "default": 5, "unit": "kills/hour"})
+        self.assertEqual(fast["income"]["rate"]["default"], 20)
+
+        # Lists are replaced whole: the fast version has no inputs at all.
+        self.assertEqual(len(slow["income"]["inputs"]), 1)
+        self.assertEqual(fast["income"]["inputs"], [])
+
+        # Everything else is shared, and versions never share one mutable table.
+        self.assertEqual(slow["requirements"], fast["requirements"])
+        self.assertIsNot(slow["requirements"], fast["requirements"])
+
+        for method in (slow, fast):
+            self.assertEqual(method["schema"], 1)
+            self.assertEqual(method["origin"], "bundled")
+            self.assertEqual(method["source"]["url"],
+                             "https://runescape.wiki/w/Money_making_guide/Fixture?oldid=123")
+            self.assertEqual(method["income"]["period"], "hour")
+            self.assertEqual(method["location"]["routes"], [])
+
+    def test_income_rows_and_items_fill_in_names_and_links(self):
+        self.items["44"] = {"name": "Potion (6)", "page": "Potion", "revision": 7}
+        page = short_page()
+        page["income"]["inputs"].append({"item_id": 44, "name": "Potion", "quantity": 1, "basis": "hour"})
+        expanded = self.expand(page)
+
+        inputs = expanded["methods"][0]["income"]["inputs"]
+        self.assertEqual(inputs[0]["name"], "Fixture item")
+        self.assertEqual(inputs[1]["name"], "Potion")
+        self.assertEqual(expanded["items"]["44"], {"name": "Potion (6)", "source": "https://runescape.wiki/w/Potion?oldid=7"})
+
+    def test_bad_short_source_is_reported(self):
+        for change, message in (
+            (lambda page: page["requirements"]["access"].append("skill:PRAYER"), "shorthand"),
+            (lambda page: page.pop("revision"), "Wiki revision"),
+            (lambda page: page.update(versions=[]), "at least one version"),
+            (lambda page: page["requirements"].update(access={"kind": "all"}), "must be a list"),
+        ):
+            with self.subTest(message=message):
+                page = short_page()
+                change(page)
+
+                with self.assertRaisesRegex(ValueError, message):
+                    self.expand(page)
+
+        with self.assertRaisesRegex(ValueError, "schema 2"):
+            catalogue.expand_methods({"schema": 1, "items": {}, "methods": []})
+
+    def test_layout_keeps_short_records_on_one_line(self):
+        text = catalogue.source_text({"pages": [short_page()]})
+
+        self.assertIn('"access": ["skill:PRAYER:92"]', text)
+        self.assertIn('{"item_id": 42, "quantity": 2, "basis": "hour"}', text)
+        self.assertTrue(all(len(line) <= 110 for line in text.splitlines()))
+
+        # Layout only changes spacing, never the data.
+        self.assertEqual(json.loads(text), {"pages": [short_page()]})
+
+    def test_packed_methods_read_back_exactly(self):
+        # Tricky text on purpose: quotes, backslashes, a newline and non-English
+        # letters must all survive. Numbers and booleans must not turn into text.
+        page = short_page()
+        page["title"] = 'Fixture "quoted" \\ method\nwith Ünïcode'
+        page["instructions"] = ["One", "One", "Two"]
+        page["income"]["inputs"][0]["quantity"] = 0.041666666666666664
+        catalogue_data = self.expand(page)
+        catalogue_data["equipment"] = {}
+        packed = catalogue.pack_methods(catalogue_data)
+
+        lua = LuaRuntime(unpack_returned_tuples=True)
+        lua.globals().package.path = catalogue.ROOT.as_posix() + "/?.lua"
+        lua.execute("package.loaded['data/methods'] = ...", lua.execute(packed))
+        loaded = lua.eval('require("src/data/method_data")')
+        reader = loaded[0] if isinstance(loaded, tuple) else loaded
+
+        method = catalogue_data["methods"][0]
+        self.assertEqual(catalogue.from_lua(reader.find("fixture-method")), catalogue.plain(method))
+        self.assertEqual(catalogue.from_lua(reader["items"]), catalogue.plain(catalogue_data["items"]))
+        self.assertIs(reader.find("fixture-method")["members"], True)
+        self.assertIsNone(reader.find("missing"))
+
+        # Repeated text is stored once.
+        self.assertEqual(packed.count('"One"'), 1)
+
+    def test_packing_refuses_lists_that_mix_text_and_numbers(self):
+        with self.assertRaisesRegex(ValueError, "cannot mix text"):
+            catalogue.pack_methods({"items": {}, "methods": [{"id": "x", "mixed": ["a", 1]}]})
 
 
 def recipe_fixture():
