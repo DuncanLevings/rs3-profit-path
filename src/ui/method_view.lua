@@ -11,6 +11,8 @@
 local Style = require("src/ui/view_style")
 local ItemIcon = require("src/ui/item_icon")
 local RecipeCost = require("src/methods/recipe_cost")
+local Loot = require("src/methods/loot")
+local Dropdown = require("src/ui/dropdown")
 
 local MethodView = {}
 
@@ -302,7 +304,7 @@ local function itemTable(panel, definitions, moneyColour)
         -- Untradeable supplies are priced by what they cost to make; the tooltip
         -- says so, and the Notes below name any ingredient counted as free.
         local creationTip = definition.pricing == "recipe"
-            and "Creation cost: made from its ingredients at GE buy prices." or nil
+            and "Creation cost: made from its ingredients at GE buy prices." or definition.valuation_note
 
         local total = panel:AddText({
             text = "", x = valueRight - 130, xAnchor = 1, y = y + 10, width = 130, height = 24,
@@ -328,16 +330,89 @@ local function itemTable(panel, definitions, moneyColour)
     end
 end
 
+-- The header's title, plus a version dropdown when the method has several
+-- versions (e.g. elder logs with or without wood spirits). The title and dropdown
+-- are centred together as one unit, the dropdown right after the title. Picking
+-- another version calls onVersion(method). Returns a release() for the dropdown's
+-- pending callback (a no-op when there's no dropdown).
+local VERSION_GAP = 10
+
+local function mountTitle(view, method, guarded, versions, onVersion)
+    -- One version: the usual centred "Title - Version" text.
+    if not versions or #versions < 2 then
+        local title = method.title .. (method.variant and " - " .. method.variant or "")
+
+        view:AddTitle({
+            text = title, absolute = true, x = 44, y = 10, width = -88, widthAnchor = 1, height = 28,
+            alignHorizontal = ui.AlignMode.CENTRE,
+        })
+
+        return function() end
+    end
+
+    -- Several versions: the title alone, then the dropdown. Work out the pair's
+    -- total width so both can be placed either side of the centre line.
+    local titleWidth = Style.textWidth(method.title, true)
+    local versionWidth = 0
+
+    -- Fit the longest label, leaving room for the small native arrow and insets.
+    for _, version in ipairs(versions) do
+        versionWidth = math.max(versionWidth, Style.textWidth(version.variant) + 28)
+    end
+
+    local left = -math.floor((titleWidth + VERSION_GAP + versionWidth) / 2)
+
+    view:AddTitle({
+        text = method.title, absolute = true,
+        x = left, xAnchor = 0.5, y = 10, width = titleWidth + 8, height = 28,
+    })
+
+    local entries, selected = {}, 0
+
+    for index, version in ipairs(versions) do
+        entries[index] = { id = index - 1, label = version.variant }
+
+        if version == method then
+            selected = index - 1
+        end
+    end
+
+    local _, release = Dropdown.new(view.content, {
+        x = left + titleWidth + VERSION_GAP, xAnchor = 0.5, y = 12,
+        width = versionWidth,
+        compact = true,
+        entries = entries,
+        selected = selected,
+        owner = "profit-path-version",
+        guarded = guarded,
+        onChange = function(id)
+            local chosen = versions[id + 1]
+
+            if chosen and chosen ~= method then
+                onVersion(chosen)
+            end
+        end,
+    })
+
+    return release
+end
+
 -- Builds the whole method screen inside `view`. `guarded` comes from the workbench:
 -- wrap every callback with it, so clicks on a screen we've left are ignored.
--- `activeTab` (optional) reopens a tab, e.g. when the screen is rebuilt after the
--- window is resized.
 --
--- Returns two functions: refresh(reason), which the workbench calls when the
--- account changes, and activeTab(), which says which tab is open right now.
-function MethodView.mount(view, method, calculator, guarded, activeTab)
-    local title = method.title .. (method.variant and " - " .. method.variant or "")
-    view:AddTitle({ text = title, absolute = true, x = 44, y = 10, width = -88, widthAnchor = 1, height = 28, alignHorizontal = ui.AlignMode.CENTRE })
+-- options (all optional):
+--   activeTab   reopen this tab, e.g. when the screen is rebuilt after a resize
+--   versions    every version of this method, in catalogue order
+--   onVersion   called with the chosen method when the player picks a version
+--
+-- Returns three functions: refresh(reason), which the workbench calls when the
+-- account changes; activeTab(), which says which tab is open right now; and
+-- release(), which cancels pending dropdown callbacks when the screen goes away.
+function MethodView.mount(view, method, calculator, guarded, options)
+    options = options or {}
+
+    local activeTab = options.activeTab
+    local releaseTitle = mountTitle(view, method, guarded, options.versions, options.onVersion)
 
     -- Tabs fill everything under the header, and stretch with the window.
     local tabs = view:AddTabs({
@@ -375,7 +450,8 @@ function MethodView.mount(view, method, calculator, guarded, activeTab)
     local ready = false
 
     -- Inputs and Outputs side by side, both sized for the longer of the two lists.
-    local rowCount = math.max(#method.income.inputs, #method.income.outputs, 1)
+    local outputDefinitions = Loot.outputs(method.income)
+    local rowCount = math.max(#method.income.inputs, #outputDefinitions, 1)
     local tableHeight = 74 + rowCount * 46
 
     -- Each table takes half the page. The page keeps PAGE_PADDING clear on both
@@ -397,17 +473,12 @@ function MethodView.mount(view, method, calculator, guarded, activeTab)
     }), tableHeight, true)
 
     inputs:AddText({ text = "Inputs", x = 12, y = 6, width = 88, colour = Style.gold, height = 26, tooltip = "Supply costs use instant-buy prices. Actual purchase prices may differ." })
-    outputs:AddText({ text = "Outputs", x = 12, y = 6, width = 88, colour = Style.gold, height = 26, tooltip = "Outputs use instant-sell prices after tax. Your pace and actual sale prices affect profit." })
+    outputs:AddText({ text = "Outputs", x = 12, y = 6, width = 88, colour = Style.gold, height = 26, tooltip = "GE outputs use instant-sell prices after tax. Coin drops and alchemy proceeds are untaxed. Your pace and luck affect profit." })
 
     -- Costs read red and earnings green, so it's obvious at a glance which way
     -- the money goes. The "Inputs"/"Outputs" headings still say it in words.
     local updateInputs = itemTable(inputs, method.income.inputs, Style.bad)
-    local updateOutputs = itemTable(outputs, method.income.outputs, Style.good)
-
-    -- PvM loot isn't valued yet; say so rather than show an empty table.
-    if method.income.loot then
-        outputs:AddText({ text = "Drop income is not available yet.", x = 12, y = 64, height = 48, colour = Style.muted })
-    end
+    local updateOutputs = itemTable(outputs, outputDefinitions, Style.good)
 
     -- The rate row: label, input box, Save and Reset buttons, then a status line.
     income:AddText({ text = "Rate per hour", width = 106, height = 28, colour = Style.muted, tooltip = method.income.rate.unit })
@@ -510,7 +581,7 @@ function MethodView.mount(view, method, calculator, guarded, activeTab)
         if calculator.message then
             messages[#messages + 1] = calculator.message
         elseif result.status ~= "available" then
-            messages[#messages + 1] = "Income estimate unavailable: some prices or costs are missing."
+            messages[#messages + 1] = result.message or "Income estimate unavailable: some prices or costs are missing."
         end
 
         state.content = table.concat(messages, " / ")
@@ -560,7 +631,7 @@ function MethodView.mount(view, method, calculator, guarded, activeTab)
         return tabs:GetActiveIndex()
     end
 
-    return refresh, currentTab
+    return refresh, currentTab, releaseTitle
 end
 
 return MethodView

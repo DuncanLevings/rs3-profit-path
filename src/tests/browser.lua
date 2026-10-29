@@ -250,7 +250,7 @@ return function(test, equal, client, pretty)
 
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui:findButton("Open Profit Path")()
-        equal(calls, 13)
+        equal(calls, 48)
 
         local browse = prettyui.views[2]
 
@@ -275,16 +275,16 @@ return function(test, equal, client, pretty)
         header.fields[1]:SetText("steel", true)
         header.nativeLists[1]:SetEntrySelected(1, true)
         Event.Logic.emit({})
-        equal(calls, 13)
+        equal(calls, 48)
 
 
         prettyui:findMethod("Smelting steel bars")()
-        equal(calls, 16)
+        equal(calls, 51)
 
         local detail = prettyui.views[3]
         detail.tabs[1].pages[1].fields[1]:SetText("1000", true)
         detail.buttons["Back to methods"]()
-        equal(calls, 16)
+        equal(calls, 51)
 
         -- An unsaved draft must not leak into saved-rate list comparisons.
         local text = {}
@@ -427,6 +427,7 @@ return function(test, equal, client, pretty)
         local titles = {
             ["Smelting steel bars"] = Style.categories.production,
             ["Cutting elder logs - Without wood spirits"] = Style.categories.skilling,
+            ["Cutting elder logs - With wood spirits"] = Style.categories.skilling,
             ["Killing abyssal demons - Melee"] = Style.categories.pvm,
         }
 
@@ -446,7 +447,7 @@ return function(test, equal, client, pretty)
             return seen
         end
 
-        equal(checkTitles(), 3)
+        equal(checkTitles(), 4)
 
         -- Each row is its own card: a lighter fill behind everything, then a thin
         -- bar down the left edge in the same activity colour as its title.
@@ -469,11 +470,12 @@ return function(test, equal, client, pretty)
             end
         end
 
-        equal(rows, 3)
+        equal(rows, 4)
 
-        for _, category in ipairs({ "PvM", "Skilling", "Production" }) do
+        -- Elder logs has two versions, so Skilling shows two rows.
+        for category, count in pairs({ PvM = 1, Skilling = 2, Production = 1 }) do
             sidebar.buttons[category]()
-            equal(checkTitles(), 1, "One method under " .. category)
+            equal(checkTitles(), count, "Rows under " .. category)
         end
 
         PluginShutdown()
@@ -562,7 +564,7 @@ return function(test, equal, client, pretty)
             end
         end
 
-        equal(rows, 3)
+        equal(rows, 4)
 
         -- Method pages: 14 padding each side, 8 between side-by-side panels.
         prettyui:findMethod("Cutting elder logs")()
@@ -589,6 +591,78 @@ return function(test, equal, client, pretty)
         assert(fulls > 0)
 
         PluginShutdown()
+    end)
+
+    -- Methods with several versions (same title) get a version dropdown right after
+    -- the title on the method page. Picking another version loads that version's
+    -- prices and saved rate and rebuilds the page on the same tab. One-version
+    -- methods keep the plain "Title - Version" header with no dropdown.
+    test("the method page switches between versions of the same method", function()
+        client()
+        prettyui = pretty()
+        gepl = nil
+
+        dofile("main.lua")
+
+        Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
+        prettyui:findButton("Open Profit Path")()
+
+        -- One version only: plain title, no dropdown.
+        prettyui:findMethod("Smelting steel bars")()
+        local steel = prettyui.views[#prettyui.views]
+        equal(steel.nativeLists, nil)
+        steel.buttons["Back to methods"]()
+
+        -- Elder logs has two versions. Open the one without spirits.
+        prettyui:findMethod("Without wood spirits")()
+        local detail = prettyui.views[#prettyui.views]
+
+        local function headerTitles(screen)
+            local titles = {}
+
+            for _, label in ipairs(screen.texts) do
+                titles[#titles + 1] = label.content
+            end
+
+            return table.concat(titles, "|")
+        end
+
+        equal(headerTitles(detail), "Cutting elder logs", "Title without the version; the dropdown shows it")
+
+        local versions = detail.nativeLists[1]
+        equal(versions.entries["Without wood spirits"], 0)
+        equal(versions.entries["With wood spirits"], 1)
+        equal(versions.selectedID, 0)
+        equal(detail.tabs[1].pages[1].fields[1]:GetText(), "320")
+
+        -- On the Requirements tab, switch to the wood spirits version.
+        detail.tabs[1].activeIndex = 2
+        versions:SetEntrySelected(1, true)
+        Event.Logic.emit({})
+
+        local switched = prettyui.views[#prettyui.views]
+        assert(switched ~= detail and detail.destroyed, "The page is rebuilt for the other version")
+        equal(switched.nativeLists[1].selectedID, 1)
+        equal(switched.tabs[1].activeIndex, 2, "Same tab after switching")
+        equal(switched.tabs[1].pages[1].fields[1]:GetText(), "580", "The other version's own rate")
+
+        -- Its Income table lists the spirits.
+        local names = {}
+
+        for _, panel in ipairs(switched.tabs[1].pages[1].children) do
+            for _, slot in ipairs(panel.items or {}) do
+                names[#names + 1] = slot.tooltip
+            end
+        end
+
+        assert(table.concat(names, "|"):find("Elder wood spirit", 1, true), "Spirits are an input")
+
+        -- Only the window's size check is still listening; the dropdown's one-off
+        -- callback is gone.
+        equal(Event.Logic.count(), 1)
+
+        PluginShutdown()
+        equal(Event.Logic.count(), 0)
     end)
 
     -- A rebuilt method screen comes back on the same tab with the same draft rate,
@@ -755,13 +829,13 @@ return function(test, equal, client, pretty)
         local income = detail.tabs[1].pages[1]
         local rate = income.fields[1]
         rate:SetText("1000", true)
-        equal(calls, 16)
+        equal(calls, 51)
         assert(not income.buttons["Refresh prices"])
 
         prettyui.windows[1]:Close()
         price = 50
         prettyui:findButton("Open Profit Path")()
-        equal(calls, 19)
+        equal(calls, 54)
         equal(rate:GetText(), "1000")
 
         local lines = {}
@@ -982,6 +1056,37 @@ return function(test, equal, client, pretty)
         detail.buttons["Back to methods"]()
         save()
         equal(preferences:loadRate(method), 100)
+        PluginShutdown()
+    end)
+
+    test("PvM outputs render shared drops and rate edits reuse the quote snapshot", function()
+        client()
+        prettyui = pretty()
+        local calls = 0
+        gepl = {
+            isReady = function() return true end,
+            getLatest = function()
+                calls = calls + 1
+                return { high = 1000, highTime = 50, low = 1000, lowTime = 50 }
+            end,
+        }
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
+        prettyui:findButton("Open Profit Path")()
+        prettyui:findMethod("Killing abyssal demons")()
+        local income = prettyui.views[#prettyui.views].tabs[1].pages[1]
+        local outputs = income.children[3]
+        equal(#outputs.items, 16)
+
+        for _, label in ipairs(income:allTexts()) do
+            assert(not label.content:find("Drop income is not available yet", 1, true))
+            assert(not label.content:find("Not estimated", 1, true))
+        end
+
+        local capturedCalls = calls
+        income.fields[1]:SetText("450", true)
+        equal(calls, capturedCalls)
+        equal(#outputs.items, 16)
         PluginShutdown()
     end)
 

@@ -12,6 +12,22 @@ return {
             ["native_mapping"] = "unverified",
             ["source"] = "https://runescape.wiki/w/Enhanced_Excalibur?oldid=37166072",
         },
+        ["1513"] = {
+            ["name"] = "Magic logs",
+            ["source"] = "https://runescape.wiki/w/Magic_logs?oldid=37153904",
+        },
+        ["1617"] = {
+            ["name"] = "Uncut diamond",
+            ["source"] = "https://runescape.wiki/w/Uncut_diamond?oldid=37179840",
+        },
+        ["1619"] = {
+            ["name"] = "Uncut ruby",
+            ["source"] = "https://runescape.wiki/w/Uncut_ruby?oldid=37179839",
+        },
+        ["1631"] = {
+            ["name"] = "Uncut dragonstone",
+            ["source"] = "https://runescape.wiki/w/Uncut_dragonstone?oldid=37179841",
+        },
         ["19888"] = {
             ["name"] = "Demon horn necklace",
             ["native_mapping"] = "unverified",
@@ -26,6 +42,14 @@ return {
             ["name"] = "Elder logs",
             ["native_mapping"] = "unverified",
             ["source"] = "https://runescape.wiki/w/Elder_logs?oldid=37166250",
+        },
+        ["30825"] = {
+            ["name"] = "Abyssal wand",
+            ["source"] = "https://runescape.wiki/w/Abyssal_wand?oldid=37006364",
+        },
+        ["30828"] = {
+            ["name"] = "Abyssal orb",
+            ["source"] = "https://runescape.wiki/w/Abyssal_orb?oldid=37006352",
         },
         ["31453"] = {
             ["name"] = "Gold accumulator",
@@ -102,6 +126,10 @@ return {
             ["native_mapping"] = "unverified",
             ["source"] = "https://runescape.wiki/w/Advanced_gold_accumulator?oldid=37082712",
         },
+        ["4151"] = {
+            ["name"] = "Abyssal whip",
+            ["source"] = "https://runescape.wiki/w/Abyssal_whip?oldid=37138922",
+        },
         ["440"] = {
             ["name"] = "Iron ore",
             ["native_mapping"] = "unverified",
@@ -116,10 +144,34 @@ return {
             },
             ["source"] = "https://runescape.wiki/w/Grace_of_the_elves?oldid=37148450",
         },
+        ["44809"] = {
+            ["name"] = "Orichalcite stone spirit",
+            ["source"] = "https://runescape.wiki/w/Orichalcite_stone_spirit?oldid=36495250",
+        },
+        ["44812"] = {
+            ["name"] = "Phasmatite stone spirit",
+            ["source"] = "https://runescape.wiki/w/Phasmatite_stone_spirit?oldid=36495252",
+        },
         ["453"] = {
             ["name"] = "Coal",
             ["native_mapping"] = "unverified",
             ["source"] = "Inherited monster snapshot, built 2026-10-22",
+        },
+        ["47240"] = {
+            ["name"] = "Medium bladed adamant salvage",
+            ["source"] = "https://runescape.wiki/w/Medium_bladed_adamant_salvage?oldid=36709020",
+        },
+        ["47286"] = {
+            ["name"] = "Tiny spiky rune salvage",
+            ["source"] = "https://runescape.wiki/w/Tiny_spiky_rune_salvage?oldid=36709061",
+        },
+        ["47306"] = {
+            ["name"] = "Tiny plated rune salvage",
+            ["source"] = "https://runescape.wiki/w/Tiny_plated_rune_salvage?oldid=36709056",
+        },
+        ["47312"] = {
+            ["name"] = "Large plated rune salvage",
+            ["source"] = "https://runescape.wiki/w/Large_plated_rune_salvage?oldid=36709052",
         },
         ["48239"] = {
             ["name"] = "Aggroverload (6)",
@@ -141,6 +193,19 @@ return {
             ["native_mapping"] = "unverified",
             ["source"] = "https://runescape.wiki/w/Elder_wood_box?oldid=37044932",
         },
+        ["54924"] = {
+            ["name"] = "Elder wood spirit",
+            ["native_mapping"] = "unverified",
+            ["source"] = "https://runescape.wiki/w/Elder_wood_spirit?oldid=36950369",
+        },
+        ["569"] = {
+            ["name"] = "Fire orb",
+            ["source"] = "https://runescape.wiki/w/Fire_orb?oldid=37215300",
+        },
+        ["7936"] = {
+            ["name"] = "Pure essence",
+            ["source"] = "https://runescape.wiki/w/Pure_essence?oldid=37192383",
+        },
         ["9807"] = {
             ["name"] = "Woodcutting cape",
             ["native_mapping"] = "unverified",
@@ -151,6 +216,10 @@ return {
                 34647,
             },
             ["source"] = "https://runescape.wiki/w/Woodcutting_cape?oldid=37168210",
+        },
+        ["995"] = {
+            ["name"] = "Coins",
+            ["source"] = "https://runescape.wiki/w/Coins?oldid=37132270",
         },
     },
     ["methods"] = {
@@ -370,8 +439,11 @@ return {
                 ["assumptions"] = {
                     "Only the listed drops count towards this estimate.",
                     "Assumes you use a spring cleaner and attuned ectoplasmator.",
+                    "Hourly drops are long-run averages, not guaranteed loot in a single hour.",
+                    "Wand and orb income assumes an eligible Slayer task. Uses the listed base drop rates, without luck or Most Wanted-card bonuses.",
+                    "Salvage is alchemised by a spring cleaner at high-alchemy value; spring costs are included. This differs from the Wiki table's GE salvage valuation.",
                 },
-                ["coverage"] = "partial",
+                ["coverage"] = "complete",
                 ["inputs"] = {
                     {
                         ["basis"] = "hour",
@@ -409,16 +481,19 @@ return {
                     ["selection"] = {
                         {
                             ["item"] = "Abyssal wand",
+                            ["rate"] = "1/6104",
                             ["rows"] = 1,
                             ["section"] = "Pre-roll",
                         },
                         {
                             ["item"] = "Abyssal orb",
+                            ["rate"] = "1/6104",
                             ["rows"] = 1,
                             ["section"] = "Pre-roll",
                         },
                         {
                             ["item"] = "Abyssal whip",
+                            ["rate"] = "1/1024",
                             ["rows"] = 1,
                             ["section"] = "Pre-roll",
                         },
@@ -449,28 +524,43 @@ return {
                         },
                         {
                             ["item"] = "Medium bladed adamant salvage",
+                            ["pricing"] = "fixed",
                             ["rows"] = 1,
                             ["section"] = "Salvage",
+                            ["unit_value"] = 6000,
+                            ["valuation_note"] = "Spring-cleaner high alchemy; spring cost is included under Inputs. No GE sale tax.",
                         },
                         {
                             ["item"] = "Tiny spiky rune salvage",
+                            ["pricing"] = "fixed",
                             ["rows"] = 1,
                             ["section"] = "Salvage",
+                            ["unit_value"] = 8000,
+                            ["valuation_note"] = "Spring-cleaner high alchemy; spring cost is included under Inputs. No GE sale tax.",
                         },
                         {
                             ["item"] = "Tiny plated rune salvage",
+                            ["pricing"] = "fixed",
                             ["rows"] = 1,
                             ["section"] = "Salvage",
+                            ["unit_value"] = 8000,
+                            ["valuation_note"] = "Spring-cleaner high alchemy; spring cost is included under Inputs. No GE sale tax.",
                         },
                         {
                             ["item"] = "Large plated rune salvage",
+                            ["pricing"] = "fixed",
                             ["rows"] = 1,
                             ["section"] = "Salvage",
+                            ["unit_value"] = 32000,
+                            ["valuation_note"] = "Spring-cleaner high alchemy; spring cost is included under Inputs. No GE sale tax.",
                         },
                         {
                             ["item"] = "Coins",
+                            ["pricing"] = "fixed",
                             ["rows"] = 2,
                             ["section"] = "Coins",
+                            ["unit_value"] = 1,
+                            ["valuation_note"] = "Coin drops, using the average of each drop range. No GE sale tax.",
                         },
                         {
                             ["item"] = "Pure essence",
@@ -496,10 +586,7 @@ return {
                     ["key"] = "kills_per_hour",
                     ["unit"] = "kills/hour",
                 },
-                ["unresolved"] = {
-                    "Reconcile shared drop quantities and probabilities with this method revision.",
-                    "Verify source-equivalent salvage valuation and spring-cleaner treatment before calculating a complete profit.",
-                },
+                ["unresolved"] = {},
             },
             ["instructions"] = {
                 "Kill abyssal demons using a suitable combat setup.",
@@ -608,6 +695,141 @@ return {
             ["source_category"] = "Combat/Mid",
             ["title"] = "Killing abyssal demons",
             ["variant"] = "Melee",
+        },
+        {
+            ["category"] = "skilling",
+            ["difficulty"] = nil,
+            ["id"] = "cutting-elder-logs.with-spirits",
+            ["income"] = {
+                ["assumptions"] = {
+                    "Each elder wood spirit gives one extra log: 320 cut plus 260 from spirits makes 580 logs an hour. Spirit use scales with the logs-per-hour rate.",
+                    "Not worth it if one wood spirit costs more than one elder log. Extra logs and costs from optional equipment are not included.",
+                },
+                ["coverage"] = "complete",
+                ["inputs"] = {
+                    {
+                        ["basis"] = "hour",
+                        ["item_id"] = 33234,
+                        ["name"] = "Perfect plus potion",
+                        ["portion"] = 6,
+                        ["pricing"] = "recipe",
+                        ["quantity"] = 0.041666666666666664,
+                        ["recipe"] = "Perfect plus potion",
+                        ["source_quantity"] = "1/6 * 1/4",
+                    },
+                    {
+                        ["basis"] = "action",
+                        ["item_id"] = 54924,
+                        ["name"] = "Elder wood spirit",
+                        ["quantity"] = 0.4482758620689655,
+                        ["source_quantity"] = "260 per 580 logs",
+                    },
+                },
+                ["outputs"] = {
+                    {
+                        ["basis"] = "action",
+                        ["item_id"] = 29556,
+                        ["name"] = "Elder logs",
+                        ["quantity"] = 1,
+                        ["tax_denominator"] = 50,
+                    },
+                },
+                ["period"] = "hour",
+                ["rate"] = {
+                    ["default"] = 580,
+                    ["key"] = "logs_per_hour",
+                    ["unit"] = "logs/hour",
+                },
+                ["unresolved"] = {},
+            },
+            ["instructions"] = {
+                "Cut an elder tree, then move to another tree when it is depleted.",
+                "Rotate through three locations while previously cut trees regrow.",
+                "Bank logs between trees, or use suitable storage or porters if available.",
+            },
+            ["intensity"] = "Low",
+            ["location"] = {
+                ["coverage"] = "partial",
+                ["routes"] = {},
+                ["text"] = "Rotating between elder trees; the source suggests Yanille, Varrock and Edgeville, or Varrock and the trees around Draynor.",
+            },
+            ["members"] = true,
+            ["requirements"] = {
+                ["access"] = {
+                    ["children"] = {
+                        {
+                            ["kind"] = "skill",
+                            ["level"] = 90,
+                            ["skill"] = "WOODCUTTING",
+                            ["text"] = "90 Woodcutting",
+                        },
+                        {
+                            ["equipment_scope"] = "flexible",
+                            ["kind"] = "gear",
+                            ["text"] = "Use the highest-tier hatchet you have",
+                        },
+                    },
+                    ["kind"] = "all",
+                    ["text"] = "Required",
+                },
+                ["coverage"] = "partial",
+                ["recommended"] = {
+                    ["children"] = {
+                        {
+                            ["kind"] = "skill",
+                            ["level"] = 33,
+                            ["skill"] = "SUMMONING",
+                            ["text"] = "33 Summoning (recommended)",
+                        },
+                        {
+                            ["kind"] = "skill",
+                            ["level"] = 22,
+                            ["skill"] = "INVENTION",
+                            ["text"] = "22 Invention (recommended)",
+                        },
+                        {
+                            ["display_items"] = {
+                                12021,
+                                39745,
+                                39746,
+                                39747,
+                                39748,
+                                39749,
+                                9807,
+                                52246,
+                                44548,
+                                54913,
+                            },
+                            ["equipment_scope"] = "specific",
+                            ["kind"] = "gear",
+                            ["text"] = "Beaver pouch; Nature's sentinel outfit; Woodcutting cape; Sana's fyrtorch; Grace of the elves; Elder wood box (recommended)",
+                        },
+                        {
+                            ["display_icon"] = "perk_honed",
+                            ["kind"] = "capability",
+                            ["text"] = "Honed perk (recommended)",
+                        },
+                        {
+                            ["display_icon"] = "perk_fortune",
+                            ["kind"] = "capability",
+                            ["text"] = "Fortune perk (recommended)",
+                        },
+                    },
+                    ["kind"] = "all",
+                    ["text"] = "Recommended",
+                },
+                ["unresolved"] = {
+                    "Verify usable hatchet alternatives before automatically matching tools.",
+                },
+            },
+            ["source"] = {
+                ["revision"] = 37041274,
+                ["title"] = "Money making guide/Cutting elder logs",
+                ["url"] = "https://runescape.wiki/w/Money_making_guide/Cutting_elder_logs?oldid=37041274",
+            },
+            ["source_category"] = "Gathering",
+            ["title"] = "Cutting elder logs",
+            ["variant"] = "With wood spirits",
         },
     },
     ["schema"] = 1,

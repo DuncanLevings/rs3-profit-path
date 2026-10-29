@@ -66,11 +66,18 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
         self.methodRefresh = nil
         self.browseRefresh = nil
 
-        -- Remember which method tab was open, so a rebuild (e.g. after a resize)
-        -- comes back to the same tab. Picking a different method clears it.
+        -- Remember which method tab was open, so a rebuild (e.g. after a resize
+        -- or switching version) comes back to the same tab. Picking a different
+        -- method from Browse clears it.
         if self.methodActiveTab then
             self.methodTab = self.methodActiveTab()
             self.methodActiveTab = nil
+        end
+
+        -- Cancel the version dropdown's pending callback, if any.
+        if self.methodRelease then
+            self.methodRelease()
+            self.methodRelease = nil
         end
 
         diagnostics:unmount()
@@ -215,7 +222,27 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
                         disabled = not browser.favourites[self.method.id],
                     })
 
-                    self.methodRefresh, self.methodActiveTab = MethodView.mount(view, self.method, calculator, guarded, self.methodTab)
+                    -- Every catalogue entry with the same title is a version of
+                    -- this method; the page lets the player switch between them.
+                    -- Switching loads that version's prices and saved rate and
+                    -- rebuilds the page on the same tab (clearView remembers it).
+                    local versions = {}
+
+                    for _, candidate in ipairs(browser.methods) do
+                        if candidate.title == self.method.title then
+                            versions[#versions + 1] = candidate
+                        end
+                    end
+
+                    self.methodRefresh, self.methodActiveTab, self.methodRelease = MethodView.mount(view, self.method, calculator, guarded, {
+                        activeTab = self.methodTab,
+                        versions = versions,
+                        onVersion = function(version)
+                            calculator:select(version)
+                            self.method = version
+                            navigate("method")
+                        end,
+                    })
                 elseif self.screen == "diagnostics" then
                     diagnostics:mount(view, guarded)
                 else

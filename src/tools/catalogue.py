@@ -23,7 +23,7 @@ import math
 import re
 from pathlib import Path
 
-from lupa.lua54 import LuaRuntime
+from lupa.lua54 import LuaRuntime, LuaError
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -885,12 +885,46 @@ def validate_methods(source, monsters, recipes=None):
                 if len(matches) != selected["rows"]:
                     raise ValueError(f"Loot selector changed: {method['id']} / {selected}")
 
-            # The calculator doesn't value loot yet, so it can't be "complete".
-            if income["coverage"] == "complete":
-                raise ValueError("Unprocessed monster loot cannot be labelled complete")
+            # Use the actual runtime expansion against source data. This checks
+            # rates/ranges once, without a second Python parser or stale Lua bundle.
+            lua = LuaRuntime(unpack_returned_tuples=True)
+            resolver = lua.execute((ROOT / "src" / "methods" / "loot.lua").read_text(encoding="utf-8"))
+
+            try:
+                rows = resolver.expand(lua.execute("return " + lua_literal(loot["selection"])),
+                                       lua.execute("return " + lua_literal(monster)))
+            except LuaError as error:
+                raise ValueError(f"Invalid loot model for {method_id}: {error}") from error
+
+            for row in rows.values():
+                item = items.get(str(row["item_id"]))
+
+                if not item or item["name"] != row["name"]:
+                    raise ValueError("Unresolved loot item metadata")
 
         if income["coverage"] == "complete" and income.get("unresolved"):
             raise ValueError("Complete income cannot have unresolved assumptions")
+
+    # Methods sharing a title are versions of one method (like elder logs with and
+    # without wood spirits); the method page has a dropdown to switch between them.
+    # The dropdown shows each version's label, so every version needs its own one,
+    # and they must be the same kind of activity.
+    versions_by_title = {}
+
+    for method in source["methods"]:
+        versions_by_title.setdefault(method["title"], []).append(method)
+
+    for title, versions in versions_by_title.items():
+        if len(versions) < 2:
+            continue
+
+        labels = [version.get("variant") for version in versions]
+
+        if any(not isinstance(label, str) or not label.strip() for label in labels) or len(set(labels)) != len(labels):
+            raise ValueError(f"Versions of {title} need distinct variant labels")
+
+        if len({version["category"] for version in versions}) != 1:
+            raise ValueError(f"Versions of {title} must share an activity category")
 
     json_text(source)
 

@@ -30,6 +30,7 @@ Additional item identifiers:
 https://runescape.wiki/w/Steel_bar?oldid=37134793
 https://runescape.wiki/w/Elder_logs?oldid=37166250
 https://runescape.wiki/w/Spring?oldid=37186141
+https://runescape.wiki/w/Elder_wood_spirit?oldid=36950369
 
 Retrieved 2026-10-28 using MediaWiki API. Wiki contributor attribution and the
 CC BY-NC-SA 3.0 content license above also apply to this derived reference data.
@@ -55,3 +56,7 @@ Profit Path uses the public API of the separately installed rsprite 0.1.2 librar
 Project: https://github.com/sereselene/rsprite
 Licence: PolyForm Strict 1.0.0, as supplied with rsprite. Its source code is not copied or bundled here.
 The small native sprite-name registry references RuneScape game assets, copyright Jagex Ltd.; Profit Path does not distribute these images.
+
+Abyssal demon output reconciliation, 2026-10-29
+Expected quantities checked against Money making guide/Killing abyssal demons revision 37017140. The method keeps references to the shared drop snapshot. Item source revisions are recorded in catalogue-source/methods.json. Salvage valuation is modified to actual high-alchemy proceeds rather than the source table's GE values (6,000 / 8,000 / 8,000 / 32,000 GP); spring inputs are retained.
+https://runescape.wiki/w/Abyssal_demon

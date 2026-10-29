@@ -221,6 +221,29 @@ class MethodTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Only input rows"):
             catalogue.methods_text(self.methods, self.monsters, recipes)
 
+    def test_versions_sharing_a_title_need_distinct_labels_and_one_category(self):
+        second = copy.deepcopy(self.methods["methods"][0])
+        second["id"] = "fixture-method.other"
+        self.methods["methods"].append(second)
+
+        # Same title, no labels: the version dropdown would have nothing to show.
+        with self.assertRaisesRegex(ValueError, "distinct variant labels"):
+            catalogue.methods_text(self.methods, self.monsters)
+
+        self.methods["methods"][0]["variant"] = "First"
+        second["variant"] = "First"
+
+        with self.assertRaisesRegex(ValueError, "distinct variant labels"):
+            catalogue.methods_text(self.methods, self.monsters)
+
+        second["variant"] = "Second"
+        catalogue.methods_text(self.methods, self.monsters)
+
+        second["category"] = "skilling"
+
+        with self.assertRaisesRegex(ValueError, "share an activity category"):
+            catalogue.methods_text(self.methods, self.monsters)
+
     def test_ownership_variants_reject_invalid_native_ids(self):
         for aliases in ([], [True], [0], [-1], [1.5], "42"):
             with self.subTest(aliases=aliases):
@@ -377,7 +400,7 @@ class MethodTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Only hourly"):
             catalogue.methods_text(self.methods, self.monsters)
 
-    def test_input_tax_and_unprocessed_complete_loot_are_rejected(self):
+    def test_input_tax_is_rejected_and_validated_loot_can_be_complete(self):
         income = self.methods["methods"][0]["income"]
 
         # You don't pay sale tax on things you buy.
@@ -386,18 +409,38 @@ class MethodTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "only valid on output"):
             catalogue.methods_text(self.methods, self.monsters)
 
-        # Loot isn't valued yet, so a method with loot can't claim to be complete.
+        # Complete loot is allowed once the shared quantities/rates resolve.
         del income["inputs"][0]["tax_denominator"]
         income["coverage"] = "complete"
 
-        with self.assertRaisesRegex(ValueError, "Unprocessed monster loot"):
-            catalogue.methods_text(self.methods, self.monsters)
+        catalogue.methods_text(self.methods, self.monsters)
 
         income["coverage"] = "partial"
         income["loot"] = {}
 
         with self.assertRaisesRegex(ValueError, "Loot monster"):
             catalogue.methods_text(self.methods, self.monsters)
+
+    def test_loot_rejects_ambiguous_rates_duplicate_rows_and_invalid_fixed_values(self):
+        base = copy.deepcopy(self.methods)
+
+        for change in ("ambiguous", "infinite", "duplicate", "fixed", "tax"):
+            methods = copy.deepcopy(base)
+            selected = methods["methods"][0]["income"]["loot"]["selection"]
+
+            if change == "ambiguous":
+                selected[0]["rate"] = "1/10; 1/20"
+            elif change == "infinite":
+                selected[0]["rate"] = "1/" + "9" * 500
+            elif change == "duplicate":
+                selected.append(copy.deepcopy(selected[0]))
+            elif change == "fixed":
+                selected[0].update(pricing="fixed", unit_value=-1, valuation_note="Coins")
+            else:
+                selected[0].update(pricing="fixed", unit_value=1, valuation_note="Coins", tax_denominator=50)
+
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, "Invalid loot model"):
+                catalogue.methods_text(methods, self.monsters)
 
     def test_required_view_fields_and_schema_types_are_checked(self):
         self.methods["schema"] = True

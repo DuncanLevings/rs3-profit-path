@@ -2,6 +2,7 @@
 -- child views; its cleanup runs before ui.lua destroys the parent screen.
 -- Browser state and money calculations live elsewhere, so repainting is cheap.
 local Browser = require("src/methods/browser")
+local Dropdown = require("src/ui/dropdown")
 local Style = require("src/ui/view_style")
 local BrowseView = {}
 
@@ -13,11 +14,8 @@ local categories = {
 }
 
 -- Native dropdown entries need integer IDs. Keep those UI-only numbers separate
--- from the readable strings used in saved settings and browser logic.
---
--- IDs start at 0 and run 0, 1, 2... in list order. Heads-up: in game, selecting
--- ID 1 highlighted the SECOND entry, so this client seems to count entries from 0
--- whatever ID we pass to Add. Numbering from 0 makes both readings agree.
+-- from the readable strings used in saved settings and browser logic. IDs count
+-- from 0 in list order (see dropdown.lua for why).
 local sortEntries = { { id = 0, label = "Profit" }, { id = 1, label = "ROI" } }
 local sortNames = { [0] = "profit", [1] = "roi" }
 local sortIDs = { profit = 0, roi = 1 }
@@ -121,7 +119,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
     local heading
     local sectionButtons, categoryButtons = {}, {}
     local renderResults
-    local selectionOwners = {}
+    -- release() functions for the dropdowns' pending change callbacks.
+    local dropdownReleases = {}
 
     -- Invalidate row clicks before tearing down their native targets.
     local function clearResults()
@@ -141,8 +140,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
 
         closed = true
 
-        for _, owner in ipairs(selectionOwners) do
-            Event.Logic.Unsubscribe(owner)
+        for _, release in ipairs(dropdownReleases) do
+            release()
         end
 
         -- Keep the list's scroll position, so a rebuild (e.g. after the window is
@@ -387,56 +386,24 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         local dividerX = slotX(1) + DROPDOWN_WIDTH + math.floor((slotX(2) - slotX(1) - DROPDOWN_WIDTH) / 2) - 1
         Style.rectangle(header, { x = dividerX, y = CAPTION_Y, width = 2, height = DROPDOWN_Y + 30 - CAPTION_Y, colour = 0x655638FF })
 
-        -- Reconcile the final native selection once after event delivery. Reading
-        -- it inside the hook can see the previous selection on this client.
-        --
-        -- `slot` is the dropdown's place in the row (0 = leftmost).
+        -- One dropdown in the row. `slot` is its place in the row (0 = leftmost);
+        -- dropdown.lua handles the client's selection quirks.
         local function dropdown(entries, selectedID, slot, changed)
-            local x = slotX(slot)
+            local control, release = Dropdown.new(header.content, {
+                x = slotX(slot),
+                y = DROPDOWN_Y,
+                width = DROPDOWN_WIDTH,
+                entries = entries,
+                selected = selectedID,
+                owner = "profit-path-dropdown-" .. slot,
+                guarded = guarded,
+                onChange = changed,
+                isClosed = function()
+                    return closed
+                end,
+            })
 
-            local control = ui.List.new(header.content)
-            control.stylesheetID = id.StyleSheet.DROPDOWN_DEFAULT
-            control:SetPos(x, DROPDOWN_Y)
-            control:SetSize(DROPDOWN_WIDTH, 30)
-            control.dropdownMaxVisibleEntries = #entries
-
-            for _, entry in ipairs(entries) do
-                assert(control:Add(entry.label, entry.id), "Could not add dropdown option")
-            end
-
-            control:SetEntrySelected(selectedID, true)
-            local owner = "profit-path-dropdown-" .. slot
-            selectionOwners[#selectionOwners + 1] = owner
-
-            control:Subscribe(ui.Hook.ONSELECTIONCHANGED, guarded(function()
-                if closed then
-                    return
-                end
-
-                -- Repeated clicks replace the same pending callback. This is not
-                -- a poller: unsubscribe before reading or rebuilding any controls.
-                Event.Logic.Unsubscribe(owner)
-                Event.Logic.Subscribe(owner, function()
-                    Event.Logic.Unsubscribe(owner)
-                    guarded(function()
-                        if closed then
-                            return
-                        end
-
-                        -- Ask the list about each of OUR entry IDs. Don't read
-                        -- `selectedEntries`: the docs say it holds entry tables,
-                        -- but this client hands back plain numbers that aren't
-                        -- always our IDs (picking "Any" came back as the next
-                        -- entry). GetEntrySelected(id) is keyed by our own IDs.
-                        for _, entry in ipairs(entries) do
-                            if control:GetEntrySelected(entry.id) then
-                                changed(entry.id)
-                                break
-                            end
-                        end
-                    end)()
-                end)
-            end))
+            dropdownReleases[#dropdownReleases + 1] = release
 
             return control
         end

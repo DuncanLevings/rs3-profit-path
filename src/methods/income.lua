@@ -12,6 +12,7 @@
 -- Untradeable supplies (rows with pricing = "recipe") have no GE price of their own;
 -- recipe_cost.lua prices them from their ingredients instead.
 local RecipeCost = require("src/methods/recipe_cost")
+local Loot = require("src/methods/loot")
 
 local Income = {}
 
@@ -99,7 +100,7 @@ function Income.captureQuotes(library, model)
         end
     end
 
-    for _, lines in ipairs({ model.inputs, model.outputs }) do
+    for _, lines in ipairs({ model.inputs, Loot.outputs(model) }) do
         for _, line in ipairs(lines) do
             if line.pricing == "recipe" then
                 -- Sorted so the fetch order (and any test counting it) is stable.
@@ -114,7 +115,7 @@ function Income.captureQuotes(library, model)
                 for _, itemId in ipairs(ids) do
                     fetch(itemId)
                 end
-            elseif line.item_id then
+            elseif line.item_id and line.pricing ~= "fixed" then
                 fetch(line.item_id)
             end
         end
@@ -160,7 +161,11 @@ function Income.calculate(model, rate, quotes)
 
             local quote, price, timestamp, recipeProblem
 
-            if line.pricing == "recipe" then
+            if line.pricing == "fixed" then
+                -- Coin drops and alchemy proceeds have a fixed GP value, no GE
+                -- quote timestamp, and no sale tax. Their source value is bundled.
+                price = line.unit_value
+            elseif line.pricing == "recipe" then
                 -- Priced from its ingredients. On failure the second value is why.
                 price, timestamp = RecipeCost.price(line.recipe, line.portion, quotes)
 
@@ -186,7 +191,7 @@ function Income.calculate(model, rate, quotes)
                 row.gross = 0
                 row.tax = 0
                 row.value = 0
-            elseif nonNegativeFinite(price) and nonNegativeFinite(timestamp) then
+            elseif nonNegativeFinite(price) and (line.pricing == "fixed" or nonNegativeFinite(timestamp)) then
                 -- GE tax works per item and is rounded down: floor(price / 50) for a
                 -- 2% tax. Round per item first, then multiply, or the totals drift
                 -- from the Wiki's numbers.
@@ -222,14 +227,7 @@ function Income.calculate(model, rate, quotes)
     end
 
     calculated.inputs, calculated.cost = calculateLines(model.inputs, "high")
-    calculated.outputs, calculated.revenue, calculated.tax = calculateLines(model.outputs, "low")
-
-    -- PvM methods point at monster drop rows, but we haven't checked that loot
-    -- model against the Wiki yet, so its revenue stays out of the maths for now.
-    if model.loot then
-        calculated.revenue = nil
-        calculated.tax = nil
-    end
+    calculated.outputs, calculated.revenue, calculated.tax = calculateLines(Loot.outputs(model), "low")
 
     if overflow then
         return { status = "invalid", message = "This rate produces values too large to calculate." }

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Value selected shared PvM drops and render expected hourly outputs. Abyssal demons now includes all 16 Wiki-listed outputs, actual spring-cleaner alchemy proceeds and untaxed coin drops; missing live quotes still prevent total profit. Validate ambiguous rates/quantities with the runtime loot expansion during builds.
+
+- Make the method version picker compact: fit its labels, reduce its height and arrow, and soften the frame beside the title. Browse dropdown styling is unchanged.
+
+- Add the elder logs "With wood spirits" version and a version dropdown after the method title for methods with several versions; Browse still lists each version. Move the native dropdown workarounds into a shared src/ui/dropdown.lua.
 - Keep panel padding correct when a page shows a scrollbar: Browse rows and Income/Requirements panels are sized to the page's final width after the screen is built (fixes clipped ROI text). Side-by-side item sections now use the same symmetric padding as the Income tables.
 - Detect window resizes with a per-tick size comparison while the window is visible (the ONRESIZE hook never fired for PrettyUI window resizes in game); the screen still rebuilds once after the size has held for 0.3 s.
 - Rebuild the current screen once after the window is resized (documented ONRESIZE hook, settles after 0.3 s), keeping filters, list scroll, the method tab and the draft rate; fix the method page's uneven side padding (tabs no longer pick up PrettyUI's default left padding); style Browse rows as cards with a lighter fill and an activity-coloured left bar.

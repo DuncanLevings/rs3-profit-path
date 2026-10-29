@@ -212,9 +212,9 @@ return function(test, equal, client, pretty)
 
     -- methods[2] is elder logs: its Perfect plus potion is priced by creation cost,
     -- so with every price it has a full profit. Missing ingredient prices mean no
-    -- cost and no profit (never a pretend zero). methods[3] is abyssal demons (loot
-    -- not valued yet), which never has a total.
-    test("creation-cost supplies give a full profit while missing prices and unprocessed loot stay unknown", function()
+    -- cost and no profit (never a pretend zero). The same rule applies when
+    -- abyssal demon loot prices are missing.
+    test("creation-cost supplies give a full profit while missing ingredient or loot prices stay unknown", function()
         local elder = require("data/methods").methods[2].income
 
         -- 320 logs x 1,000 = 320,000 minus tax 320 x 20 = 313,600. The potion
@@ -249,10 +249,53 @@ return function(test, equal, client, pretty)
         equal(pvm.profit, nil)
     end)
 
+    -- Elder logs with wood spirits: each spirit gives one extra log, so at the
+    -- source's 580 logs an hour it uses 260 spirits. Spirits scale with the rate.
+    test("elder logs with wood spirits uses 260 spirits for 580 logs an hour", function()
+        local spirits
+
+        for _, method in ipairs(require("data/methods").methods) do
+            if method.id == "cutting-elder-logs.with-spirits" then
+                spirits = method
+            end
+        end
+
+        equal(spirits.title, "Cutting elder logs")
+        equal(spirits.income.rate.default, 580)
+
+        local quotes = perfectPlusQuotes()
+        quotes[29556] = { status = "available", low = 1000, lowTime = 50 }
+        quotes[54924] = { status = "available", high = 400, highTime = 50 }
+
+        local result = Income.calculate(spirits.income, 580, quotes)
+        local rows = {}
+
+        for _, row in ipairs(result.inputs) do
+            rows[row.name] = row
+        end
+
+        -- 580 logs x (1,000 - 20 tax) = 568,400. Spirits 260 x 400 = 104,000, plus
+        -- the potion at 100,000 / 24 an hour.
+        equal(result.revenue, 568400)
+        assert(math.abs(rows["Elder wood spirit"].quantity - 260) < 1e-9)
+        assert(math.abs(result.cost - (104000 + 100000 / 24)) < 1e-6)
+        equal(result.status, "available")
+
+        -- Half the logs, half the spirits.
+        local half = Income.calculate(spirits.income, 290, quotes)
+        local halfRows = {}
+
+        for _, row in ipairs(half.inputs) do
+            halfRows[row.name] = row
+        end
+
+        assert(math.abs(halfRows["Elder wood spirit"].quantity - 130) < 1e-9)
+    end)
+
     -- Abyssal demons: Aggroverload is untradeable (creation cost), Super prayer
     -- renewal is a normal GE item. Every supply gets a value and the supply total
-    -- is known, but there's still no profit because the loot isn't valued yet.
-    test("abyssal demon potions are priced while unvalued loot still blocks profit", function()
+    -- is known, but missing sell quotes still prevent total revenue/profit.
+    test("abyssal demon potions are priced while missing loot prices still block profit", function()
         local RecipeCost = require("src/methods/recipe_cost")
         local demons = require("data/methods").methods[3].income
 
@@ -289,6 +332,78 @@ return function(test, equal, client, pretty)
         assert(result.cost, "Every supply is priced, so the supply total is known")
         equal(result.profit, nil)
         equal(result.status, "partial")
+    end)
+
+    -- An independent hand calculation for all Wiki-selected drops. GE items use
+    -- 1,000 GP each (980 after tax); salvage/coin income never uses a GE quote.
+    test("shared PvM loot matches Wiki quantities and alchemy values and scales with kills", function()
+        local Loot = require("src/methods/loot")
+        local method = require("data/methods").methods[3]
+        local outputs = Loot.outputs(method.income)
+        equal(#outputs, 16)
+        local quotes, fetched = {}, {}
+        local library = {
+            isReady = function() return true end,
+            getLatest = function(itemId)
+                assert(itemId ~= 995 and itemId ~= 47240 and itemId ~= 47286 and itemId ~= 47306 and itemId ~= 47312,
+                    "Coin and alchemy proceeds must not fetch GE prices")
+                assert(not fetched[itemId], "Duplicate quote")
+                fetched[itemId] = true
+                return { high = 1000, highTime = 50, low = 1000, lowTime = 50 }
+            end,
+        }
+        quotes = Income.captureQuotes(library, method.income)
+        local result = Income.calculate(method.income, 900, quotes)
+        equal(result.status, "available")
+        local rows = {}
+
+        for _, row in ipairs(result.outputs) do
+            rows[row.name] = row
+        end
+
+        local expectedPerKill = {
+            ["Abyssal wand"] = 1/6104, ["Abyssal orb"] = 1/6104, ["Abyssal whip"] = 1/1024,
+            ["Uncut ruby"] = 14/128, ["Uncut diamond"] = 6/128, ["Uncut dragonstone"] = 2/128,
+            ["Orichalcite stone spirit"] = 4/128, ["Phasmatite stone spirit"] = 4/128,
+            ["Medium bladed adamant salvage"] = 12/128, ["Tiny spiky rune salvage"] = 8/128,
+            ["Tiny plated rune salvage"] = 4/128, ["Large plated rune salvage"] = 4/128,
+            Coins = 2400*18/128 + 3000*14/128,
+            ["Pure essence"] = 80*12/128, ["Magic logs"] = 6*6/128, ["Fire orb"] = 2*6/128,
+        }
+
+        for name, perKill in pairs(expectedPerKill) do
+            assert(math.abs(rows[name].quantity - perKill * 900) < 1e-9, name)
+        end
+
+        -- Two coin ranges: average 2,400 at 18/128 and 3,000 at 14/128.
+        equal(rows.Coins.quantity, 900 * (2400 * 18 / 128 + 3000 * 14 / 128))
+        equal(rows.Coins.value, 599062.5)
+        equal(rows.Coins.tax, 0)
+        equal(rows["Large plated rune salvage"].value, 900 * 4 / 128 * 32000)
+        equal(rows["Medium bladed adamant salvage"].value, 900 * 12 / 128 * 6000)
+        equal(rows["Tiny spiky rune salvage"].value, 900 * 8 / 128 * 8000)
+        equal(rows["Tiny plated rune salvage"].value, 900 * 4 / 128 * 8000)
+        equal(rows["Pure essence"].quantity, 900 * 80 * 12 / 128)
+        equal(rows["Magic logs"].quantity, 900 * 6 * 6 / 128)
+        equal(rows["Fire orb"].quantity, 900 * 2 * 6 / 128)
+        equal(rows["Abyssal wand"].quantity, 900 / 6104)
+        equal(rows["Abyssal whip"].quantity, 900 / 1024)
+
+        local gePerKill = 2 / 6104 + 1 / 1024 + 14 / 128 + 6 / 128 + 2 / 128
+            + 4 / 128 + 4 / 128 + 80 * 12 / 128 + 6 * 6 / 128 + 2 * 6 / 128
+        local expected = 2680312.5 + 900 * gePerKill * 980
+        assert(math.abs(result.revenue - expected) < 1e-7)
+        assert(math.abs(result.profit - (expected - result.cost)) < 1e-7)
+        local half = Income.calculate(method.income, 450, quotes)
+        assert(math.abs(half.revenue - result.revenue / 2) < 1e-7)
+
+        -- Missing a single sell price makes total revenue/profit unavailable,
+        -- but fixed coin/alchemy rows remain visible and usable.
+        quotes[30825] = nil
+        local missing = Income.calculate(method.income, 900, quotes)
+        equal(missing.revenue, nil)
+        equal(missing.profit, nil)
+        equal(missing.outputs[13].value, 599062.5)
     end)
 
     test("rate parser rejects empty negative nonfinite input and arithmetic overflow", function()
@@ -481,12 +596,12 @@ return function(test, equal, client, pretty)
         local income = tabs.pages[1]
         local rate = income.fields[1]
 
-        -- Browse fetched 13 prices (steel bars 3; elder logs 1 plus 9 Perfect plus
-        -- ingredients), then the method 3 more. Typing a rate must not fetch more.
-        equal(calls, 16)
+        -- Browse fetched 48 prices across the four methods, including the now-valued
+        -- PvM loot and its ingredient tree, then the steel method fetched 3 more. Typing a rate must not fetch more.
+        equal(calls, 51)
 
         rate:SetText("1000", true)
-        equal(calls, 16)
+        equal(calls, 51)
 
         -- Save 1000, then type away and back. Being back on the saved value should
         -- show "Saved personal rate" again, not "not saved".
@@ -546,7 +661,7 @@ return function(test, equal, client, pretty)
 
         rate:SetText("5", true)
         income.buttons["Save rate"]()
-        equal(calls, 16)
+        equal(calls, 51)
 
         for key, value in pairs(state.db) do
             assert(key:find("profit-path.rate.v1/", 1, true) ~= 1)

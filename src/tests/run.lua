@@ -275,7 +275,7 @@ local function client(database)
     end }
     ui.SelectionChangeEvent = { SELECTED = 1, DESELECTED = 0 }
     ui.List = { new = function(parent)
-        local list = { selectedID = nil, entries = {} }
+        local list = { selectedID = nil, entries = {}, headerSprite = {}, buttonSprite = {}, entryText = {} }
         parent.testOwner.nativeLists = parent.testOwner.nativeLists or {}
         table.insert(parent.testOwner.nativeLists, list)
 

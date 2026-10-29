@@ -15,10 +15,11 @@ local Style = {
     categories = { pvm = 0xDEA19AFF, skilling = 0xACCEA0FF, production = 0x9EBEDFFF },
 }
 
--- The Coins item, and the font PrettyUI uses for body text. We measure numbers in
--- that font so a coin can sit right next to right-aligned text.
+-- The Coins item, and the fonts PrettyUI uses for body text and titles. We
+-- measure text so things can sit right next to it (a coin, a dropdown).
 local COINS_ITEM_ID = 995
 local BODY_FONT = "MUSEO_SANS_15PT_REGULAR"
+local TITLE_FONT = "CINZEL_13PT_BOLD"
 
 -- Gap between a coin and the number it belongs to, in interface units.
 local COIN_GAP = 4
@@ -233,6 +234,21 @@ function Style.coins(parent, options)
     return (rsprite.Draw(parent.content, iconNames.coins, drawOptions))
 end
 
+-- How wide `text` is on screen, from the client's own font measurement
+-- (config.Font:GetStringWidth). `title` = true for title text. If measuring fails
+-- we guess about 8 units per character (10 for titles): worst case a gap is off.
+function Style.textWidth(text, title)
+    local ok, width = pcall(function()
+        return config.Font[title and TITLE_FONT or BODY_FONT]:GetStringWidth(text, false)
+    end)
+
+    if not ok or type(width) ~= "number" then
+        return #text * (title and 10 or 8)
+    end
+
+    return width
+end
+
 -- Slides a coin so it sits just left of a right-aligned number, instead of at a
 -- fixed spot with a big gap when the number is short. `rightEdge` is the label's
 -- right edge measured from the parent's right side (a negative x with xAnchor 1).
@@ -244,14 +260,7 @@ function Style.placeCoin(coin, text, options)
         return
     end
 
-    local ok, width = pcall(function()
-        return config.Font[BODY_FONT]:GetStringWidth(text, false)
-    end)
-
-    if not ok or type(width) ~= "number" then
-        width = #text * 8
-    end
-
+    local width = Style.textWidth(text)
     local size = options.size or 20
     local x = options.rightEdge - width - COIN_GAP - size
 
