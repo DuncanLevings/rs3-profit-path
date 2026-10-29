@@ -11,13 +11,17 @@ function Account.new(onChanged)
     local self = {
         active = true,
 
+        -- Item counts read for the item borders, per container ("INV", "WORN",
+        -- "BANK"). Each entry is { configId, counts = { [itemId] = total } } and is
+        -- thrown away as soon as that container changes. Lives only in memory.
+        ownershipCache = {},
+
         -- Temporary diagnostics state; see the probe section below.
         eventCount = 0,
         lastEvent = "No inventory events observed yet.",
         inspection = nil,
         questInspection = nil,
         lastInventoryName = nil,
-        ownershipCache = {},
     }
 
     -- Every event we subscribe to, so destroy() can unsubscribe all of them.
@@ -30,11 +34,14 @@ function Account.new(onChanged)
         end
     end
 
+    -- Subscribes under one shared name and remembers the event for destroy().
     local function subscribe(event, callback)
         event.Subscribe("profit-path-account", callback)
         subscriptions[#subscriptions + 1] = event
     end
 
+    -- Any change to a container (an item gained, banked, equipped...) makes our
+    -- cached counts for it stale, so drop them; the next border refresh re-reads.
     local function inventoryChanged(kind, event)
         if not self.active then
             return
@@ -108,9 +115,17 @@ function Account.new(onChanged)
         return name
     end
 
-    -- Read only the requested item totals, caching them until that inventory
-    -- changes. INV/WORN/BANK are verified config names (also used by Skill Tips).
-    -- Completeness here covers these three containers, not Diango or other stores.
+    -- How many of each item in `wanted` (a set like { [2353] = true }) the player
+    -- has across backpack (INV), worn gear (WORN) and bank (BANK). Those three
+    -- config names are verified (Skill Tips uses them too).
+    --
+    -- Returns { counts = { [itemId] = total }, complete = true/false }. `complete`
+    -- means all three containers were read. It does NOT cover other storage (Diango,
+    -- house, etc.), so the UI only treats "0 with complete = true" as "not found in
+    -- these three". If any container can't be read, absence proves nothing.
+    --
+    -- Counts are cached per container until an inventory event says it changed, so
+    -- refreshing the borders doesn't hit the client for every item every time.
     function self:readOwnership(wanted)
         local totals = {}
 
@@ -126,6 +141,9 @@ function Account.new(onChanged)
 
         for _, name in ipairs({ "INV", "WORN", "BANK" }) do
             local snapshot = self.ownershipCache[name]
+
+            -- Native reads can fail (e.g. the bank isn't sent until opened), so
+            -- protect them. Any bad answer means "couldn't read this container".
             local ok, read = pcall(function()
                 local definition = config.Inv[name]
                 local inventory = definition and Inventory.Find(definition)
@@ -134,6 +152,7 @@ function Account.new(onChanged)
                     return nil
                 end
 
+                -- Start from what's cached and only ask about items we haven't yet.
                 local counts = snapshot and snapshot.counts or {}
 
                 for itemId in pairs(wanted) do

@@ -3,25 +3,28 @@
 -- Opening/reopening captures prices; filtering never fetches prices.
 local Browser = {}
 
-local intensityOrder = { Low = 1, Moderate = 2, Medium = 2, High = 3 }
-local difficultyOrder = { Easy = 1, Medium = 2, Hard = 3, Elite = 4 }
+-- Filter levels for the Intensity and Difficulty dropdowns. The source says both
+-- "Moderate" and "Medium" for the same middle intensity, so they share a level.
+-- Labels we don't recognise get no level: they only show under "Any".
+Browser.intensityLevels = { "Low", "Moderate", "High" }
+Browser.difficultyLevels = { "Easy", "Medium", "Hard", "Elite" }
 
--- Unknown includes unclassified labels. Guessing where a new label belongs would
--- give the player an ordering we haven't actually researched.
+local intensityLevel = { Low = "Low", Moderate = "Moderate", Medium = "Moderate", High = "High" }
+
+-- Sorting is only by money now (profit or ROI). A method without a usable estimate
+-- has no value, and those always go last.
 local function sortValue(method, estimates, key)
-    if key == "intensity" then
-        return intensityOrder[method.intensity]
-    end
-
-    if key == "difficulty" then
-        return difficultyOrder[method.difficulty]
-    end
-
     local estimate = estimates[method.id]
 
     if estimate and estimate.status == "available" then
         return estimate[key]
     end
+end
+
+-- "any" lets everything through. Otherwise the method's label has to match; a
+-- method with no difficulty rating never matches a specific difficulty.
+local function matchesLevel(chosen, value)
+    return chosen == "any" or chosen == value
 end
 
 -- Keep this window's browsing state in memory. Only explicit sort and favourite
@@ -30,13 +33,30 @@ function Browser.new(methods, preferences, estimateMethod)
     local settings, warning = preferences:loadBrowser()
     local self = {
         methods = methods,
-        section = "browse", category = "all", search = "", scroll = 0,
-        sort = settings.sort, descending = settings.descending,
-        estimates = {}, message = warning,
+
+        -- What the player is looking at: sidebar section, activity filter, search
+        -- text and the list's scroll position (kept for coming back from a method).
+        section = "browse",
+        category = "all",
+        search = "",
+        scroll = 0,
+
+        -- Difficulty and intensity filters ("any", or one of the levels above).
+        -- Like search, these only live for this window and aren't saved.
+        difficulty = "any",
+        intensity = "any",
+
+        -- Saved sort choice (a device-wide setting).
+        sort = settings.sort,
+        descending = settings.descending,
+
+        -- Profit estimates by method ID, and the latest problem to show the player.
+        estimates = {},
+        message = warning,
     }
 
-    -- Favourites belong to a manual profile, just like saved rates. Reload this
-    -- when coming back from a method, where the player may have switched profile.
+    -- Favourites belong to the character's profile, just like saved rates. Reload
+    -- them when the window opens or after a method, in case the character changed.
     function self:loadFavourites()
         -- A profile switch also changes every personal rate. Old list estimates
         -- must go even when this reload came from the detail's favourite button.
@@ -106,9 +126,13 @@ function Browser.new(methods, preferences, estimateMethod)
         for _, method in ipairs(methods) do
             local matchesCategory = self.category == "all" or method.category == self.category
             local matchesSection = self.section ~= "favourites" or self.favourites[method.id]
+
+            local matchesFilters = matchesLevel(self.difficulty, method.difficulty)
+                and matchesLevel(self.intensity, intensityLevel[method.intensity])
+
             local searchable = (method.title .. " " .. (method.variant or "") .. " " .. method.source_category):lower()
 
-            if matchesCategory and matchesSection and searchable:find(query, 1, true) then
+            if matchesCategory and matchesSection and matchesFilters and searchable:find(query, 1, true) then
                 rows[#rows + 1] = method
             end
         end
@@ -117,8 +141,8 @@ function Browser.new(methods, preferences, estimateMethod)
             local a = sortValue(left, self.estimates, self.sort)
             local b = sortValue(right, self.estimates, self.sort)
 
-            -- Missing estimates and not-applicable difficulty go last in BOTH
-            -- directions. Reversing an ascending array would put them first.
+            -- Missing estimates go last in BOTH directions. Reversing an
+            -- ascending array would put them first.
             if a == nil or b == nil then
                 if a ~= b then
                     return a ~= nil

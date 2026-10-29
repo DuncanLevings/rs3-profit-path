@@ -167,8 +167,9 @@ local function client(database)
         return state.permitted
     end }
 
-    -- The fake exposes only the lookup API we use. No search index, drawing or
-    -- startup work should be requested from rsprite for this fixed set of icons.
+    -- The fake exposes only the rsprite API we use: name lookups, plus drawing one
+    -- native sprite (the coin). No search index or startup work should be requested
+    -- for this fixed set of icons. Every name in data/icons.lua gets a made-up ID.
     local spriteIDs = {}
     state.spriteLookups = {}
     local nextSpriteID = 1000
@@ -178,11 +179,44 @@ local function client(database)
         nextSpriteID = nextSpriteID + 1
     end
 
-    rsprite = { version = "0.1.2", Get = function(name)
-        assert(type(name) == "string", "rsprite.Get expects a native sprite name")
-        state.spriteLookups[name] = (state.spriteLookups[name] or 0) + 1
-        return spriteIDs[name]
+    -- A native sprite as rsprite returns it. It records where it was moved to, and
+    -- belongs to the PrettyUI view whose native `.content` layer it was drawn on.
+    local function nativeSprite(parent, source, options)
+        assert(parent.testOwner, "Native sprites must be drawn on a view's content layer")
+
+        local sprite = { source = source, options = options, x = options.x, y = options.y }
+
+        function sprite:SetPos(x, y)
+            self.x, self.y = x, y
+        end
+
+        parent.testOwner.nativeSprites = parent.testOwner.nativeSprites or {}
+        table.insert(parent.testOwner.nativeSprites, sprite)
+
+        return sprite
+    end
+
+    rsprite = {
+        version = "0.1.2",
+
+        Get = function(name)
+            assert(type(name) == "string", "rsprite.Get expects a native sprite name")
+            state.spriteLookups[name] = (state.spriteLookups[name] or 0) + 1
+            return spriteIDs[name]
+        end,
+
+        Draw = function(parent, name, options)
+            return nativeSprite(parent, { name = name }, options), 1
+        end,
+    }
+
+    -- Fake font measurement: 7 units per character is close enough for checking
+    -- that a coin moves when the number next to it gets longer.
+    local font = { GetStringWidth = function(_, text)
+        return #text * 7
     end }
+
+    config.Font = { MUSEO_SANS_15PT_REGULAR = font, CINZEL_13PT_BOLD = font }
 
     -- Whatever a test puts in state.inventory is what every inventory lookup returns.
     Inventory = { Find = function()
@@ -197,6 +231,29 @@ local function client(database)
         equal(componentId, id.Component.TOPLEVEL_V2__GAME_AREA)
         return state.gameArea
     end } }
+
+    -- Plain native sprites (the coin). They record the item and quantity they were
+    -- given, and land in the same nativeSprites list as rsprite's drawings.
+    ui.ObjectQuantityDisplayMode = { NEVER = "never", ALWAYS = "always", MULTIPLE = "multiple" }
+    ui.Sprite = { new = function(parent)
+        local sprite = nativeSprite(parent, {}, {})
+
+        function sprite:SetSize(width, height)
+            self.width, self.height = width, height
+        end
+
+        -- Like the real client: only the one-argument form exists, even though
+        -- the docs list an optional quantity.
+        function sprite:SetAssociatedObject(itemId, quantity)
+            if quantity ~= nil then
+                error("sol: no matching function call takes this number of arguments and the specified types")
+            end
+
+            self.source = { item = itemId }
+        end
+
+        return sprite
+    end }
 
     ui.Hook = { ONSELECTIONCHANGED = "selection" }
     ui.AlignMode = { BOTTOMRIGHT = "right", CENTRE = "centre" }
@@ -236,7 +293,12 @@ local function client(database)
             return true
         end
 
+        -- In game, selecting ID 1 highlighted the second entry: the client counts
+        -- entries from 0. Insist our IDs follow that, so 1-based IDs fail here.
         function list:Add(label, id)
+            self.count = (self.count or 0) + 1
+            equal(id, self.count - 1, "Dropdown entry IDs must count from 0 in list order")
+
             self.entries[label] = id
             return true
         end
@@ -266,7 +328,10 @@ local function client(database)
             -- Reproduce the client's problematic ordering: the hook can precede
             -- the update of the selected-entry collection.
             self.selectedID = id
-            self.selectedEntries = { { id = id, selected = true } }
+            -- The real client's selectedEntries holds plain numbers that don't
+            -- reliably match our entry IDs, so the fake makes them useless on
+            -- purpose: code must ask GetEntrySelected(id) instead.
+            self.selectedEntries = { id + 1 }
 
             return true
         end
@@ -274,7 +339,9 @@ local function client(database)
         return list
     end }
 
+    -- Item configs for every catalogue item.
     config.Obj = { FromID = function(itemId)
+
         local item = require("data/methods").items[tostring(itemId)]
 
         if item then

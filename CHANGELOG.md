@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Keep Browse method titles in their activity colour (PvM red, skilling green, production blue) under every activity filter, not only "All activities".
+- Title the window just "Profit Path"; the character name is no longer shown (settings still follow the character, and a future account page will show the binding).
+- Stop the "coin icon: item with quantity failed" message: the client has no two-argument SetAssociatedObject, so the coin now attaches the Coins item and sets its quantity as a property directly (the combination confirmed in game).
+- Colour Browse profit figures with the same money colours as the method page: subtle green for a profit, subtle red for a loss; "Not estimated" stays gold.
+- Number dropdown entries from 0, matching how the client counts them, so Profit + Highest first and both "Any" filters show as the defaults; colour Inputs money values subtle red and Outputs subtle green.
+- Read dropdown selections with GetEntrySelected(id) instead of selectedEntries, fixing "Any" applying the next option; label the dropdown row with SORT BY / DIFFICULTY / INTENSITY captions, separate the sort pair from the filters with a divider, and shorten filter options to "Any".
+- Make the coin pile robust: try each native step separately (item with quantity, else item plus quantity property), keep the Coins item art instead of the old COINS sprite when the quantity form is rejected, and print the first failure of each step once.
+- Fix the Browse dropdown crash (the client reports selected entries as plain IDs), so sorting works again; sort by Profit or ROI only and add separate Difficulty and Intensity filter dropdowns. Old saved difficulty/intensity sorts fall back to Profit.
+- Draw the Coins item at a large quantity so the client shows the full coin pile; Browse profit reads "[coin] 1.2M / H"; centre icons vertically on their text; even out Income page and table padding on both sides and right-align the summary ROI.
+
+- Use the skills-tab style (hitmark) skill icons and the Coins item's big-stack graphic; show a coin only beside income totals, placed right next to the number; box the Reset button like Save.
+- Guideline cleanup: comment and space out the view, storage and account code; name the character/favourites storage keys; remove the unused manual profile selector (tests now use character binding).
+
 - Integrate rsprite 0.1.2 as a development dependency for native coin, skill, perk and save sprite lookup; retain PrettyUI rendering and a standard save icon button. Remove temporary downloaded/custom icon assets and custom native save-click control.
 
 - Keep the window/calculator usable when image resources are not registered; omit missing decorations, retain a text Save button and report bounded missing-resource diagnostics.

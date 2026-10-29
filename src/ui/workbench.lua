@@ -163,14 +163,25 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
                         return browser.favourites[self.method.id] and "Remove favourite" or "Add favourite"
                     end
 
+                    -- Reload favourites first in case the character changed while this
+                    -- method was open. A save error shows on the Income status line.
                     favouriteButton = view:AddSpriteButton("STAR", guarded(function()
                         browser:loadFavourites()
                         browser:toggleFavourite(self.method)
+
                         favouriteButton:SetTooltip(favouriteLabel())
                         favouriteButton:SetDisabled(not browser.favourites[self.method.id])
+
                         calculator.message = browser.message
                         self.methodRefresh()
-                    end), { absolute = true, x = -36, xAnchor = 1, y = 10, size = 24, tooltip = favouriteLabel(), toggleable = true, disabled = not browser.favourites[self.method.id] })
+                    end), {
+                        absolute = true, x = -36, xAnchor = 1, y = 10, size = 24,
+                        tooltip = favouriteLabel(),
+
+                        -- "disabled" is PrettyUI's unlit toggle look, not unclickable.
+                        toggleable = true,
+                        disabled = not browser.favourites[self.method.id],
+                    })
 
                     self.methodRefresh = MethodView.mount(view, self.method, calculator, guarded)
                 elseif self.screen == "diagnostics" then
@@ -240,7 +251,9 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
 
         local ok, failure = pcall(function()
             self.window = library.Window.new(gameArea, {
-                title = "Profit Path / " .. calculator.characterName,
+                -- Just the plugin name. Settings still follow the character behind
+                -- the scenes; a future account page will show whose they are.
+                title = "Profit Path",
                 width = width,
                 height = height,
 
@@ -252,7 +265,8 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
 
                 minWidth = math.min(700, width),
                 minHeight = math.min(480, height),
-                resizable = true, scrollable = false,
+                resizable = true,
+                scrollable = false,
 
                 -- The window's own X button only hides it. Stop callbacks while it's
                 -- hidden; openWindow turns them back on.

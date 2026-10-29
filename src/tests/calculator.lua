@@ -221,7 +221,7 @@ return function(test, equal, client, pretty)
 
     -- Each `Preferences.new(PersistentDB)` below is like a plugin reload: a fresh
     -- object reading the same storage.
-    test("rate overrides survive reload, isolate manual profiles and reset only one rate", function()
+    test("rate overrides survive reload, isolate character profiles and reset only one rate", function()
         local state = client()
         local preferences = Preferences.new(PersistentDB)
 
@@ -230,27 +230,34 @@ return function(test, equal, client, pretty)
         assert(preferences:saveRate(steel, 1234.5))
         equal(Preferences.new(PersistentDB):loadRate(steel), 1234.5)
 
-        -- A second profile starts from the default and keeps its own value (0 is valid).
-        assert(preferences:selectProfile("Other character"))
+        -- The first character bound keeps the existing (Default) profile and rate.
+        assert(preferences:bindCharacter("First character"))
+        equal(preferences:loadRate(steel), 1234.5)
+
+        -- A second character gets its own profile, starting from the source default,
+        -- and keeps its own value (0 is valid).
+        assert(preferences:bindCharacter("Other character"))
         equal(preferences:loadRate(steel), 2000)
 
         assert(preferences:saveRate(steel, 0))
 
-        -- The selected profile itself is remembered across a reload.
+        -- The binding itself is remembered across a reload.
         local reloaded = Preferences.new(PersistentDB)
+        assert(reloaded:bindCharacter("Other character"))
 
         equal(reloaded.profile, "Other character")
         equal(reloaded:loadRate(steel), 0)
 
-        -- Resetting Default's rate must not touch unrelated keys or the other profile.
-        assert(reloaded:selectProfile("Default"))
+        -- Resetting the first character's rate must not touch unrelated keys or the
+        -- other character's rate.
+        assert(reloaded:bindCharacter("First character"))
         state.db["unrelated-setting"] = "preserve"
 
         assert(reloaded:resetRate(steel))
         equal(reloaded:loadRate(steel), 2000)
         equal(state.db["unrelated-setting"], "preserve")
 
-        assert(reloaded:selectProfile("Other character"))
+        assert(reloaded:bindCharacter("Other character"))
         equal(reloaded:loadRate(steel), 0)
     end)
 
@@ -290,13 +297,14 @@ return function(test, equal, client, pretty)
         local state = client()
         local preferences = Preferences.new(PersistentDB)
 
-        equal(preferences:selectProfile(""), false)
-        equal(preferences:selectProfile("bad/name"), false)
+        -- Blank names and names with control characters are rejected outright.
+        equal(preferences:bindCharacter(""), false)
+        equal(preferences:bindCharacter("bad\nname"), false)
 
         -- A failed write leaves us on the old profile and reports failure.
         state.failWrite = true
 
-        equal(preferences:selectProfile("New"), false)
+        equal(preferences:bindCharacter("New"), false)
         equal(preferences.profile, "Default")
         equal(preferences:saveRate(steel, 1000), false)
 
@@ -407,7 +415,7 @@ return function(test, equal, client, pretty)
             combined[#combined + 1] = label.content
         end
 
-        assert(table.concat(combined):find("19,000/hour", 1, true))
+        assert(table.concat(combined):find("19,000 / h", 1, true))
 
         -- Reset puts 2000 back in the box and deletes the saved record.
         income.buttons["Reset to source rate"]()

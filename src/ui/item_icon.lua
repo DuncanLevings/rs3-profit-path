@@ -1,12 +1,21 @@
--- Draws item references using the client's own Obj configs. These are display
--- lookups only: an icon never proves that the player owns or can use the item.
+-- Draws an item's icon using the client's own item config (Obj), for the income
+-- tables and the Requirements tab. This is display only: showing an icon never
+-- means the player owns the item or can use it.
 local definitions = require("data/methods").items
 local ItemIcon = {}
 
--- Keep bad/missing references visible without showing an unrelated native item.
--- The parent owns the returned control and its tooltip, including on shutdown.
+-- Adds the icon for `itemId` to `parent` and returns three things:
+--   control  - the item slot (or an info icon if we couldn't verify the item)
+--   name     - the item's name from our catalogue, also used as the tooltip
+--   verified - true only if the client's item has the name we expected
+--
+-- The name check matters: if the ID in our data were wrong, the client would
+-- happily draw some unrelated item. Showing an info icon instead keeps the
+-- mistake visible. The parent owns the control and its tooltip, as usual.
 function ItemIcon.add(parent, itemId, options)
     local definition = definitions[tostring(itemId)]
+
+    -- Native config lookups can throw for unknown IDs, so protect this one.
     local ok, object = pcall(function()
         return config.Obj.FromID(itemId)
     end)
@@ -18,8 +27,8 @@ function ItemIcon.add(parent, itemId, options)
         return parent:AddSpriteButton("INFO", function() end, options), expected, false
     end
 
+    -- Item slots ignore the mouse by default; we need hovers for the tooltip.
     options.clickthrough = false
-    options.tooltip = expected
 
     return parent:AddItemSlot(object, options), expected, true
 end

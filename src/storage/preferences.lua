@@ -1,19 +1,29 @@
--- Saves personal rates, favourites, character bindings and browser ordering.
--- PersistentDB is shared across characters on a device. Visible character names
--- choose separate profiles, retaining the legacy selected profile on first bind.
--- Tracking IDs are never used, and existing rate keys remain unchanged.
+-- Everything Profit Path saves: personal rates, favourites, which character uses
+-- which profile, and the browser's sort choice.
+--
+-- How profiles work: PersistentDB is shared by every character on this computer,
+-- so saved rates and favourites live under a "profile". When a window opens we
+-- read the character's visible name and look up (or create) its profile. We never
+-- use the tracking ID, which needs a permission we don't ask for.
 --
 -- Each rate lives under its own key rather than in one big record, so a failed save
 -- or a reset can only ever touch that one rate. Treat the key formats below as a
--- contract: changing them would silently lose everyone's saved rates.
+-- contract: changing them would silently lose everyone's saved settings.
 local Preferences = {}
 
+-- Storage keys. Profile-specific keys add "/<length>:<profile>" on the end.
 local PROFILE_KEY = "profit-path.profile.v1"
 local BROWSER_KEY = "profit-path.browser.v1"
-local sortKeys = { profit = true, roi = true, difficulty = true, intensity = true }
+local CHARACTERS_KEY = "profit-path.characters.v1"
+local FAVOURITES_KEY = "profit-path.favourites.v1"
 
--- Profile names end up inside storage keys, so we only allow a small, readable set
--- of characters: 1-40 letters, digits, spaces, _ or -, and not all spaces.
+-- Difficulty and intensity used to be sorts too; they're filters now, so an old
+-- saved "difficulty"/"intensity" sort just falls back to the profit default.
+local sortKeys = { profit = true, roi = true }
+
+-- Older builds let players type a profile name, stored at PROFILE_KEY. We only
+-- read it now, so the first character keeps those settings. It was limited to
+-- 1-40 letters, digits, spaces, _ or -, and not all spaces.
 local function validProfile(name)
     return type(name) == "string" and #name <= 40
         and name:match("^[%w _-]+$") ~= nil and name:find("%S") ~= nil
@@ -47,8 +57,9 @@ end
 function Preferences.new(db)
     local self = { profile = "Default", warning = nil }
 
-    -- Restore the last selected profile. If it can't be read, or it's junk, fall back
-    -- to Default and keep a warning so the UI can tell the player what happened.
+    -- Restore the profile an older build last had selected. If it can't be read, or
+    -- it's junk, fall back to Default and keep a warning for the UI. bindCharacter()
+    -- picks the real profile once the window opens.
     local ok, savedProfile, exists = pcall(function()
         return db:GetString(PROFILE_KEY), db:CheckExists(PROFILE_KEY)
     end)
@@ -71,6 +82,11 @@ function Preferences.new(db)
     local function rateKey(method)
         return "profit-path.rate.v1/" .. #self.profile .. ":" .. self.profile
             .. "/" .. method.id .. "/" .. method.income.rate.key
+    end
+
+    -- The current profile's favourites list, e.g. "profit-path.favourites.v1/7:Default".
+    local function favouritesKey()
+        return FAVOURITES_KEY .. "/" .. #self.profile .. ":" .. self.profile
     end
 
     -- Returns rate, isSaved, message. With nothing saved we quietly use the source
@@ -99,49 +115,37 @@ function Preferences.new(db)
         return stored.value, true
     end
 
-    -- Switches profile and remembers the choice for next time. If the save fails we
-    -- stay on the old profile, so the screen never claims something that isn't true.
-    function self:selectProfile(name)
-        if not validProfile(name) then
-            return false, "Use 1-40 letters, numbers, spaces, underscores or hyphens for the profile."
-        end
-
-        local success, written = pcall(function()
-            return db:SetString(PROFILE_KEY, name)
-        end)
-
-        if not success or written ~= true then
-            return false, "Profile could not be saved: " .. tostring(written)
-        end
-
-        self.profile = name
-        self.warning = nil
-
-        return true
-    end
-
-    -- Bind a character to a storage profile without rewriting any saved rates.
-    -- The first character keeps the previously selected profile; later characters
-    -- get their own. One record keeps this migration from being half-written.
+    -- Switches to the profile for character `name`, creating one if it's new. No
+    -- saved rate is ever rewritten here: we only decide which profile to read from.
+    --
+    -- The stored record is { schema, owner, bindings = { [name] = profile } }:
+    --   * the first character ever bound becomes the "owner" and keeps the old
+    --     profile (usually "Default"), so settings from older builds aren't lost;
+    --   * every later character gets a profile named after itself.
+    -- It's all one record, so a failed write can't leave half a migration behind.
     function self:bindCharacter(name)
         if not validCharacterText(name) then
             return false, "Character name is unavailable or contains invalid text. Try opening again."
         end
 
-        local key = "profit-path.characters.v1"
         local ok, stored, exists = pcall(function()
-            return db:GetStructuredData(key), db:CheckExists(key)
+            return db:GetStructuredData(CHARACTERS_KEY), db:CheckExists(CHARACTERS_KEY)
         end)
 
         if not ok then
             return false, "Character settings could not be read: " .. tostring(stored)
         end
 
+        -- Load and check the existing bindings. If anything looks off we stop and
+        -- write nothing, rather than risk overwriting the player's real setup.
         local bindings = {}
         local owner
 
         if stored ~= nil or exists then
-            if type(stored) ~= "table" or stored.schema ~= 1 or type(stored.bindings) ~= "table" or not validCharacterText(stored.owner) then
+            local validRecord = type(stored) == "table" and stored.schema == 1
+                and type(stored.bindings) == "table" and validCharacterText(stored.owner)
+
+            if not validRecord then
                 return false, "Saved character bindings are invalid; existing settings were left untouched."
             end
 
@@ -163,11 +167,13 @@ function Preferences.new(db)
         end)
         local profile = bindings[normalized]
 
+        -- New character: work out its profile and save the binding.
         if not profile then
             profile = owner and name or self.profile
 
-            -- An older manually named profile might already have this name. Don't
-            -- bind a second character to it and mix their rates/favourites.
+            -- Another character might already use a profile with this name (say, an
+            -- old typed profile). Prefix "_" until it's unique, so two characters
+            -- never share rates or favourites by accident.
             local used = {}
 
             for _, existing in pairs(bindings) do
@@ -182,7 +188,7 @@ function Preferences.new(db)
             owner = owner or normalized
 
             local success, written = pcall(function()
-                return db:SetStructuredData(key, { schema = 1, owner = owner, bindings = bindings })
+                return db:SetStructuredData(CHARACTERS_KEY, { schema = 1, owner = owner, bindings = bindings })
             end)
 
             if not success or written ~= true then
@@ -196,6 +202,8 @@ function Preferences.new(db)
         return true
     end
 
+    -- Saves one method's personal rate under the current profile. Returns true, or
+    -- false plus a message for the UI if storage refused the write.
     function self:saveRate(method, rate)
         -- The calculator already validated this. If it's bad here, that's a bug in
         -- our code, so fail loudly instead of writing garbage to storage.
@@ -292,8 +300,13 @@ function Preferences.new(db)
 
     -- Read a profile's favourite IDs without needing a catalogue scan. Keep valid
     -- IDs even if they aren't in this bundle, so an update won't erase choices.
+    --
+    -- Returns ids, warning, writable. `writable` is false when what's stored couldn't
+    -- be read or understood; saveFavourite then refuses to write, so a glitch can
+    -- never replace a real list with an empty one.
     function self:loadFavourites()
-        local key = "profit-path.favourites.v1/" .. #self.profile .. ":" .. self.profile
+        local key = favouritesKey()
+
         local success, stored, exists = pcall(function()
             return db:GetStructuredData(key), db:CheckExists(key)
         end)
@@ -339,9 +352,8 @@ function Preferences.new(db)
 
         ids[id] = selected or nil
 
-        local key = "profit-path.favourites.v1/" .. #self.profile .. ":" .. self.profile
         local success, written = pcall(function()
-            return db:SetStructuredData(key, { schema = 1, ids = ids })
+            return db:SetStructuredData(favouritesKey(), { schema = 1, ids = ids })
         end)
 
         if not success or written ~= true then

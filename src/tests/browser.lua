@@ -26,7 +26,7 @@ return function(test, equal, client, pretty)
         return table.concat(values, ",")
     end
 
-    test("all four browser sorts keep unknowns last in either direction with stable ties", function()
+    test("profit and ROI sorts keep unknowns last in either direction with stable ties", function()
         client()
 
         local source = methods()
@@ -50,19 +50,38 @@ return function(test, equal, client, pretty)
         browser:setSort("roi", false)
         equal(ids(browser:rows()), "a,b,z,unknown")
 
-        browser:setSort("difficulty", true)
-        equal(ids(browser:rows()), "z,a,b,unknown")
-
-        browser:setSort("difficulty", false)
-        equal(ids(browser:rows()), "a,z,b,unknown")
-
-        browser:setSort("intensity", true)
-        equal(ids(browser:rows()), "z,b,a,unknown")
-
-        browser:setSort("intensity", false)
-        equal(ids(browser:rows()), "a,b,z,unknown")
-
         equal(source[1].id, "z", "Never rearrange source records")
+    end)
+
+    -- Difficulty and intensity are filters now, not sorts. "Moderate" and "Medium"
+    -- are the same intensity, and a method with no difficulty never matches one.
+    test("difficulty and intensity filters narrow the list and combine", function()
+        client()
+
+        local source = methods()
+        source[#source + 1] = { id = "m", title = "Medium one", category = "skilling", source_category = "Gathering", intensity = "Medium" }
+
+        local browser = Browser.new(source, Preferences.new(PersistentDB), function() end)
+        browser.estimates = {}
+
+        browser.difficulty = "Hard"
+        equal(ids(browser:rows()), "z")
+
+        browser.difficulty = "any"
+        browser.intensity = "Moderate"
+        equal(ids(browser:rows()), "m,b")
+
+        browser.intensity = "Low"
+        browser.difficulty = "Easy"
+        equal(ids(browser:rows()), "a")
+
+        browser.difficulty = "Hard"
+        equal(ids(browser:rows()), "")
+
+        -- Old saved sorts that are now filters fall back to the profit default.
+        local state = client()
+        state.db["profit-path.browser.v1"] = { schema = 1, sort = "difficulty", descending = false }
+        equal(Preferences.new(PersistentDB):loadBrowser().sort, "profit")
     end)
 
     test("search category and favourites combine without treating search as a pattern", function()
@@ -98,10 +117,12 @@ return function(test, equal, client, pretty)
         assert(reloaded:loadFavourites()[steel.id])
         equal(reloaded:loadRate(steel), 1000)
 
-        assert(reloaded:selectProfile("Other"))
+        -- First character keeps Default's favourites; a second character has none.
+        assert(reloaded:bindCharacter("First"))
+        assert(reloaded:bindCharacter("Other"))
         equal(next(reloaded:loadFavourites()), nil)
 
-        assert(reloaded:selectProfile("Default"))
+        assert(reloaded:bindCharacter("First"))
         assert(reloaded:saveFavourite(steel.id, false))
         assert(reloaded:loadFavourites()["future-method"], "Keep IDs outside the current bundle")
         equal(reloaded:loadRate(steel), 1000)
@@ -232,9 +253,27 @@ return function(test, equal, client, pretty)
         equal(calls, 3)
 
         local browse = prettyui.views[2]
+
+        -- Estimated profits use the method page's money colours: green for a
+        -- profit, red for a loss.
+        local Style = require("src/ui/view_style")
+        local coloured = 0
+
+        for _, label in ipairs(browse:allTexts()) do
+            local text = tostring(label.content)
+
+            if text:find(" / h", 1, true) then
+                local expected = text:sub(1, 1) == "-" and Style.bad or Style.good
+                equal(label.options.colour, expected, "Profit colour for " .. text)
+                coloured = coloured + 1
+            end
+        end
+
+        assert(coloured > 0, "Expected at least one estimated profit in Browse")
+
         local header = browse.children[2]
         header.fields[1]:SetText("steel", true)
-        header.nativeLists[1]:SetEntrySelected(2, true)
+        header.nativeLists[1]:SetEntrySelected(1, true)
         Event.Logic.emit({})
         equal(calls, 3)
 
@@ -291,6 +330,8 @@ return function(test, equal, client, pretty)
         client()
 
         local prefs = Preferences.new(PersistentDB)
+        assert(prefs:bindCharacter("First"))
+
         local source = methods()
         local browser = Browser.new(source, prefs, function()
             return { status = "available", profit = 5 }
@@ -299,7 +340,8 @@ return function(test, equal, client, pretty)
         browser:refreshEstimates()
         assert(browser.estimates.z)
 
-        assert(prefs:selectProfile("Other"))
+        -- Switching to a second character changes profile, so old estimates must go.
+        assert(prefs:bindCharacter("Other"))
         browser:loadFavourites()
         equal(next(browser.estimates), nil)
 
@@ -368,6 +410,52 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
+    -- Method titles keep their activity colour in every list, not just under
+    -- "All activities".
+    test("browse titles keep their activity colour under every activity filter", function()
+        client()
+        prettyui = pretty()
+        gepl = nil
+
+        dofile("main.lua")
+
+        Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
+        prettyui:findButton("Open Profit Path")()
+
+        local Style = require("src/ui/view_style")
+        local sidebar = prettyui.views[2].children[1]
+        local titles = {
+            ["Smelting steel bars"] = Style.categories.production,
+            ["Cutting elder logs - Without wood spirits"] = Style.categories.skilling,
+            ["Killing abyssal demons - Melee"] = Style.categories.pvm,
+        }
+
+        -- Counts the coloured titles currently shown, checking each one's colour.
+        local function checkTitles()
+            local seen = 0
+
+            for _, label in ipairs(prettyui.views[2]:allTexts()) do
+                local expected = titles[label.content]
+
+                if expected then
+                    equal(label.options.colour, expected, "Colour for " .. label.content)
+                    seen = seen + 1
+                end
+            end
+
+            return seen
+        end
+
+        equal(checkTitles(), 3)
+
+        for _, category in ipairs({ "PvM", "Skilling", "Production" }) do
+            sidebar.buttons[category]()
+            equal(checkTitles(), 1, "One method under " .. category)
+        end
+
+        PluginShutdown()
+    end)
+
     test("money presentation keeps negative values precision and unavailable states distinct", function()
         local Style = require("src/ui/view_style")
 
@@ -375,8 +463,8 @@ return function(test, equal, client, pretty)
         equal(Style.number(-1000.125, 1), "-1,000.1")
         equal(Style.number(0), "0")
         equal(Style.number(nil), "Unavailable")
-        equal(Style.compact(-38000), "-38.0k/h")
-        equal(Style.compact(1200000), "1.2m/h")
+        equal(Style.compact(-38000), "-38.0k / h")
+        equal(Style.compact(1200000), "1.2m / h")
         equal(Style.compact(nil), "Not estimated")
         equal(Style.quantity(2000), "2,000")
         equal(Style.quantity(1.25), "1.25")
@@ -398,14 +486,50 @@ return function(test, equal, client, pretty)
         equal(sort.stylesheetID, id.StyleSheet.DROPDOWN_DEFAULT)
 
         -- Several hooks can arrive before the native collection catches up.
-        sort:SetEntrySelected(4, true)
         sort:SetEntrySelected(3, true)
-
         sort:SetEntrySelected(2, true)
-        direction:SetEntrySelected(2, true)
+
+        sort:SetEntrySelected(1, true)
+        direction:SetEntrySelected(1, true)
         Event.Logic.emit({})
         equal(state.db["profit-path.browser.v1"].sort, "roi")
         equal(state.db["profit-path.browser.v1"].descending, false)
+
+        -- Only Profit and ROI to sort by; difficulty and intensity are their own
+        -- filter dropdowns. Entry 3 under difficulty is "Hard" (IDs count from 0), and none of the
+        -- bundled methods has a difficulty rating, so the list empties.
+        equal(#header.nativeLists, 4)
+        equal(sort.entries.Difficulty, nil)
+        equal(sort.entries.ROI, 1)
+
+        local difficulty = header.nativeLists[3]
+        equal(difficulty.entries.Any, 0)
+        equal(difficulty.selectedID, 0, "Filters start on Any")
+        equal(header.nativeLists[4].selectedID, 0)
+        equal(difficulty.entries.Hard, 3)
+
+        local function shownText()
+            local text = {}
+
+            for _, label in ipairs(prettyui.views[2]:allTexts()) do
+                text[#text + 1] = tostring(label.content)
+            end
+
+            return table.concat(text, "|")
+        end
+
+        -- Captions say which group each dropdown belongs to.
+        for _, caption in ipairs({ "SORT BY", "DIFFICULTY", "INTENSITY" }) do
+            assert(shownText():find(caption, 1, true), "Missing caption " .. caption)
+        end
+
+        difficulty:SetEntrySelected(3, true)
+        Event.Logic.emit({})
+        assert(shownText():find("0 matching methods", 1, true), "Hard should filter out every unrated method")
+
+        difficulty:SetEntrySelected(0, true)
+        Event.Logic.emit({})
+        assert(not shownText():find("0 matching methods", 1, true), "Any brings them back")
 
         local afterClick = sort.selectionWrites
         sort.callback(sort, 1, ui.SelectionChangeEvent.SELECTED)
@@ -415,9 +539,9 @@ return function(test, equal, client, pretty)
         equal(Event.Logic.count(), 0)
 
         state.failWrite = true
-        sort:SetEntrySelected(3, true)
+        sort:SetEntrySelected(0, true)
         Event.Logic.emit({})
-        equal(sort.selectedID, 2)
+        equal(sort.selectedID, 1)
         equal(state.db["profit-path.browser.v1"].sort, "roi")
 
         state.failWrite = false
@@ -467,11 +591,12 @@ return function(test, equal, client, pretty)
         end
 
         local text = table.concat(lines, "\n")
-        assert(text:find("29,000/hour", 1, true), "Recalculate using fresh quotes and the draft rate")
+        assert(text:find("29,000 / h", 1, true), "Recalculate using fresh quotes and the draft rate")
         assert(not text:find("Trade timestamp", 1, true))
         assert(not text:find("GE sale tax", 1, true))
         assert(not text:find(".00", 1, true))
         assert(text:find("Outputs", 1, true))
+
 
         PluginShutdown()
     end)
@@ -506,7 +631,7 @@ return function(test, equal, client, pretty)
 
         assert(table.concat(names):find("Perfect plus potion", 1, true))
         assert(table.concat(names):find("Elder logs", 1, true))
-        assert(prettyui.windows[1].options.title:find("Fixture", 1, true))
+        equal(prettyui.windows[1].options.title, "Profit Path", "No character name in the title")
 
         PluginShutdown()
     end)
@@ -648,11 +773,18 @@ return function(test, equal, client, pretty)
         assert(preferences:bindCharacter("Fixture"))
         local method = require("data/methods").methods[2]
         equal(preferences:loadRate(method), 100)
-        assert(state.spriteLookups.COINS)
+
+        -- Skills use the small skills-tab style icons, not the round medallions.
+        assert(state.spriteLookups.HITMARK_ICON_SKILL_WOODCUTTING)
+        equal(state.spriteLookups.SKILL_WOODCUTTING, nil)
+
         assert(state.spriteLookups.WARDROBE_ICON_PRESET_SAVE_24PX_0)
-        assert(state.spriteLookups.SKILL_WOODCUTTING)
         assert(state.spriteLookups.INVENTION_ICON_PERKS_TOOLS_HONED)
         assert(state.spriteLookups.INVENTION_ICON_PERKS_TOOLS_FORTUNE)
+
+        -- Reset is a boxed sprite button like Save, not a bare sprite.
+        assert(state.spriteLookups.RS3_ICON_STOPWATCH_RESET_0)
+        assert(type(income.buttonControls["Reset to source rate"].sprite) == "number")
 
         income.fields[1]:SetText("200", true)
         detail.buttons["Back to methods"]()
@@ -687,6 +819,101 @@ return function(test, equal, client, pretty)
         local icon = require("src/ui/view_style").icon(income, "coins", { size = 20 })
         assert(icon)
         PluginShutdown()
+    end)
+
+    -- Coins: one coin per table, by the heading total only (not on every row). It's
+    -- the real Coins item at its biggest-pile graphic, and it slides left as the
+    -- total gets longer so it always sits right next to the number.
+    test("income tables show the coin pile only beside each total and keep it next to the number", function()
+        client()
+        prettyui = pretty()
+        gepl = nil
+        dofile("main.lua")
+
+        Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
+        prettyui:findButton("Open Profit Path")()
+        prettyui:findMethod("Smelting steel bars")()
+
+        local income = prettyui.views[3].tabs[1].pages[1]
+        local inputs = income.children[2]
+        local outputs = income.children[3]
+
+        -- The Coins item at a huge quantity, so the client draws the full pile,
+        -- with the quantity number hidden.
+        for _, panel in ipairs({ inputs, outputs }) do
+            equal(#panel.nativeSprites, 1)
+            equal(panel.nativeSprites[1].source.item, 995)
+            equal(panel.nativeSprites[1].associatedObjectQuantity, 1000000)
+            equal(panel.nativeSprites[1].associatedObjectQuantityMode, ui.ObjectQuantityDisplayMode.NEVER)
+            equal(panel.sprites, nil)
+        end
+
+        -- Money colours: Inputs (costs) in subtle red, Outputs (earnings) in
+        -- subtle green, for both the heading total and each row's value.
+        local Style = require("src/ui/view_style")
+
+        local function moneyColours(panel)
+            local colours = {}
+
+            for _, label in ipairs(panel:allTexts()) do
+                if type(label.options) == "table" and label.options.alignHorizontal == ui.AlignMode.BOTTOMRIGHT and label.options.colour ~= Style.muted then
+                    colours[#colours + 1] = label.options.colour
+                end
+            end
+
+            return colours
+        end
+
+        for _, colour in ipairs(moneyColours(inputs)) do
+            equal(colour, Style.bad)
+        end
+
+        for _, colour in ipairs(moneyColours(outputs)) do
+            equal(colour, Style.good)
+        end
+
+        assert(#moneyColours(inputs) >= 2, "Expected a total and at least one row value")
+
+        -- No prices: the total reads "Unavailable" (11 chars x 7 = 77 wide in the
+        -- fake font), so the coin sits at -20 - 77 - 4 - 20.
+        local coin = inputs.nativeSprites[1]
+        equal(coin.x, -20 - 77 - 4 - 20)
+
+        -- Two more characters (7 units each) push the coin 14 further left, so the
+        -- gap to the number stays the same.
+
+        Style.placeCoin(coin, "1,000/h", { rightEdge = -20, y = 9, size = 20 })
+        local shortX = coin.x
+
+        Style.placeCoin(coin, "100,000/h", { rightEdge = -20, y = 9, size = 20 })
+        equal(coin.x, shortX - 14)
+
+        PluginShutdown()
+    end)
+
+    -- The coin uses only the one-argument SetAssociatedObject plus the quantity
+    -- property (the two-argument form doesn't exist on this client), so a normal
+    -- draw reports no problems at all.
+    test("coin draws the pile without the unsupported two-argument call or any warning", function()
+        client()
+
+        local Style = require("src/ui/view_style")
+        local printed = {}
+        local realPrint = print
+
+        print = function(text)
+            printed[#printed + 1] = text
+        end
+
+        local coin = Style.coins({ content = { testOwner = {} } }, { size = 20 })
+
+        print = realPrint
+
+        equal(coin.source.item, 995)
+        equal(coin.associatedObjectQuantity, 1000000)
+        equal(coin.associatedObjectQuantityMode, ui.ObjectQuantityDisplayMode.NEVER)
+        equal(coin.hidden, nil)
+        equal(#printed, 0)
     end)
 
     test("display-name reads fail safely and character profile collisions stay separate", function()

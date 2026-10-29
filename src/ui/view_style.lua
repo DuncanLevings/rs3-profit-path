@@ -1,6 +1,11 @@
--- Shared colours, number formatting and small decorations for both views.
--- Every native control created here belongs to the supplied parent.
+-- Shared look-and-feel for the Browse and method screens: colours, number
+-- formatting, and a few small decorations (icons, coin, boxed icon buttons).
+--
+-- Ownership: every control made here is a child of the `parent` passed in, so it
+-- gets cleaned up when that parent view is destroyed. Nothing here keeps state
+-- between calls.
 local iconNames = require("data/icons")
+
 local Style = {
     text = 0xEEE9DAFF,
     muted = 0xB5B1A2FF,
@@ -10,10 +15,28 @@ local Style = {
     categories = { pvm = 0xDEA19AFF, skilling = 0xACCEA0FF, production = 0x9EBEDFFF },
 }
 
--- Native rectangles give tables quiet bands and item slots a state border.
--- The parent owns them; clickthrough keeps them out of tooltip/input handling.
+-- The Coins item, and the font PrettyUI uses for body text. We measure numbers in
+-- that font so a coin can sit right next to right-aligned text.
+local COINS_ITEM_ID = 995
+local BODY_FONT = "MUSEO_SANS_15PT_REGULAR"
+
+-- Gap between a coin and the number it belongs to, in interface units.
+local COIN_GAP = 4
+
+-- The client picks Coins art from the stack size: 1 coin looks like a single
+-- coin, a big stack looks like the full pile. Any amount this big gets the pile.
+local COIN_PILE_QUANTITY = 1000000
+
+-- A heads-up on `parent.content`: PrettyUI views expose their native component
+-- layer as `.content`, and we draw a few plain native shapes (rectangles, the coin)
+-- straight onto it. The rest of the app already parents native children there.
+-- Those shapes die with the view, just like PrettyUI's own controls.
+
+-- Native rectangles give tables their quiet row bands and item slots a coloured
+-- border. Clickthrough keeps them from stealing hovers and clicks.
 function Style.rectangle(parent, options)
     local rectangle = ui.Rectangle.new(parent.content)
+
     rectangle:SetPos(options.x or 0, options.y or 0, options.xAnchor or 0, 0)
     rectangle:SetSize(options.width, options.height, options.widthAnchor or 0, options.heightAnchor or 0)
     rectangle.rgba = options.colour
@@ -23,8 +46,9 @@ function Style.rectangle(parent, options)
     return rectangle
 end
 
--- rsprite owns name resolution, caching and unsafe/missing-sprite warnings.
--- PrettyUI owns drawing and cleanup. Missing decorations leave the text usable.
+-- Draws one of our named sprites (see data/icons.lua). rsprite finds the sprite's ID
+-- and warns once if it's missing; PrettyUI draws it. If the sprite doesn't exist we
+-- just skip it, because every icon sits next to text that still makes sense alone.
 function Style.icon(parent, name, options)
     local sprite = rsprite.Get(iconNames[name])
 
@@ -35,19 +59,165 @@ function Style.icon(parent, name, options)
     return parent:AddSprite(sprite, options)
 end
 
--- A native save sprite fits PrettyUI's public icon-button API. Keep text Save
--- available if that sprite is absent in a different client build; Enter also saves.
-function Style.saveButton(parent, action)
-    local sprite = rsprite.Get(iconNames.save)
+-- A small boxed button showing a native sprite, like the Save and Reset buttons by
+-- the rate box. If the sprite is missing in this client build we show a plain text
+-- button instead, so the action never disappears.
+function Style.iconButton(parent, name, fallbackText, tooltip, action)
+    local sprite = rsprite.Get(iconNames[name])
 
-    return parent:AddSimpleButton(sprite or "Save", action, {
-        inline = true, width = sprite and 28 or 64, height = 28,
-        iconSize = 20, tooltip = "Save rate",
+    return parent:AddSimpleButton(sprite or fallbackText, action, {
+        inline = true,
+        width = sprite and 28 or 64,
+        height = 28,
+        iconSize = 20,
+        tooltip = tooltip,
     })
 end
 
--- Keep full values readable in breakdowns. Group the integer part after rounding
--- so separators don't change the decimal precision or the sign.
+-- The y that vertically centres an icon of `size` on a text box starting at `textY`
+-- with height `textHeight`. Text sits in the middle of its box, so icons placed at
+-- the box's top looked like they were floating above the words.
+function Style.middle(textY, textHeight, size)
+    return textY + math.floor((textHeight - size) / 2)
+end
+
+-- Problems hit while drawing the coin, reported once per session so a fallback
+-- never happens silently. Keyed by step, e.g. "quantity".
+local reportedCoinProblems = {}
+
+local function reportCoinProblem(step, problem)
+    if reportedCoinProblems[step] then
+        return
+    end
+
+    reportedCoinProblems[step] = true
+
+    pcall(print, "[Profit Path] coin icon: " .. step .. " failed: " .. tostring(problem))
+end
+
+-- Runs one native step and reports it if it throws. Returns true on success.
+local function coinStep(step, action)
+    local ok, problem = pcall(action)
+
+    if not ok then
+        reportCoinProblem(step, problem)
+    end
+
+    return ok
+end
+
+-- Draws the Coins item on `parent` as a big pile and returns the native sprite.
+-- The client picks Coins art from the stack size, so we give it a huge quantity
+-- and hide the quantity label so no number shows.
+--
+-- Heads-up: the docs list SetAssociatedObject(id, quantity), but this client
+-- rejects the two-argument form ("no matching function call"). Attaching the item
+-- and setting `associatedObjectQuantity` as a property does give the pile, so
+-- that's what we do.
+--
+-- Each native step is tried on its own. Worst case we still show the Coins item
+-- itself (the plain one-coin art); only if the item can't be drawn at all do we
+-- fall back to the COINS sprite.
+--
+-- It's a native sprite rather than a PrettyUI one so callers can slide it with
+-- SetPos when the number beside it changes length; see Style.placeCoin.
+function Style.coins(parent, options)
+    local x = options.x or 0
+    local y = options.y or 0
+    local xAnchor = options.xAnchor or 0
+    local size = options.size or 20
+
+    -- Step 1: make and place the sprite. Without this there's nothing to draw on.
+    local coin
+    local created = coinStep("create", function()
+        coin = ui.Sprite.new(parent.content)
+        coin:SetPos(x, y, xAnchor, 0)
+        coin:SetSize(size, size)
+    end)
+
+    -- Coins are decoration: hovers and clicks should go to whatever is underneath.
+    if created then
+        coinStep("clickthrough", function()
+            coin.clickthrough = true
+        end)
+    end
+
+    -- Step 2: attach the Coins item at pile size. The quantity is set both before
+    -- and after attaching: this combination is what worked in game, and we don't
+    -- know which of the two the client actually uses to pick the art.
+    local drawn = false
+
+    if created then
+        coinStep("quantity before item", function()
+            coin.associatedObjectQuantity = COIN_PILE_QUANTITY
+        end)
+
+        drawn = coinStep("item", function()
+            coin:SetAssociatedObject(COINS_ITEM_ID)
+        end)
+
+        if drawn then
+            coinStep("quantity after item", function()
+                coin.associatedObjectQuantity = COIN_PILE_QUANTITY
+            end)
+        end
+    end
+
+    -- Step 3: hide the quantity number. If this fails we'd show "1,000,000" on the
+    -- icon, so treat it as "can't draw the item" and use the fallback sprite.
+    if drawn then
+        drawn = coinStep("hide quantity", function()
+            coin.associatedObjectQuantityMode = ui.ObjectQuantityDisplayMode.NEVER
+        end)
+    end
+
+    if drawn then
+        return coin
+    end
+
+    -- Half-made sprite? Hide it so it can't show a stray number or blank box.
+    if coin then
+        pcall(function()
+            coin.hidden = true
+        end)
+    end
+
+    if not rsprite.Get(iconNames.coins) then
+        return nil
+    end
+
+    local drawOptions = { x = x, y = y, xAnchor = xAnchor, size = size, placeholder = false }
+
+    return (rsprite.Draw(parent.content, iconNames.coins, drawOptions))
+end
+
+-- Slides a coin so it sits just left of a right-aligned number, instead of at a
+-- fixed spot with a big gap when the number is short. `rightEdge` is the label's
+-- right edge measured from the parent's right side (a negative x with xAnchor 1).
+--
+-- Text width comes from the client's own font measurement. If that fails for some
+-- reason we guess about 8 units per character: worst case the gap is a bit off.
+function Style.placeCoin(coin, text, options)
+    if not coin then
+        return
+    end
+
+    local ok, width = pcall(function()
+        return config.Font[BODY_FONT]:GetStringWidth(text, false)
+    end)
+
+    if not ok or type(width) ~= "number" then
+        width = #text * 8
+    end
+
+    local size = options.size or 20
+    local x = options.rightEdge - width - COIN_GAP - size
+
+    coin:SetPos(x, options.y, 1, 0)
+end
+
+-- Full numbers with thousands separators, for the Income breakdown. We round first
+-- and only then add commas, so the separators can't change the decimals or the sign.
 function Style.number(value, decimals)
     if value == nil then
         return "Unavailable"
@@ -60,7 +230,8 @@ function Style.number(value, decimals)
     return sign .. grouped .. fraction
 end
 
--- The list needs a short comparison value; full numbers remain in Income.
+-- Short numbers like "1.2m / h" for the Browse list, where space is tight. The
+-- title font shows it as "1.2M / H". The full figure is in the Income tab.
 function Style.compact(value)
     if value == nil then
         return "Not estimated"
@@ -69,18 +240,18 @@ function Style.compact(value)
     local magnitude = math.abs(value)
 
     if magnitude >= 1000000 then
-        return string.format("%.1fm/h", value / 1000000)
+        return string.format("%.1fm / h", value / 1000000)
     end
 
     if magnitude >= 1000 then
-        return string.format("%.1fk/h", value / 1000)
+        return string.format("%.1fk / h", value / 1000)
     end
 
-    return Style.number(value, 0) .. "/h"
+    return Style.number(value, 0) .. " / h"
 end
 
--- Rates can be fractional (for example, potion doses per hour), unlike GP
--- displays. Keep useful quantity precision without adding .00 to whole amounts.
+-- Quantities can be fractional (e.g. 0.04 potion doses an hour), unlike GP. Show up
+-- to two decimals, but drop trailing zeros so whole amounts don't read "12.00".
 function Style.quantity(value)
     if value == nil then
         return "Unavailable"
@@ -93,7 +264,8 @@ function Style.quantity(value)
     return Style.number(value, 2):gsub("0+$", ""):gsub("%.$", "")
 end
 
--- Text accompanies each colour, so colour isn't the only way to spot a shortfall.
+-- Green for met, red for unmet, grey for unknown. The text always says the same
+-- thing too, so nobody has to rely on telling colours apart.
 function Style.statusColour(status)
     if status == "met" then
         return Style.good
