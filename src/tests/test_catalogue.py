@@ -194,6 +194,83 @@ class MethodTests(unittest.TestCase):
             }],
         }
 
+    def test_named_minimum_icon_cannot_be_an_arbitrary_high_end_example(self):
+        items = {"42": {"name": "Minimum"}, "43": {"name": "Upgrade"}}
+        equipment = {"fixture": {"candidates": [
+            {"item_id": 42, "tier": 80}, {"item_id": 43, "tier": 90},
+        ]}}
+        requirement = {"kind": "gear", "text": "T80+", "equipment_scope": "flexible",
+                       "equipment_group": "fixture", "minimum_tier": 80, "minimum_item_id": 42}
+        catalogue.validate_requirement(requirement, items, equipment)
+        requirement["minimum_item_id"] = 43
+
+        with self.assertRaisesRegex(ValueError, "lowest qualifying"):
+            catalogue.validate_requirement(requirement, items, equipment)
+
+        requirement["minimum_item_id"] = 42
+        requirement.pop("minimum_tier")
+
+        with self.assertRaisesRegex(ValueError, "explicit minimum tier"):
+            catalogue.validate_requirement(requirement, items, equipment)
+
+    def test_toolbelt_bindings_require_verified_names_offsets_and_provenance(self):
+        binding = {"presence_variable": "TOOLBELT_PRESENT", "value_variable": "TOOLBELT_LEVEL",
+                   "items_enum": "TOOLBELT_ITEMS", "value_offset": 0, "source": "Native metadata fixture"}
+        self.methods["toolbelt"] = {"fixture": binding}
+        catalogue.methods_text(self.methods, self.monsters)
+
+        for field, value in (("value_variable", "VAR()"), ("items_enum", None),
+                             ("presence_variable", 1), ("value_offset", True),
+                             ("value_offset", 2), ("source", "")):
+            with self.subTest(field=field):
+                original = copy.deepcopy(binding)
+                binding[field] = value
+
+                with self.assertRaises(ValueError):
+                    catalogue.methods_text(self.methods, self.monsters)
+
+                binding.clear()
+                binding.update(original)
+
+    def test_equipment_groups_require_resolved_candidates_and_valid_use_levels(self):
+        candidate = {"item_id": 42, "tier": 80, "skills": {"DEFENCE": 80}}
+        group = {"complete": False, "note": "Unverified variants stay unknown.", "candidates": [candidate]}
+        self.methods["equipment"] = {"body": group}
+        check = {"kind": "gear", "text": "T80+ body", "equipment_scope": "flexible",
+                 "equipment_group": "body", "minimum_tier": 80, "slot": "body", "style": "melee"}
+        self.methods["methods"][0]["requirements"]["access"]["children"].append(check)
+        catalogue.methods_text(self.methods, self.monsters)
+
+        for field, bad in (("item_id", 999), ("tier", 0), ("skills", {"DEFENCE": -1}), ("slot", 4)):
+            with self.subTest(field=field):
+                original = copy.deepcopy(candidate)
+                candidate[field] = bad
+
+                with self.assertRaises(ValueError):
+                    catalogue.methods_text(self.methods, self.monsters)
+
+                candidate.clear()
+                candidate.update(original)
+
+        group["candidates"].append(copy.deepcopy(candidate))
+
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            catalogue.methods_text(self.methods, self.monsters)
+
+    def test_equipment_requirements_reject_unknown_groups_and_bad_minimum_tiers(self):
+        check = {"kind": "gear", "text": "Tool", "equipment_scope": "flexible", "equipment_group": "missing"}
+
+        with self.assertRaisesRegex(ValueError, "Unresolved equipment"):
+            catalogue.validate_requirement(check, self.methods["items"])
+
+        check.pop("equipment_group")
+
+        for tier in (0, -1, True, 1.5):
+            check["minimum_tier"] = tier
+
+            with self.assertRaises(ValueError):
+                catalogue.validate_requirement(check, self.methods["items"])
+
     def test_recipe_priced_rows_must_name_a_known_recipe_with_matching_doses(self):
         recipes = catalogue.choose_recipes(recipe_fixture())
         line = self.methods["methods"][0]["income"]["inputs"][0]

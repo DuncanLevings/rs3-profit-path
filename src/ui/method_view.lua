@@ -82,7 +82,7 @@ local function requirementIcons(definition)
 end
 
 -- Builds the Requirements tab, grouped like the Wiki. Two kinds of live feedback:
---   * text colour on each requirement: met / unmet / unknown (from skill levels)
+--   * text colour on each requirement: met / unmet / unknown (from account evidence)
 --   * a border on each item icon: found in backpack, worn or bank / not found / can't tell
 -- Returns two refresh functions: one for requirement text, one for item borders.
 local function mountRequirements(parent, method, calculator, fitter)
@@ -111,7 +111,6 @@ local function mountRequirements(parent, method, calculator, fitter)
 
     local updates = {}
     local borders = {}
-    local wanted = {}
 
     -- Work out each section's height up front, since panels have fixed heights.
     -- Required and recommended items sit side by side when both exist, so they share
@@ -129,7 +128,12 @@ local function mountRequirements(parent, method, calculator, fitter)
         -- Item rows hold up to five 44px icons per line; text rows are 48px tall.
         for _, entry in ipairs(entries) do
             local icons = entry.definition.display_items
-            entry.height = icons and (math.ceil(#icons / 5) * 44 + 8) or 48
+            entry.height = icons and (math.ceil(#icons / 5) * 44 + 8) or (entry.definition.equipment_group and 96 or 48)
+
+            if icons and entry.definition.kind == "any" then
+                entry.height = entry.height + 24
+            end
+
             height = height + entry.height
         end
 
@@ -185,19 +189,22 @@ local function mountRequirements(parent, method, calculator, fitter)
                 -- Item requirement: a grid of item icons. Each tooltip is just the
                 -- item's name, and the border shows presence only. Owning an item
                 -- doesn't prove you can use it, so we never claim that.
+                local iconStart = y
+
+                if requirement.kind == "any" then
+                    section:AddText({ text = "Any one", x = 12, y = y, height = 24, colour = Style.muted })
+                    iconStart = y + 24
+                end
+
                 for index, itemId in ipairs(icons) do
                     local x = 12 + ((index - 1) % 5) * 44
-                    local iconY = y + math.floor((index - 1) / 5) * 44
+                    local iconY = iconStart + math.floor((index - 1) / 5) * 44
 
                     local _, _, verified = ItemIcon.add(section, itemId, { x = x, y = iconY })
                     local border = Style.rectangle(section, { x = x, y = iconY, width = 40, height = 40, fill = false, colour = Style.muted })
 
                     -- Some items count under several IDs (charged or worn variants).
                     local aliases = itemDefinitions[tostring(itemId)].ownership_ids or { itemId }
-
-                    for _, alias in ipairs(aliases) do
-                        wanted[alias] = true
-                    end
 
                     borders[#borders + 1] = { border = border, aliases = aliases, verified = verified }
                 end
@@ -217,18 +224,28 @@ local function mountRequirements(parent, method, calculator, fitter)
                 local x = 12 + #iconNames * 26
                 local label = section:AddText({ text = requirement.text, x = x, y = y, width = -x - 16, widthAnchor = 1, height = 42, colour = Style.text })
 
-                updates[#updates + 1] = { label = label, index = entry.index, recommended = entry.recommended }
+                local update = { label = label, index = entry.index, recommended = entry.recommended }
+
+                if requirement.equipment_group then
+                    -- Show an owned match or an explicitly named minimum. A broad
+                    -- 'your highest tool' requirement still gets no placeholder box.
+                    update.matchSection = section
+                    update.minimumItemId = requirement.minimum_item_id
+                    update.matchY = y + 44
+                    update.matchText = section:AddText({ text = "", x = 12, y = y + 50, width = -78, widthAnchor = 1, height = 40, colour = Style.muted })
+                end
+
+                updates[#updates + 1] = update
             end
 
             y = y + entry.height
         end
     end
 
-    if next(wanted) then
-        parent:AddText({ text = "Borders check backpack, worn gear and bank; other storage is not checked. Grey means data is unavailable.", colour = Style.muted })
-    end
+    local storageStatus = parent:AddText({ text = "", height = 96, colour = Style.muted })
 
-    -- Re-checks skills and recolours the requirement text. Cheap: no new controls.
+    -- Apply the shared verdict to text and update the owned-equipment match.
+    -- Only a changed match creates/removes its small slot; the rate field stays put.
     local function refreshRequirements()
         local required, suggested = calculator:requirements()
 
@@ -237,29 +254,108 @@ local function mountRequirements(parent, method, calculator, fitter)
             local checked = results.children[update.index]
 
             update.label.rgba = Style.statusColour(checked.status)
+
+            if update.matchSection then
+                local match = checked.evidence[1]
+                local object, name
+
+                -- A named minimum is part of the requirement itself, unlike a
+                -- top-end example of a flexible tool. Show it when no match exists.
+                local displayId = match and match.itemId or update.minimumItemId
+
+                if displayId then
+                    object, name = ItemIcon.resolve(displayId)
+                end
+
+                local itemId = object and displayId or nil
+
+                if update.matchId ~= itemId then
+                    if update.matchSlot then
+                        update.matchSlot:Destroy()
+                        update.matchBorder:Destroy()
+                        update.matchSlot, update.matchBorder = nil, nil
+                    end
+
+                    if object then
+                        update.matchSlot = update.matchSection:AddItemSlot(object, { x = 12, y = update.matchY, tooltip = name, clickthrough = false })
+                        update.matchBorder = Style.rectangle(update.matchSection, { x = 12, y = update.matchY, width = 40, height = 40, fill = false, colour = Style.muted })
+                    end
+
+                    update.matchId = itemId
+                end
+
+                update.matchText:SetPos(object and 62 or 12, update.matchY + 6)
+                local description = checked.reason
+
+                if object then
+                    if not match then
+                        description = "Minimum required"
+                    elseif match.saved then
+                        description = "Saved match - verify in game"
+                    elseif match.toolbelt then
+                        description = "On your tool belt"
+                    else
+                        description = "Usable owned match"
+                    end
+                end
+
+                update.matchText.content = description
+                local colour = match and match.saved and Style.gold or Style.statusColour(checked.status)
+
+                if not match and checked.lastKnownAbsent then
+                    colour = Style.bad
+                end
+                update.matchText.rgba = colour
+                if update.matchBorder then
+                    update.matchBorder.rgba = colour
+                end
+            end
         end
     end
 
-    -- Re-reads the containers and recolours item borders:
-    --   green = found, red = definitely not in backpack, worn or bank, grey = can't tell.
-    -- Red needs complete evidence. If a container couldn't be read, absence proves
-    -- nothing. Unverified icons (name mismatch) always stay grey.
+    -- Recolour from the same cached evidence as the checks:
+    -- Green = live, gold = saved presence, red = absent when last checked in all
+    -- three stores, grey = never fully checked. The footer makes saved stores clear;
+    -- retained red borders don't turn historical evidence into a live access check.
+    -- Unverified icons (name mismatch) always stay grey.
     local function refreshOwnership()
-        local ownership = calculator:ownership(wanted)
+        local ownership = calculator:ownership()
+        local sources = ownership.sources or {}
+        local labels = { INV = "Backpack", WORN = "Worn", BANK = "Bank" }
+        local parts = {}
+
+        for _, container in ipairs({ "INV", "WORN", "BANK" }) do
+            parts[#parts + 1] = labels[container] .. ": " .. (sources[container] or "unavailable")
+        end
+
+        parts[#parts + 1] = "Tool belt (hatchet/pickaxe/mattock): " .. (sources.TOOLBELT or "unavailable")
+        storageStatus.content = table.concat(parts, " / ") .. ". Red: absent when last checked. Gold: saved item. Other tool-belt items and stores are not checked."
+
+        if ownership.message then
+            storageStatus.content = storageStatus.content .. " " .. ownership.message
+        end
 
         for _, entry in ipairs(borders) do
             local present = false
+            local lastKnownAbsent = true
 
             for _, itemId in ipairs(entry.aliases) do
                 present = present or (ownership.counts[itemId] or 0) > 0
+                lastKnownAbsent = lastKnownAbsent and (ownership.lastKnownAbsent or {})[itemId] == true
             end
 
             local colour = Style.muted
 
             if entry.verified and present then
                 colour = Style.good
-            elseif entry.verified and ownership.complete then
+            elseif entry.verified and (ownership.complete or lastKnownAbsent) then
                 colour = Style.bad
+            elseif entry.verified then
+                for _, itemId in ipairs(entry.aliases) do
+                    if ((ownership.savedCounts or {})[itemId] or 0) > 0 then
+                        colour = Style.gold
+                    end
+                end
             end
 
             entry.border.rgba = colour
@@ -619,12 +715,10 @@ function MethodView.mount(view, method, calculator, guarded, options)
     local function refresh(reason)
         if reason ~= "inventory" then
             render()
-            refreshRequirements()
         end
 
-        if reason ~= "skills" then
-            refreshOwnership()
-        end
+        refreshRequirements()
+        refreshOwnership()
     end
 
     local function currentTab()

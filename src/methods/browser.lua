@@ -52,6 +52,8 @@ function Browser.new(methods, preferences, estimateMethod)
 
         -- Profit estimates by method ID, and the latest problem to show the player.
         estimates = {},
+        readiness = {},
+        availability = "any",
         message = warning,
     }
 
@@ -130,9 +132,13 @@ function Browser.new(methods, preferences, estimateMethod)
             local matchesFilters = matchesLevel(self.difficulty, method.difficulty)
                 and matchesLevel(self.intensity, intensityLevel[method.intensity])
 
+            local readiness = self.readiness[method.id]
+            local matchesAccess = self.availability == "any"
+                or self.availability == (readiness and readiness.status or "unknown")
+
             local searchable = (method.title .. " " .. (method.variant or "") .. " " .. method.source_category):lower()
 
-            if matchesCategory and matchesSection and matchesFilters and searchable:find(query, 1, true) then
+            if matchesCategory and matchesSection and matchesFilters and matchesAccess and searchable:find(query, 1, true) then
                 rows[#rows + 1] = method
             end
         end

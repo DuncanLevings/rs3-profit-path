@@ -87,7 +87,7 @@ def require_record(value, field):
     return value
 
 
-def validate_requirement(check, items):
+def validate_requirement(check, items, equipment=None):
     """Validate definitions once at build time; runtime checks only account evidence."""
     # Mirrors the kinds requirements.lua understands. Checking them here means the
     # plugin can trust the shape at runtime and only has to worry about player data.
@@ -122,11 +122,49 @@ def validate_requirement(check, items):
     if kind == "gear":
         scope = check.get("equipment_scope")
 
+        if "equipment_group" in check:
+            group_name = check["equipment_group"]
+
+            if not isinstance(group_name, str) or group_name not in (equipment or {}):
+                raise ValueError("Unresolved equipment group")
+
+        for field in ("style", "slot"):
+            if field in check:
+                require_text(check[field], "Equipment " + field)
+
+        if "minimum_tier" in check and not positive_integer(check["minimum_tier"]):
+            raise ValueError("Minimum equipment tier must be positive")
+
+        # A stated minimum is a real requirement, not a top-end example. Reject
+        # any display candidate above the lowest qualifying tier.
+        if "minimum_item_id" in check:
+            item_id = check["minimum_item_id"]
+
+            if not positive_integer(item_id) or str(item_id) not in items or not check.get("equipment_group"):
+                raise ValueError("A minimum item must reference a known equipment candidate")
+
+            if not positive_integer(check.get("minimum_tier")):
+                raise ValueError("A minimum item needs an explicit minimum tier")
+
+            candidates = (equipment or {})[check["equipment_group"]]["candidates"]
+            eligible = [candidate for candidate in candidates
+                        if candidate["tier"] >= check["minimum_tier"]
+                        and ("style" not in check or candidate.get("style") == check["style"])
+                        and ("slot" not in check or candidate.get("slot") == check["slot"])]
+
+            lowest_tier = min((candidate["tier"] for candidate in eligible), default=None)
+
+            if not any(candidate["item_id"] == item_id and candidate["tier"] == lowest_tier for candidate in eligible):
+                raise ValueError("The displayed minimum item must be a lowest qualifying candidate")
+
         if not isinstance(scope, str) or scope not in {"specific", "flexible"}:
             raise ValueError("Gear requires an explicit equipment scope")
 
         if scope == "flexible" and "display_items" in check:
             raise ValueError("Flexible equipment must use text, not fixed item icons")
+
+    elif "minimum_item_id" in check:
+        raise ValueError("Minimum items only apply to equipment requirements")
 
     elif "equipment_scope" in check:
         raise ValueError("Equipment scope only applies to gear requirements")
@@ -139,7 +177,7 @@ def validate_requirement(check, items):
             raise ValueError("Requirement alternatives must be a list; ANY cannot be empty")
 
         for child in children:
-            validate_requirement(child, items)
+            validate_requirement(child, items, equipment)
 
     elif kind == "skill":
         # Must look like a client SkillType name, e.g. SMITHING.
@@ -715,6 +753,65 @@ def validate_methods(source, monsters, recipes=None):
                 raise ValueError("Item ownership IDs must be positive integers")
 
 
+    # Native binding names come from developer metadata, not inferred from Wiki
+    # tool names. Runtime applies one shared lookup to every supported family.
+    toolbelt = source.get("toolbelt", {})
+
+    if not isinstance(toolbelt, dict):
+        raise ValueError("Tool-belt bindings must be a mapping")
+
+    for family, binding in toolbelt.items():
+        require_text(family, "Tool-belt family")
+        require_record(binding, "Tool-belt binding")
+        require_text(binding.get("source"), "Tool-belt source")
+
+        for field in ("value_variable", "items_enum", "presence_variable"):
+            if field == "presence_variable" and field not in binding:
+                continue
+
+            value = binding.get(field)
+
+            if not isinstance(value, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]*", value):
+                raise ValueError("Tool-belt native config name is invalid")
+
+        if type(binding.get("value_offset")) is not int or binding["value_offset"] not in (0, -1):
+            raise ValueError("Tool-belt index offset must be verified as 0 or -1")
+
+    equipment = source.get("equipment", {})
+
+    if not isinstance(equipment, dict):
+        raise ValueError("Equipment groups must be a mapping")
+
+    for name, group in equipment.items():
+        require_text(name, "Equipment group name")
+        require_record(group, "Equipment group")
+
+        if type(group.get("complete")) is not bool or not isinstance(group.get("candidates"), list) or not group["candidates"]:
+            raise ValueError("Equipment groups need candidates and a coverage flag")
+
+        require_text(group.get("note"), "Equipment coverage note")
+        seen = set()
+
+        for candidate in group["candidates"]:
+            require_record(candidate, "Equipment candidate")
+            item_id = candidate.get("item_id")
+
+            if not positive_integer(item_id) or str(item_id) not in items or item_id in seen:
+                raise ValueError("Invalid/duplicate equipment candidate")
+
+            seen.add(item_id)
+
+            if not positive_integer(candidate.get("tier")) or not isinstance(candidate.get("skills"), dict):
+                raise ValueError("Equipment candidates need a tier and use levels")
+
+            for field in ("style", "slot"):
+                if field in candidate:
+                    require_text(candidate[field], "Equipment " + field)
+
+            for skill, level in candidate["skills"].items():
+                if not isinstance(skill, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]*", skill) or not positive_integer(level):
+                    raise ValueError("Invalid equipment use level")
+
     if not isinstance(source.get("methods"), list):
         raise ValueError("Methods must be a list")
 
@@ -761,7 +858,7 @@ def validate_methods(source, monsters, recipes=None):
 
         for group in ("access", "recommended"):
             root = requirements.get(group)
-            validate_requirement(root, items)
+            validate_requirement(root, items, equipment)
 
             if root["kind"] not in {"all", "any"}:
                 raise ValueError("Access and recommended requirements must be groups")

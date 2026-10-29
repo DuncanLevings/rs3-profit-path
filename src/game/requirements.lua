@@ -114,6 +114,78 @@ function Requirements.evaluate(requirement, account)
             { { quest = requirement.quest, name = entry.name, completed = entry.completed } })
     end
 
+    -- Gear groups describe alternatives, not a mandatory top-end example. Pick
+    -- the highest owned tier that also meets its use levels and requested slot/style.
+    if kind == "gear" and requirement.equipment_group then
+        local group = account.equipment and account.equipment[requirement.equipment_group]
+
+        if not group then
+            return result(requirement, "unknown", "Equipment alternatives are not mapped yet.")
+        end
+
+        local best, saved, uncertain = nil, nil, false
+        local lastKnownAbsent, candidateCount = true, 0
+
+        for _, candidate in ipairs(group.candidates) do
+            local matches = candidate.tier >= (requirement.minimum_tier or 0)
+                and (not requirement.style or candidate.style == requirement.style)
+                and (not requirement.slot or candidate.slot == requirement.slot)
+
+            if matches then
+                local owned = account.items and account.items[candidate.item_id]
+                local usable = true
+                candidateCount = candidateCount + 1
+                lastKnownAbsent = lastKnownAbsent and owned ~= nil and owned.lastKnownAbsent == true
+
+                for skill, level in pairs(candidate.skills) do
+                    local evidence = account.skills and account.skills[skill]
+
+                    if not available(evidence) or not nonNegativeInteger(evidence.level) then
+                        usable = false
+                        uncertain = true
+                    elseif evidence.level < level then
+                        usable = false
+                    end
+                end
+
+                if available(owned) and nonNegativeInteger(owned.quantity) and owned.quantity > 0 and usable then
+                    if not best or candidate.tier > best.tier then
+                        best = { itemId = candidate.item_id, tier = candidate.tier, toolbelt = owned.toolbelt == true }
+                    end
+                elseif not available(owned) or not owned.complete or not nonNegativeInteger(owned.quantity) then
+                    uncertain = true
+                end
+
+                if owned and nonNegativeInteger(owned.savedQuantity) and owned.savedQuantity > 0 and usable then
+                    if not saved or candidate.tier > saved.tier then
+                        saved = { itemId = candidate.item_id, tier = candidate.tier, saved = true }
+                    end
+                end
+            end
+        end
+
+        if best then
+            return result(requirement, "met", "Owned equipment meets the listed tier and use levels.", { best })
+        end
+
+        if saved then
+            return result(requirement, "unknown", "A suitable item was seen in saved data; verify it in game.", { saved })
+        end
+
+        local checked
+
+        if uncertain or not group.complete then
+            checked = result(requirement, "unknown", group.note or "Equipment coverage is incomplete.")
+        else
+            checked = result(requirement, "unmet", "No usable matching equipment was found in checked storage.")
+        end
+
+        -- A named minimum can retain its red display border after the bank closes,
+        -- but the historical hint must not become a confirmed failed access check.
+        checked.lastKnownAbsent = candidateCount > 0 and lastKnownAbsent
+        return checked
+    end
+
     -- Item check: the tricky one. Seeing enough items proves the player has them. But
     -- NOT seeing them only proves they don't if we know we've seen everything (bank
     -- included). Otherwise the rest might be somewhere we haven't looked.
@@ -121,6 +193,11 @@ function Requirements.evaluate(requirement, account)
         local entry = account.items and account.items[requirement.itemId]
 
         if not available(entry) or not nonNegativeInteger(entry.quantity) then
+            if entry and nonNegativeInteger(entry.savedQuantity) and entry.savedQuantity > 0 then
+                return result(requirement, "unknown", "Seen in saved item data; current ownership needs checking.",
+                    { { itemId = requirement.itemId, saved = true } })
+            end
+
             return result(requirement, "unknown", "Current item ownership is unavailable.")
         end
 
@@ -137,8 +214,8 @@ function Requirements.evaluate(requirement, account)
         return result(requirement, "unmet", "Owned quantity is below the requirement.", evidence)
     end
 
-    -- Anything else (gear tiers, unlocks like prayers) isn't built yet. We need
-    -- verified client mappings first, so for now we're honest and say "unknown".
+    -- Unmapped gear or unlocks like prayers need verified client mappings first,
+    -- so for now we're honest and say "unknown".
     return result(requirement, "unknown", "This requirement is not supported yet.")
 end
 

@@ -45,6 +45,14 @@ end
 local difficultyEntries, difficultyValues = filterEntries(Browser.difficultyLevels)
 local intensityEntries, intensityValues = filterEntries(Browser.intensityLevels)
 
+-- Keep readiness separate from profit: missing requirements do not erase an
+-- estimate, and unknown checks are a distinct filter rather than a failed check.
+local readinessEntries = {
+    { id = 0, label = "All" }, { id = 1, label = "Met" },
+    { id = 2, label = "Missing" }, { id = 3, label = "Needs checking" },
+}
+local readinessValues = { [0] = "any", [1] = "met", [2] = "unmet", [3] = "unknown" }
+
 -- The reverse of `values`: which entry ID shows this filter value ("Any" if
 -- somehow it isn't in the list).
 local function entryFor(values, value)
@@ -57,30 +65,11 @@ local function entryFor(values, value)
     return 0
 end
 
--- Dropdown row layout. Slots 0-1 are the sort pair and slots 2-3 the filters,
--- with a wider gap (and a divider line) between the two groups so it's clear
--- which controls change the order and which hide methods.
+-- Each control is 130 interface units wide. On narrow windows the three filters
+-- share a second row, keeping Requirements beside Intensity without clipping.
 local DROPDOWN_WIDTH = 130
 local DROPDOWN_STEP = 140
 local GROUP_GAP = 24
-local CAPTION_Y = 80
-local DROPDOWN_Y = 104
-
--- Where a dropdown slot starts, counting the extra gap before the filter group.
-local function slotX(slot)
-    local x = 10 + slot * DROPDOWN_STEP
-
-    if slot >= 2 then
-        x = x + GROUP_GAP
-    end
-
-    return x
-end
-
--- The header (title, search, captions, dropdowns) is this tall; results start
--- just under it.
-local HEADER_HEIGHT = 144
-local RESULTS_Y = 150
 
 -- Method rows: a fill a little lighter than the page so each row reads as its
 -- own card, and the width of the activity-coloured bar on its left edge. Row
@@ -121,6 +110,27 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
     local renderResults
     -- release() functions for the dropdowns' pending change callbacks.
     local dropdownReleases = {}
+
+    local wrapFilters = view.content.width - 190 < 734
+    local headerHeight = wrapFilters and 202 or 144
+    local resultsY = headerHeight + 6
+
+    -- Slots 0/1 sort; slots 2/3/4 filter. Only filters wrap on small windows.
+    local function slotX(slot)
+        if wrapFilters and slot >= 2 then
+            return 10 + (slot - 2) * DROPDOWN_STEP
+        end
+
+        return 10 + slot * DROPDOWN_STEP + (slot >= 2 and GROUP_GAP or 0)
+    end
+
+    local function captionY(slot)
+        return wrapFilters and slot >= 2 and 138 or 80
+    end
+
+    local function dropdownY(slot)
+        return captionY(slot) + 24
+    end
 
     -- Invalidate row clicks before tearing down their native targets.
     local function clearResults()
@@ -166,7 +176,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
     local function drawResults()
         local generation = rowGeneration
         results = library.SimpleView.new(view.content, {
-            x = 190, y = RESULTS_Y, width = -190, height = -RESULTS_Y,
+            x = 190, y = resultsY, width = -190, height = -resultsY,
             widthAnchor = 1, heightAnchor = 1, scrollable = true,
             layout = { startY = 8, padding = 10, rowGap = 8 },
         })
@@ -362,7 +372,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         end
 
         header = library.SimpleView.new(view.content, {
-            x = 190, y = 0, width = -190, height = HEADER_HEIGHT, widthAnchor = 1, scrollable = false,
+            x = 190, y = 0, width = -190, height = headerHeight, widthAnchor = 1, scrollable = false,
         })
 
         heading = header:AddTitle({ text = "Browse methods", x = 10, y = 4, height = 32, colour = Style.gold })
@@ -377,21 +387,24 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
 
         -- Small captions over the dropdowns, in the same muted capitals as the
         -- sidebar headings: one "Sort by" over the sort pair, one per filter.
-        header:AddText({ text = "SORT BY", x = slotX(0), y = CAPTION_Y, width = DROPDOWN_STEP * 2, height = 22, colour = Style.muted })
-        header:AddText({ text = "DIFFICULTY", x = slotX(2), y = CAPTION_Y, width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
-        header:AddText({ text = "INTENSITY", x = slotX(3), y = CAPTION_Y, width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
+        header:AddText({ text = "SORT BY", x = slotX(0), y = captionY(0), width = DROPDOWN_STEP * 2, height = 22, colour = Style.muted })
+        header:AddText({ text = "DIFFICULTY", x = slotX(2), y = captionY(2), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
+        header:AddText({ text = "INTENSITY", x = slotX(3), y = captionY(3), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
 
-        -- A thin divider in the gap between the sort pair and the filters, the
-        -- same colour as the sidebar's edge line.
-        local dividerX = slotX(1) + DROPDOWN_WIDTH + math.floor((slotX(2) - slotX(1) - DROPDOWN_WIDTH) / 2) - 1
-        Style.rectangle(header, { x = dividerX, y = CAPTION_Y, width = 2, height = DROPDOWN_Y + 30 - CAPTION_Y, colour = 0x655638FF })
+        header:AddText({ text = "REQUIREMENTS", x = slotX(4), y = captionY(4), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
+
+        -- A divider separates sorting from filtering when they share a row.
+        if not wrapFilters then
+            local dividerX = slotX(1) + DROPDOWN_WIDTH + math.floor((slotX(2) - slotX(1) - DROPDOWN_WIDTH) / 2) - 1
+            Style.rectangle(header, { x = dividerX, y = captionY(0), width = 2, height = 54, colour = 0x655638FF })
+        end
 
         -- One dropdown in the row. `slot` is its place in the row (0 = leftmost);
         -- dropdown.lua handles the client's selection quirks.
         local function dropdown(entries, selectedID, slot, changed)
             local control, release = Dropdown.new(header.content, {
                 x = slotX(slot),
-                y = DROPDOWN_Y,
+                y = dropdownY(slot),
                 width = DROPDOWN_WIDTH,
                 entries = entries,
                 selected = selectedID,
@@ -450,6 +463,15 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
 
             if value and value ~= browser.intensity then
                 browser.intensity = value
+                filterChanged()
+            end
+        end)
+
+        dropdown(readinessEntries, entryFor(readinessValues, browser.availability), 4, function(selectedID)
+            local value = readinessValues[selectedID]
+
+            if value and value ~= browser.availability then
+                browser.availability = value
                 filterChanged()
             end
         end)

@@ -8,6 +8,7 @@ local Preferences = require("src/storage/preferences")
 local catalogue = require("data/methods")
 local UI = require("src/ui/workbench")
 local Browser = require("src/methods/browser")
+local Snapshot = require("src/storage/account_snapshot")
 
 local App = {}
 
@@ -17,7 +18,8 @@ function App.start()
     local active = true
 
     -- Created further down; the account callback below needs to see it, so declare it early.
-    local view
+    local view, calculator
+    local snapshot = Snapshot.new(PersistentDB)
 
     -- When the account changes, refresh whatever's on screen. A game-state change
     -- (login, logout, world hop) is different: the game area our window hangs off may
@@ -28,18 +30,21 @@ function App.start()
         end
 
         if reason == "game_state" then
+            calculator.evidence = nil
+            calculator.ownershipEvidence = nil
             view:destroyWindow()
-        else
+        elseif view.interactive then
+            calculator:refreshEvidence(reason)
             view:refresh(reason)
         end
-    end)
+    end, snapshot, catalogue.toolbelt)
 
     local preferences = Preferences.new(PersistentDB)
 
     -- The calculator is the state behind the method view: which method is open, the
     -- current rate, the captured prices and the latest result. The UI reads these
     -- fields and calls the methods below; it never does the maths itself.
-    local calculator = { profile = preferences.profile, quotes = {} }
+    calculator = { profile = preferences.profile, quotes = {} }
 
     -- List estimates use saved rates, not the unsaved draft in an open method.
     -- Partial recipes aren't priceable yet, so don't make needless quote requests.
@@ -76,7 +81,8 @@ function App.start()
         end
 
         self.characterName = name
-        account.ownershipCache = {}
+        account:bindProfile(preferences.profile)
+        self:refreshEvidence()
         self.profile = preferences.profile
         browser:loadFavourites()
 
@@ -176,35 +182,146 @@ function App.start()
         self:recalculate()
     end
 
-    -- Icon borders use exact item-presence evidence, never gear readiness.
-    function calculator:ownership(wanted)
-        return account:readOwnership(wanted)
+    -- Collect the bounded set needed by this catalogue. Extra tool candidates
+    -- are included so a basic hatchet can satisfy 'your highest-tier hatchet'.
+    local wanted, skillNames, questNames = {}, {}, {}
+    local equipment = catalogue.equipment or {}
+
+    -- Include charged/worn IDs as ownership aliases, but keep the display ID stable.
+    local function wantItem(itemId)
+        local item = catalogue.items[tostring(itemId)]
+        wanted[itemId] = true
+
+        for _, alias in ipairs(item.ownership_ids or {}) do
+            wanted[alias] = true
+        end
     end
 
-    -- Checks the open method's requirements against the player. Right now only skill
-    -- levels are read live, so we walk the requirement tree to find which skills matter
-    -- and read just those, rather than every skill in the game.
-    function calculator:requirements()
-        local names = {}
+    -- Walk both requirement trees once at startup, including nested alternatives.
+    local function collect(requirement)
+        if requirement.kind == "skill" then
+            skillNames[requirement.skill] = true
+        elseif requirement.kind == "quest" then
+            questNames[requirement.quest] = true
+        elseif requirement.kind == "item" then
+            wantItem(requirement.itemId)
+        elseif requirement.equipment_group then
+            for _, candidate in ipairs(equipment[requirement.equipment_group].candidates) do
+                wantItem(candidate.item_id)
 
-        local function collect(requirement)
-            if requirement.kind == "skill" then
-                names[requirement.skill] = true
-            end
-
-            for _, child in ipairs(requirement.children or {}) do
-                collect(child)
+                for skill in pairs(candidate.skills) do
+                    skillNames[skill] = true
+                end
             end
         end
 
-        collect(self.method.requirements.access)
-        collect(self.method.requirements.recommended)
+        for _, itemId in ipairs(requirement.display_items or {}) do
+            wantItem(itemId)
+        end
 
-        local evidence = { skills = account:readSkills(names) }
+        for _, child in ipairs(requirement.children or {}) do
+            collect(child)
+        end
+    end
 
-        -- Access (can you do it at all) and recommended (should you) are checked separately.
-        return Requirements.evaluate(self.method.requirements.access, evidence),
-            Requirements.evaluate(self.method.requirements.recommended, evidence)
+    for _, method in ipairs(catalogue.methods) do
+        collect(method.requirements.access)
+        collect(method.requirements.recommended)
+    end
+
+    -- Refresh only the evidence that changed. Inventory activity never re-reads
+    -- skills/quests, and no persistence or native scans run in the resize watcher.
+    function calculator:refreshEvidence(reason)
+        local evidence = self.evidence or { skills = {}, quests = {}, items = {}, equipment = equipment }
+
+        if reason == nil or reason == "skills" then
+            evidence.skills = account:readSkills(skillNames)
+        end
+
+        if reason == nil or reason == "quests" then
+            for name in pairs(questNames) do
+                evidence.quests[name] = account:readQuest(name)
+            end
+        end
+
+        -- A live total and a historical hint are separate fields all the way to
+        -- the UI. Aliases may add current quantities, but saved counts use a max.
+        if reason == nil or reason == "inventory" then
+            self.ownershipEvidence = account:readOwnership(wanted)
+            evidence.items = {}
+
+            for key, item in pairs(catalogue.items) do
+                local itemId = tonumber(key)
+
+                if wanted[itemId] then
+                    local quantity = self.ownershipEvidence.counts[itemId] or 0
+                    local savedQuantity = (self.ownershipEvidence.savedCounts or {})[itemId] or 0
+                    local beltCounts = self.ownershipEvidence.toolbelt and self.ownershipEvidence.toolbelt.counts or {}
+                    local onToolbelt = (beltCounts[itemId] or 0) > 0
+                    local absent = self.ownershipEvidence.lastKnownAbsent or {}
+                    local lastKnownAbsent = absent[itemId] == true
+
+                    for _, alias in ipairs(item.ownership_ids or {}) do
+                        quantity = quantity + (alias ~= itemId and self.ownershipEvidence.counts[alias] or 0)
+                        savedQuantity = math.max(savedQuantity, (self.ownershipEvidence.savedCounts or {})[alias] or 0)
+                        onToolbelt = onToolbelt or (beltCounts[alias] or 0) > 0
+                        lastKnownAbsent = lastKnownAbsent and absent[alias] == true
+                    end
+
+                    -- Native name verification prevents a wrong catalogue ID from
+                    -- qualifying an item or a supposedly higher-tier tool.
+                    local ok, name = pcall(function()
+                        local object = config.Obj.FromID(itemId)
+                        return object and object.name
+                    end)
+
+                    local verified = ok and type(name) == "string" and name:lower() == item.name:lower()
+
+                    evidence.items[itemId] = {
+                        status = verified and (quantity > 0 or self.ownershipEvidence.complete) and "available" or "unknown",
+                        quantity = quantity, savedQuantity = savedQuantity, toolbelt = onToolbelt,
+                        complete = verified and self.ownershipEvidence.complete,
+                        lastKnownAbsent = verified and lastKnownAbsent,
+                    }
+                end
+            end
+        end
+
+        self.evidence = evidence
+        self.accessChanged = false
+
+        -- Browse consumes these same verdicts. Source coverage is separate from
+        -- account evidence: passing known checks cannot fill an unmapped setup.
+        for _, method in ipairs(catalogue.methods) do
+            local checked = Requirements.evaluate(method.requirements.access, evidence)
+
+            if checked.status == "met" and method.requirements.coverage ~= "complete" then
+                checked.status = "unknown"
+                checked.reason = "Some access requirements still need verification."
+            end
+
+            local previous = browser.readiness[method.id]
+            self.accessChanged = self.accessChanged or not previous or previous.status ~= checked.status
+            browser.readiness[method.id] = checked
+        end
+    end
+
+    -- The UI reads the same evidence used by Browse. A saved bank hint isn't added
+    -- to live counts and can never turn an unknown requirement into a pass.
+    function calculator:ownership()
+        local result = self.ownershipEvidence or { counts = {}, complete = false }
+        result.message = snapshot.message or (result.toolbelt and result.toolbelt.message)
+        return result
+    end
+
+    function calculator:requirements()
+        return Requirements.evaluate(self.method.requirements.access, self.evidence or {}),
+            Requirements.evaluate(self.method.requirements.recommended, self.evidence or {})
+    end
+
+    -- Save historical evidence at meaningful UI checkpoints, not per XP drop.
+    function calculator:checkpoint()
+        snapshot:flush()
     end
 
     -- Temporary diagnostics callbacks; remove them with diagnostics.lua.

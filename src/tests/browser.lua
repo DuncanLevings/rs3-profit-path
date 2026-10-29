@@ -721,6 +721,34 @@ return function(test, equal, client, pretty)
         equal(Style.quantity(1.25), "1.25")
     end)
 
+    test("Requirements stays next to Intensity and filters wrap together on narrow windows", function()
+        for _, width in ipairs({ 1000, 700 }) do
+            client()
+            local library = pretty()
+            local view = library.SimpleView.new({ width = width, height = 740 }, { width = width, height = 740 })
+            view.content.width = width
+            local browser = Browser.new({}, Preferences.new(PersistentDB), function() end)
+            local release = require("src/ui/browse_view").mount(library, view, browser, function(callback) return callback end, function() end)
+            local header = view.children[2]
+            local lists = header.nativeLists
+            equal(#lists, 5)
+            equal(lists[5].x, lists[4].x + 140)
+            equal(lists[5].y, lists[4].y)
+            assert(lists[5].x + lists[5].width <= width - 190)
+
+            if width == 1000 then
+                equal(lists[5].y, lists[1].y)
+            else
+                assert(lists[5].y > lists[1].y)
+                equal(lists[3].y, lists[5].y)
+            end
+
+            release()
+            view:Destroy()
+            equal(Event.Logic.count(), 0)
+        end
+    end)
+
     test("native sort reconciles after selection delivery and restores failed saves without looping", function()
         local state = client()
         prettyui = pretty()
@@ -749,7 +777,7 @@ return function(test, equal, client, pretty)
         -- Only Profit and ROI to sort by; difficulty and intensity are their own
         -- filter dropdowns. Entry 3 under difficulty is "Hard" (IDs count from 0), and none of the
         -- bundled methods has a difficulty rating, so the list empties.
-        equal(#header.nativeLists, 4)
+        equal(#header.nativeLists, 5)
         equal(sort.entries.Difficulty, nil)
         equal(sort.entries.ROI, 1)
 
@@ -770,7 +798,7 @@ return function(test, equal, client, pretty)
         end
 
         -- Captions say which group each dropdown belongs to.
-        for _, caption in ipairs({ "SORT BY", "DIFFICULTY", "INTENSITY" }) do
+        for _, caption in ipairs({ "SORT BY", "DIFFICULTY", "INTENSITY", "REQUIREMENTS" }) do
             assert(shownText():find(caption, 1, true), "Missing caption " .. caption)
         end
 
@@ -1012,6 +1040,15 @@ return function(test, equal, client, pretty)
         bankAvailable = true
         owned = false
         Event.InventoryUpdated.emit({ inv = config.Inv.INV })
+
+        for _, border in ipairs(items.rectangles) do
+            equal(border.rgba, Style.bad)
+        end
+
+        -- Closing the bank keeps its explicit zero counts as last-checked
+        -- absence. It must not erase a red border or invent live coverage.
+        bankAvailable = false
+        Event.InventoryRemoved.emit({ inv = config.Inv.BANK })
 
         for _, border in ipairs(items.rectangles) do
             equal(border.rgba, Style.bad)

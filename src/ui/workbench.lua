@@ -40,9 +40,9 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
     local diagnostics = Diagnostics.new(account, inspectQuote, inspectQuest)
 
     -- Re-reads whatever the current screen shows. `reason` says what changed:
-    -- "skills", "inventory", or nil for "refresh everything" (e.g. on reopen).
-    -- Inventory changes can fire on every action. The method view updates only
-    -- item borders for those, keeping skill reads out of that hot path.
+    -- "skills", "inventory", "quests", or nil for everything (e.g. on reopen).
+    -- Account evidence has already been refreshed. Details reuse their controls;
+    -- Browse only needs new rows when an active requirements filter changes.
     function self:refresh(reason)
         if not self.view or not self.interactive then
             return
@@ -52,6 +52,8 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
             self.methodRefresh(reason)
         elseif self.screen == "diagnostics" then
             diagnostics:refresh()
+        elseif self.browseRefresh and browser.availability ~= "any" and calculator.accessChanged then
+            self.browseRefresh()
         end
     end
 
@@ -388,6 +390,8 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
                 -- hidden; openWindow turns them back on.
                 onClose = function(window)
                     if self.window == window then
+                        calculator:checkpoint()
+                        diagnostics:cancelScan()
                         self.interactive = false
                         self:stopResizeWatch()
                     end

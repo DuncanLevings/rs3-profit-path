@@ -107,8 +107,7 @@
     },
     "34769": {
       "name": "Spring cleaner 2000",
-      "source": "https://runescape.wiki/w/Spring_cleaner_2000?oldid=37010568",
-      "native_mapping": "unverified"
+      "source": "https://runescape.wiki/w/Spring_cleaner_2000?oldid=37010568"
     },
     "33186": {
       "name": "Super prayer renewal potion (6)",
@@ -219,6 +218,102 @@
     "569": {
       "name": "Fire orb",
       "source": "https://runescape.wiki/w/Fire_orb?oldid=37215300"
+    },
+    "1351": {
+      "name": "Bronze hatchet",
+      "source": "https://runescape.wiki/w/Bronze_hatchet?oldid=37131917"
+    },
+    "1349": {
+      "name": "Iron hatchet",
+      "source": "https://runescape.wiki/w/Iron_hatchet?oldid=37134922"
+    },
+    "1353": {
+      "name": "Steel hatchet",
+      "source": "https://runescape.wiki/w/Steel_hatchet?oldid=36945200"
+    },
+    "1355": {
+      "name": "Mithril hatchet",
+      "source": "https://runescape.wiki/w/Mithril_hatchet?oldid=37018081"
+    },
+    "1357": {
+      "name": "Adamant hatchet",
+      "source": "https://runescape.wiki/w/Adamant_hatchet?oldid=37082399"
+    },
+    "1359": {
+      "name": "Rune hatchet",
+      "source": "https://runescape.wiki/w/Rune_hatchet?oldid=37020035"
+    },
+    "6739": {
+      "name": "Dragon hatchet",
+      "source": "https://runescape.wiki/w/Dragon_hatchet?oldid=37157887"
+    },
+    "32645": {
+      "name": "Crystal hatchet",
+      "source": "https://runescape.wiki/w/Crystal_hatchet?oldid=37161188"
+    },
+    "54890": {
+      "name": "Imcando hatchet",
+      "source": "https://runescape.wiki/w/Imcando_hatchet?oldid=37161192"
+    },
+    "58244": {
+      "name": "Hatchet of ember and glade",
+      "source": "https://runescape.wiki/w/Hatchet_of_ember_and_glade?oldid=37161194"
+    },
+    "58081": {
+      "name": "Primal hatchet",
+      "source": "https://runescape.wiki/w/Primal_hatchet?oldid=36696645"
+    },
+    "58247": {
+      "name": "Hatchet of bloom and blight",
+      "source": "https://runescape.wiki/w/Hatchet_of_bloom_and_blight?oldid=37202800"
+    },
+    "36543": {
+      "name": "Augmented dragon hatchet",
+      "source": "https://runescape.wiki/w/Augmented_dragon_hatchet?oldid=37160810"
+    },
+    "36545": {
+      "name": "Augmented crystal hatchet",
+      "source": "https://runescape.wiki/w/Augmented_crystal_hatchet?oldid=37161189"
+    },
+    "58245": {
+      "name": "Augmented hatchet of ember and glade",
+      "source": "https://runescape.wiki/w/Augmented_hatchet_of_ember_and_glade?oldid=37161195"
+    },
+    "58248": {
+      "name": "Augmented hatchet of bloom and blight",
+      "source": "https://runescape.wiki/w/Augmented_hatchet_of_bloom_and_blight?oldid=37161906"
+    },
+    "34770": {
+      "name": "Spring cleaner 3000",
+      "source": "https://runescape.wiki/w/Spring_cleaner_3000?oldid=37113880"
+    },
+    "34771": {
+      "name": "Spring cleaner 5000",
+      "source": "https://runescape.wiki/w/Spring_cleaner_5000?oldid=37010566"
+    },
+    "34772": {
+      "name": "Spring cleaner 9000",
+      "source": "https://runescape.wiki/w/Spring_cleaner_9000?oldid=37010565"
+    },
+    "1361": {
+      "name": "Black hatchet",
+      "source": "https://runescape.wiki/w/Black_hatchet?oldid=37008046"
+    },
+    "58079": {
+      "name": "Elder rune hatchet",
+      "source": "https://runescape.wiki/w/Elder_rune_hatchet?oldid=36642286"
+    },
+    "58075": {
+      "name": "Necronium hatchet",
+      "source": "https://runescape.wiki/w/Necronium_hatchet?oldid=36828737"
+    },
+    "58073": {
+      "name": "Orikalkum hatchet",
+      "source": "https://runescape.wiki/w/Orikalkum_hatchet?oldid=36828742"
+    },
+    "58077": {
+      "name": "Bane hatchet",
+      "source": "https://runescape.wiki/w/Bane_hatchet?oldid=36828743"
     }
   },
   "methods": [
@@ -318,7 +413,7 @@
         "url": "https://runescape.wiki/w/Money_making_guide/Cutting_elder_logs?oldid=37041274"
       },
       "requirements": {
-        "coverage": "partial",
+        "coverage": "complete",
         "access": {
           "kind": "all",
           "text": "Required",
@@ -332,7 +427,8 @@
             {
               "kind": "gear",
               "text": "Use the highest-tier hatchet you have",
-              "equipment_scope": "flexible"
+              "equipment_scope": "flexible",
+              "equipment_group": "hatchet"
             }
           ]
         },
@@ -381,9 +477,7 @@
             }
           ]
         },
-        "unresolved": [
-          "Verify usable hatchet alternatives before automatically matching tools."
-        ]
+        "unresolved": []
       },
       "income": {
         "coverage": "complete",
@@ -463,20 +557,92 @@
               "text": "71 Prayer"
             },
             {
-              "kind": "gear",
-              "text": "Gem bag (upgraded) or Artificer's measure; Spring cleaner 2000 or above; Attuned ectoplasmator and Demon horn necklace; Enhanced Excalibur; Luck of the Dwarves; Gold accumulator or Advanced gold accumulator",
+              "kind": "any",
+              "text": "Gem bag (upgraded) or Artificer's measure",
+              "children": [
+                {
+                  "kind": "item",
+                  "itemId": 31455,
+                  "quantity": 1,
+                  "text": "Gem bag (upgraded)"
+                },
+                {
+                  "kind": "item",
+                  "itemId": 50805,
+                  "quantity": 1,
+                  "text": "Artificer's measure"
+                }
+              ],
               "display_items": [
                 31455,
-                50805,
-                34769,
+                50805
+              ]
+            },
+            {
+              "kind": "gear",
+              "equipment_scope": "flexible",
+              "equipment_group": "spring_cleaner_2000plus",
+              "text": "Spring cleaner 2000 or above",
+              "minimum_tier": 2000,
+              "minimum_item_id": 34769
+            },
+            {
+              "kind": "all",
+              "text": "Attuned ectoplasmator; Demon horn necklace; Enhanced Excalibur; Luck of the Dwarves",
+              "children": [
+                {
+                  "kind": "item",
+                  "itemId": 32339,
+                  "quantity": 1,
+                  "text": "Attuned ectoplasmator"
+                },
+                {
+                  "kind": "item",
+                  "itemId": 19888,
+                  "quantity": 1,
+                  "text": "Demon horn necklace"
+                },
+                {
+                  "kind": "item",
+                  "itemId": 14632,
+                  "quantity": 1,
+                  "text": "Enhanced Excalibur"
+                },
+                {
+                  "kind": "item",
+                  "itemId": 39812,
+                  "quantity": 1,
+                  "text": "Luck of the Dwarves"
+                }
+              ],
+              "display_items": [
                 32339,
                 19888,
                 14632,
-                39812,
+                39812
+              ]
+            },
+            {
+              "kind": "any",
+              "text": "Gold accumulator or Advanced gold accumulator",
+              "children": [
+                {
+                  "kind": "item",
+                  "itemId": 31453,
+                  "quantity": 1,
+                  "text": "Gold accumulator"
+                },
+                {
+                  "kind": "item",
+                  "itemId": 41375,
+                  "quantity": 1,
+                  "text": "Advanced gold accumulator"
+                }
+              ],
+              "display_items": [
                 31453,
                 41375
-              ],
-              "equipment_scope": "specific"
+              ]
             }
           ]
         },
@@ -521,8 +687,9 @@
               "text": "95 Prayer (recommended)"
             },
             {
-              "kind": "capability",
-              "text": "The Temple at Senntisten for Ancient Curses (recommended)"
+              "kind": "quest",
+              "text": "The Temple at Senntisten for Ancient Curses (recommended)",
+              "quest": "TEMPLE_AT_SENNTISTEN"
             }
           ]
         },
@@ -710,7 +877,7 @@
         "url": "https://runescape.wiki/w/Money_making_guide/Cutting_elder_logs?oldid=37041274"
       },
       "requirements": {
-        "coverage": "partial",
+        "coverage": "complete",
         "access": {
           "kind": "all",
           "text": "Required",
@@ -724,7 +891,8 @@
             {
               "kind": "gear",
               "text": "Use the highest-tier hatchet you have",
-              "equipment_scope": "flexible"
+              "equipment_scope": "flexible",
+              "equipment_group": "hatchet"
             }
           ]
         },
@@ -773,9 +941,7 @@
             }
           ]
         },
-        "unresolved": [
-          "Verify usable hatchet alternatives before automatically matching tools."
-        ]
+        "unresolved": []
       },
       "income": {
         "coverage": "complete",
@@ -830,5 +996,209 @@
         "routes": []
       }
     }
-  ]
+  ],
+  "equipment": {
+    "hatchet": {
+      "complete": false,
+      "note": "Checks carried, worn, banked and mapped tool-belt hatchets. Unlisted variants remain unverified.",
+      "candidates": [
+        {
+          "item_id": 1351,
+          "tier": 5,
+          "skills": {
+            "WOODCUTTING": 1
+          }
+        },
+        {
+          "item_id": 1349,
+          "tier": 10,
+          "skills": {
+            "WOODCUTTING": 10
+          }
+        },
+        {
+          "item_id": 1353,
+          "tier": 20,
+          "skills": {
+            "WOODCUTTING": 20
+          }
+        },
+        {
+          "item_id": 1355,
+          "tier": 30,
+          "skills": {
+            "WOODCUTTING": 30
+          }
+        },
+        {
+          "item_id": 1357,
+          "tier": 40,
+          "skills": {
+            "WOODCUTTING": 40
+          }
+        },
+        {
+          "item_id": 1359,
+          "tier": 50,
+          "skills": {
+            "WOODCUTTING": 50
+          }
+        },
+        {
+          "item_id": 6739,
+          "tier": 63,
+          "skills": {
+            "WOODCUTTING": 60
+          }
+        },
+        {
+          "item_id": 32645,
+          "tier": 73,
+          "skills": {
+            "WOODCUTTING": 70
+          }
+        },
+        {
+          "item_id": 54890,
+          "tier": 83,
+          "skills": {
+            "WOODCUTTING": 80
+          }
+        },
+        {
+          "item_id": 58244,
+          "tier": 93,
+          "skills": {
+            "WOODCUTTING": 90
+          }
+        },
+        {
+          "item_id": 58081,
+          "tier": 100,
+          "skills": {
+            "WOODCUTTING": 100
+          }
+        },
+        {
+          "item_id": 58247,
+          "tier": 103,
+          "skills": {
+            "WOODCUTTING": 100
+          }
+        },
+        {
+          "item_id": 36543,
+          "tier": 63,
+          "skills": {
+            "WOODCUTTING": 60
+          }
+        },
+        {
+          "item_id": 36545,
+          "tier": 73,
+          "skills": {
+            "WOODCUTTING": 70
+          }
+        },
+        {
+          "item_id": 58245,
+          "tier": 93,
+          "skills": {
+            "WOODCUTTING": 90
+          }
+        },
+        {
+          "item_id": 58248,
+          "tier": 103,
+          "skills": {
+            "WOODCUTTING": 100
+          }
+        },
+        {
+          "item_id": 1361,
+          "tier": 25,
+          "skills": {
+            "WOODCUTTING": 25
+          }
+        },
+        {
+          "item_id": 58079,
+          "tier": 90,
+          "skills": {
+            "WOODCUTTING": 90
+          }
+        },
+        {
+          "item_id": 58075,
+          "tier": 70,
+          "skills": {
+            "WOODCUTTING": 70
+          }
+        },
+        {
+          "item_id": 58073,
+          "tier": 60,
+          "skills": {
+            "WOODCUTTING": 60
+          }
+        },
+        {
+          "item_id": 58077,
+          "tier": 80,
+          "skills": {
+            "WOODCUTTING": 80
+          }
+        }
+      ],
+      "source": "https://runescape.wiki/w/Hatchets?oldid=37191363"
+    },
+    "spring_cleaner_2000plus": {
+      "complete": false,
+      "note": "Checks listed spring-cleaner upgrades; ownership does not verify its settings or charges.",
+      "candidates": [
+        {
+          "item_id": 34769,
+          "tier": 2000,
+          "skills": {}
+        },
+        {
+          "item_id": 34770,
+          "tier": 3000,
+          "skills": {}
+        },
+        {
+          "item_id": 34771,
+          "tier": 5000,
+          "skills": {}
+        },
+        {
+          "item_id": 34772,
+          "tier": 9000,
+          "skills": {}
+        }
+      ]
+    }
+  },
+  "toolbelt": {
+    "hatchet": {
+      "presence_variable": "TOOLBELT_HATCHET",
+      "value_variable": "TOOLBELT_HATCHET_LEVEL",
+      "items_enum": "TOOLBELT_HATCHETS",
+      "value_offset": 0,
+      "source": "Native beta metadata and displayed item verification, 2026-10-29."
+    },
+    "pickaxe": {
+      "presence_variable": "TOOLBELT_PICKAXE",
+      "value_variable": "TOOLBELT_PICKAXE_LEVEL",
+      "items_enum": "TOOLBELT_PICKAXES",
+      "value_offset": 0,
+      "source": "Native beta metadata and displayed item verification, 2026-10-29."
+    },
+    "mattock": {
+      "value_variable": "TOOLBELT_MATTOCK",
+      "items_enum": "TOOLBELT_MATTOCKS",
+      "value_offset": -1,
+      "source": "Native beta metadata; value 1 verified as bronze on tool-belt display, 2026-10-29."
+    }
+  }
 }

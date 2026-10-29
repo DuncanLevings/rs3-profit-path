@@ -26,6 +26,18 @@ https://runescape.wiki/w/Money_making_guide/Smelting_steel_bars?oldid=36866574
 https://runescape.wiki/w/Money_making_guide/Cutting_elder_logs?oldid=37041274
 https://runescape.wiki/w/Money_making_guide/Killing_abyssal_demons?oldid=37017140
 
+Equipment alternatives and use-level reference data were normalised from Wiki
+item pages on 2026-10-29. Per-item revision URLs are retained in
+catalogue-source/methods.json and data/methods.lua. Hatchet tiers here mean cutting
+performance, not combat weapon tiers. Cutting-power comparison and use levels:
+https://runescape.wiki/w/Hatchets?oldid=37191363
+The Wiki attribution and content license above apply.
+
+Tool-belt variable names, enum names and indexing offsets come from native beta
+client metadata and developer display verification on 2026-10-29. The reader uses
+the native item enums rather than bundling copied item mappings. Other tool-belt
+categories and unlisted equipment variants remain unverified.
+
 Additional item identifiers:
 https://runescape.wiki/w/Steel_bar?oldid=37134793
 https://runescape.wiki/w/Elder_logs?oldid=37166250

@@ -1,12 +1,22 @@
 -- Temporary development probes. The parent view owns all components; this module
 -- only retains labels while mounted. Remove these probes before release packaging.
+local ToolbeltProbe = require("src/game/toolbelt_probe")
 local Diagnostics = {}
 
 function Diagnostics.new(account, inspectQuote, inspectQuest)
     local self = {}
     local labels = {}
 
+    -- A hidden/destroyed Diagnostics screen must not leave discovery work running.
+    function self:cancelScan()
+        if self.cancelProbe then
+            self.cancelProbe()
+            self.cancelProbe = nil
+        end
+    end
+
     function self:unmount()
+        self:cancelScan()
         labels = {}
     end
 
@@ -86,6 +96,53 @@ function Diagnostics.new(account, inspectQuote, inspectQuest)
             else
                 labels.inventory.content = "No inventory change observed yet. Equip or remove an item first."
             end
+        end))
+
+        view:AddTitle("Tool-belt hatchet")
+        local toolbeltResult = view:AddText("Not checked. Raw values do not establish an owned item yet.")
+        view:AddSimpleButton("Inspect tool-belt hatchet", guarded(function()
+            local result = account:inspectToolbeltHatchet()
+
+            if result.status == "available" then
+                toolbeltResult.content = "Raw hatchet value: " .. result.value .. " (config " .. result.configId
+                    .. "). Compare with the hatchet shown on your tool belt."
+            else
+                toolbeltResult.content = result.message
+            end
+        end))
+
+        local resolvedTools = view:AddText("Resolved tool-belt items have not been checked.")
+        view:AddSimpleButton("Read tool-belt items", guarded(function()
+            local belt = account:readToolbelt()
+            local lines = {}
+
+            for family, slot in pairs(belt.slots) do
+                lines[#lines + 1] = family .. ": " .. (slot.itemId and slot.name .. " [" .. slot.itemId .. "]" or slot.message or "No tool present")
+            end
+
+            table.sort(lines)
+            resolvedTools.content = #lines > 0 and table.concat(lines, "\n") or belt.message or "No mapped families."
+        end))
+
+        local toolbeltMetadata = view:AddText("Shared tool-belt mapping discovery has not run.")
+        view:AddSimpleButton("Inspect tool-belt metadata", guarded(function()
+            self:cancelScan()
+            toolbeltMetadata.content = "Scanning native configs in small batches; keep Diagnostics open."
+
+            self.cancelProbe = ToolbeltProbe.start(guarded(function(line)
+                print("[Profit Path toolbelt] " .. line)
+            end), guarded(function(scanned, matched)
+                toolbeltMetadata.content = "Inspected " .. scanned .. " IDs; found " .. matched .. " candidate configs."
+            end), guarded(function(result)
+                local summary = result.message .. " Inspected " .. result.scanned .. "; candidates " .. result.matched
+                    .. "; read failures " .. result.failures .. "."
+                toolbeltMetadata.content = summary
+                print("[Profit Path toolbelt] " .. summary)
+
+                if result.firstFailure then
+                    print("[Profit Path toolbelt] First failed read: " .. result.firstFailure)
+                end
+            end))
         end))
 
         view:AddTitle("Quest availability")

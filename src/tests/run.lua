@@ -74,7 +74,7 @@ local function client(database)
 
     Event = {}
 
-    for _, name in ipairs({ "InventoryAdded", "InventoryUpdated", "InventoryRemoved", "SkillTransmit", "GameStateChanged", "ContentLayerReady", "Logic" }) do
+    for _, name in ipairs({ "InventoryAdded", "InventoryUpdated", "InventoryRemoved", "SkillTransmit", "GameStateChanged", "ContentLayerReady", "Logic", "VarTransmit" }) do
         Event[name] = event()
     end
 
@@ -264,6 +264,10 @@ local function client(database)
             self.x, self.y = x, y
         end
 
+        function rectangle:Destroy()
+            self.destroyed = true
+        end
+
         function rectangle:SetSize(width, height)
             self.width, self.height = width, height
         end
@@ -417,6 +421,10 @@ local function pretty()
             local label = { content = type(text) == "table" and text.text or text, options = text }
             self.texts[#self.texts + 1] = label
 
+            function label:SetPos(x, y)
+                self.x, self.y = x, y
+            end
+
             return label
         end
 
@@ -494,6 +502,14 @@ local function pretty()
             local slot = { object = object, tooltip = options.tooltip, options = options }
             self.items = self.items or {}
             self.items[#self.items + 1] = slot
+
+            function slot:Destroy()
+                self.destroyed = true
+            end
+
+            function slot:SetObject(object)
+                self.object = object
+            end
 
             function slot:SetTooltip(text)
                 self.tooltip = text
@@ -1383,5 +1399,7 @@ end)
 -- these helpers.
 dofile("src/tests/calculator.lua")(test, equal, client, pretty)
 dofile("src/tests/browser.lua")(test, equal, client, pretty)
+
+dofile("src/tests/account.lua")(test, equal, client, pretty)
 
 print(string.format("%d behavior tests passed.", passed))

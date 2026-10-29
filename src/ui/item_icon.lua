@@ -4,30 +4,33 @@
 local definitions = require("data/methods").items
 local ItemIcon = {}
 
--- Adds the icon for `itemId` to `parent` and returns three things:
---   control  - the item slot (or an info icon if we couldn't verify the item)
---   name     - the item's name from our catalogue, also used as the tooltip
---   verified - true only if the client's item has the name we expected
---
--- The name check matters: if the ID in our data were wrong, the client would
--- happily draw some unrelated item. Showing an info icon instead keeps the
--- mistake visible. The parent owns the control and its tooltip, as usual.
-function ItemIcon.add(parent, itemId, options)
+-- Check the native item's name before showing it. A bad ID must never display
+-- some unrelated picture. Keep native property access inside the protected read.
+function ItemIcon.resolve(itemId)
     local definition = definitions[tostring(itemId)]
-
-    -- Native config lookups can throw for unknown IDs, so protect this one.
+    local expected = definition and definition.name or "Unknown item"
     local ok, object = pcall(function()
-        return config.Obj.FromID(itemId)
+        local native = config.Obj.FromID(itemId)
+        local name = native and native.name
+
+        if definition and type(name) == "string" and name:lower() == expected:lower() then
+            return native
+        end
     end)
 
-    local expected = definition and definition.name or "Unknown item"
+    return ok and object or nil, expected
+end
+
+-- Fixed source icons and the changing owned-match slot share the same native
+-- identity check, so a stale/bad ID never displays another item's picture.
+function ItemIcon.add(parent, itemId, options)
+    local object, expected = ItemIcon.resolve(itemId)
     options.tooltip = expected
 
-    if not ok or not object or not definition or object.name:lower() ~= expected:lower() then
+    if not object then
         return parent:AddSpriteButton("INFO", function() end, options), expected, false
     end
 
-    -- Item slots ignore the mouse by default; we need hovers for the tooltip.
     options.clickthrough = false
 
     return parent:AddItemSlot(object, options), expected, true

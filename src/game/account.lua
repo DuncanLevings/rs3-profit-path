@@ -1,13 +1,17 @@
--- Everything we read about the player's own account goes through here. This file
--- owns the client event subscriptions (inventory, skills, game state) and tells its
--- owner when something changed, passing a reason: "skills", "inventory" or
--- "game_state". It never does money maths or decides recommendations.
+-- Lasting player-account reads and small manual probes live here. The temporary
+-- toolbelt_probe.lua separately owns batched native-config discovery. This file
+-- owns the client event subscriptions (inventory, skills, quests, game state) and
+-- tells its owner which evidence changed. It never does money maths or decides
+-- recommendations.
 --
--- Bank data may be unavailable while closed. Item borders only describe readable
--- backpack, worn gear and bank contents; they never establish full account ownership.
+-- Bank data may be unavailable while closed. Readable backpack/worn/bank contents
+-- and mapped tool-belt families still don't establish full account ownership.
+local Toolbelt = require("src/game/toolbelt")
 local Account = {}
 
-function Account.new(onChanged)
+-- App supplies the optional snapshot owner and validated tool-belt bindings;
+-- isolated native probes can omit them without importing the whole catalogue.
+function Account.new(onChanged, snapshot, toolbeltBindings)
     local self = {
         active = true,
 
@@ -15,6 +19,11 @@ function Account.new(onChanged)
         -- "BANK"). Each entry is { configId, counts = { [itemId] = total } } and is
         -- thrown away as soon as that container changes. Lives only in memory.
         ownershipCache = {},
+        snapshot = snapshot,
+        questVariables = {},
+        toolbeltBindings = toolbeltBindings or {},
+        toolbeltVariables = {},
+        toolbeltCache = nil,
 
         -- Temporary diagnostics state; see the probe section below.
         eventCount = 0,
@@ -48,6 +57,11 @@ function Account.new(onChanged)
         end
 
         local inventoryConfig = event.inv
+
+        -- A removed bank is a useful checkpoint for the last observed contents.
+        if kind == "Removed" and self.snapshot then
+            self.snapshot:flush()
+        end
 
         for name, snapshot in pairs(self.ownershipCache) do
             if snapshot.configId == inventoryConfig.id then
@@ -115,19 +129,43 @@ function Account.new(onChanged)
         return name
     end
 
+    -- Keep plain tool-belt evidence until one of its watched variables changes.
+    -- It is live state, never written into the bank/inventory snapshot records.
+    function self:readToolbelt()
+        if not self.active or not Player.IsAvailable() then
+            return { counts = {}, slots = {}, complete = false, message = "Tool belt is unavailable outside a game world." }
+        end
+
+        if not self.toolbeltCache then
+            self.toolbeltCache = Toolbelt.read(self.toolbeltBindings)
+            self.toolbeltVariables = self.toolbeltCache.watched
+        end
+
+        return self.toolbeltCache
+    end
+
     -- How many of each item in `wanted` (a set like { [2353] = true }) the player
-    -- has across backpack (INV), worn gear (WORN) and bank (BANK). Those three
-    -- config names are verified (Skill Tips uses them too).
+    -- can use across backpack (INV), worn gear (WORN), bank (BANK) and mapped
+    -- tool-belt families. The three inventory config names are verified.
     --
     -- Returns { counts = { [itemId] = total }, complete = true/false }. `complete`
-    -- means all three containers were read. It does NOT cover other storage (Diango,
-    -- house, etc.), so the UI only treats "0 with complete = true" as "not found in
-    -- these three". If any container can't be read, absence proves nothing.
+    -- means the three containers and mapped belt families were readable. It does
+    -- NOT cover Diango, the house or other belt categories. Unreadable live state
+    -- can't establish absence; lastKnownAbsent separately preserves saved zeros.
     --
     -- Counts are cached per container until an inventory event says it changed, so
     -- refreshing the borders doesn't hit the client for every item every time.
+    -- Saved counts are returned separately and never count towards live ownership.
     function self:readOwnership(wanted)
-        local totals = {}
+        local totals, savedCounts, sources = {}, {}, {}
+        local lastKnownAbsent = {}
+
+        -- A red border can retain a last-checked absence after the bank closes.
+        -- Each container must explicitly record zero for this item; a missing key
+        -- is unknown, not zero. This display hint never qualifies access checks.
+        for itemId in pairs(wanted) do
+            lastKnownAbsent[itemId] = true
+        end
 
         if next(wanted) == nil then
             return { counts = totals, complete = false }
@@ -172,17 +210,118 @@ function Account.new(onChanged)
 
             if ok and read then
                 self.ownershipCache[name] = read
+                sources[name] = "live"
+
+                if self.snapshot then
+                    self.snapshot:observe(name, read.counts)
+                end
 
                 for itemId in pairs(wanted) do
                     totals[itemId] = (totals[itemId] or 0) + read.counts[itemId]
+                    lastKnownAbsent[itemId] = lastKnownAbsent[itemId] and read.counts[itemId] == 0
                 end
             else
                 self.ownershipCache[name] = nil
                 complete = false
+                local remembered = self.snapshot and self.snapshot.data[name]
+                sources[name] = remembered and "saved" or "unavailable"
+
+                -- Historical locations can contain the SAME moved item. Never sum
+                -- them or add them to live counts; they are only a last-seen hint.
+                for itemId in pairs(wanted) do
+                    local recorded = remembered and remembered[itemId]
+                    local quantity = recorded or 0
+                    lastKnownAbsent[itemId] = lastKnownAbsent[itemId] and recorded == 0
+
+                    if quantity > (savedCounts[itemId] or 0) then
+                        savedCounts[itemId] = quantity
+                    end
+                end
             end
         end
 
-        return { counts = totals, complete = complete }
+        local toolbelt = self:readToolbelt()
+        sources.TOOLBELT = toolbelt.complete and "live" or "partly checked"
+
+        for itemId in pairs(wanted) do
+            if toolbelt.counts[itemId] then
+                -- The belt proves a usable tool, not another tradeable copy.
+                -- Do not inflate named-item quantities by adding a virtual stack.
+                totals[itemId] = math.max(totals[itemId] or 0, 1)
+                lastKnownAbsent[itemId] = false
+            end
+        end
+
+        return { counts = totals, complete = complete and toolbelt.complete, savedCounts = savedCounts,
+            sources = sources, lastKnownAbsent = lastKnownAbsent, toolbelt = toolbelt }
+    end
+
+    -- Called only after Preferences has identified and bound the current player.
+    function self:bindProfile(profile)
+        self.ownershipCache = {}
+        self.questVariables = {}
+        self.toolbeltCache = nil
+        self.toolbeltVariables = {}
+
+        if self.snapshot then
+            self.snapshot:bind(profile)
+        end
+    end
+
+    -- Read documented quest completion flags and watch only their progress variables.
+    -- Unknown native values stay unknown rather than becoming an incomplete quest.
+    function self:readQuest(name)
+        if not self.active then
+            return { status = "stopped" }
+        end
+
+        if type(name) ~= "string" or not name:match("^[A-Z][A-Z0-9_]*$") then
+            return { status = "invalid", message = "Enter a current, non-deprecated quest config name." }
+        end
+
+        if not Player.IsAvailable() then
+            return { status = "unavailable", message = "Log into a game world first." }
+        end
+
+        local ok, result = pcall(function()
+            local quest = config.Quest[name]
+
+            if not quest then
+                return { status = "unknown", message = "Quest config is not available: " .. name }
+            end
+
+            if quest.deprecated then
+                return { status = "unknown", message = "This quest config is deprecated; use its replacement." }
+            end
+
+            -- Track only this quest's progress variables. Other variable traffic
+            -- must not trigger a catalogue-wide refresh.
+            for _, descriptor in pairs(quest.masterQuestVars or {}) do
+                if descriptor.varPlayer then
+                    self.questVariables[descriptor.varPlayer.id] = true
+                end
+            end
+
+            local completed = quest.hasFinishedQuest
+            local started = quest.hasStartedQuest
+
+            if type(completed) ~= "boolean" or type(started) ~= "boolean" then
+                return { status = "unknown", message = "Quest progress is unavailable." }
+            end
+
+            return {
+                status = "available",
+                name = quest.name,
+                completed = completed,
+                started = started,
+            }
+        end)
+
+        if not ok then
+            result = { status = "error", message = "Quest read failed: " .. tostring(result) }
+        end
+
+        return result
     end
 
     -- Safe to call twice. Unsubscribes first, so no event can arrive mid-teardown.
@@ -193,6 +332,12 @@ function Account.new(onChanged)
 
         self.active = false
         self.ownershipCache = {}
+        self.toolbeltCache = nil
+        self.toolbeltVariables = {}
+
+        if self.snapshot then
+            self.snapshot:unbind()
+        end
 
         for _, event in ipairs(subscriptions) do
             event.Unsubscribe("profit-path-account")
@@ -286,43 +431,47 @@ function Account.new(onChanged)
         return result
     end
 
-    -- Completion flags need comparison with the quest journal.
-    function self:inspectQuest(name)
-        if not self.active then
-            return { status = "stopped" }
-        end
-        self.questInspection = nil
-        if type(name) ~= "string" or not name:match("^[A-Z][A-Z0-9_]*$") then
-            return { status = "invalid", message = "Enter a current, non-deprecated quest config name." }
-        end
-        if not Player.IsAvailable() then
-            return { status = "unavailable", message = "Log into a game world first." }
+    -- Temporary read-only probe. The config name is verified in Skill Tips, but
+    -- its numeric values aren't mapped yet, so this must not qualify equipment.
+    function self:inspectToolbeltHatchet()
+        if not self.active or not Player.IsAvailable() then
+            return { status = "unavailable", message = "Enter a game world first." }
         end
 
         local ok, result = pcall(function()
-            local quest = config.Quest[name]
-            if not quest then
-                return { status = "unknown", message = "Quest config is not available: " .. name }
+            local setting = var.VarPlayer.TOOLBELT_HATCHET_LEVEL
+
+            if not setting then
+                return { status = "unknown", message = "The tool-belt hatchet variable is unavailable." }
             end
-            if quest.deprecated then
-                return { status = "unknown", message = "This quest config is deprecated; use its replacement." }
+
+            local value = setting.value
+
+            if type(value) ~= "number" or value < 0 or value >= math.huge or value % 1 ~= 0 then
+                return { status = "unknown", message = "The tool-belt hatchet value is unavailable or not an integer." }
             end
-            local completed = quest.hasFinishedQuest
-            local started = quest.hasStartedQuest
-            if type(completed) ~= "boolean" or type(started) ~= "boolean" then
-                return { status = "unknown", message = "Quest progress is unavailable." }
-            end
-            return {
-                status = "available",
-                name = quest.name,
-                completed = completed,
-                started = started,
-            }
+
+            return { status = "available", value = value, configId = setting.id }
         end)
+
         if not ok then
-            result = { status = "error", message = "Quest read failed: " .. tostring(result) }
+            return { status = "error", message = "Tool-belt read failed: " .. tostring(result) }
         end
-        self.questInspection = result
+
+        return result
+    end
+
+    -- Temporary diagnostics wrapper; the native reader above is lasting code.
+    function self:inspectQuest(name)
+        -- Invalid input and offline reads should clear the previous probe result.
+        -- Lasting requirement reads use readQuest without touching this UI state.
+        self.questInspection = nil
+        local result = self:readQuest(name)
+
+        if result.status ~= "invalid" and result.status ~= "unavailable" and result.status ~= "stopped" then
+            self.questInspection = result
+        end
+
         return result
     end
 
@@ -340,6 +489,17 @@ function Account.new(onChanged)
         inventoryChanged("Removed", event)
     end)
 
+    subscribe(Event.VarTransmit, function(event)
+        if self.toolbeltVariables[event.var.id] then
+            self.toolbeltCache = nil
+            notify("inventory")
+        end
+
+        if self.questVariables[event.var.id] then
+            notify("quests")
+        end
+    end)
+
     -- This may well fire on every XP drop while skilling (not checked in game yet),
     -- so keep the reaction cheap: the UI just re-reads the few skills on screen.
     subscribe(Event.SkillTransmit, function()
@@ -353,6 +513,13 @@ function Account.new(onChanged)
             return
         end
 
+        if self.snapshot then
+            self.snapshot:unbind()
+        end
+
+        self.questVariables = {}
+        self.toolbeltCache = nil
+        self.toolbeltVariables = {}
         self.inspection = nil
         self.questInspection = nil
         self.lastInventoryName = nil

@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.7.1-dev — 2026-10-29
+
+- Connect quest, item and equipment-alternative requirements to shared account evidence. Add a Requirements dropdown beside Intensity, keep cards free of readiness labels and wrap filters together on narrow windows.
+- Save catalogue-relevant inventory counts per character at meaningful checkpoints. Keep historical evidence separate from live ownership; retain last-checked missing-item borders after bank close and protect invalid stored data.
+- Resolve tool-belt hatchets, pickaxes and mattocks through native enums and verified indexing. Cache plain results, invalidate on relevant variable events and show the actual owned item with On your tool belt. Other belt categories remain unverified.
+- Complete the normal hatchet candidate list and rank it by cutting power separately from use/combat levels. Tool-belt evidence never inflates tradeable quantities or enters saved bank records.
+- Show a named minimum such as Spring cleaner 2000+ when no owned match exists, with a missing/unknown border. Replace it with an owned upgrade when found; broad highest-tool requirements retain their flexible wording.
+- Keep item tooltips name-only, verify native names before displaying icons and update equipment slots without rebuilding the rate input. Temporary native discovery probes are bounded, report errors/limits and cancel on screen/session teardown.
+- Validate with 111 Lua behaviour tests and 32 Python catalogue tests, plus deterministic data, syntax, manifest and repository file-policy checks.
+
+## Earlier development
 
 - Value selected shared PvM drops and render expected hourly outputs. Abyssal demons now includes all 16 Wiki-listed outputs, actual spring-cleaner alchemy proceeds and untaxed coin drops; missing live quotes still prevent total profit. Validate ambiguous rates/quantities with the runtime loot expansion during builds.
 
