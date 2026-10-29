@@ -1,0 +1,100 @@
+Monster Lookup: plugin-specific material
+
+Combat icons named resources/stat_*.png are RuneScape artwork, copyright Jagex Ltd.
+Retrieved from the RuneScape Wiki. Individual file sources are listed in
+resources/STAT_ICONS_SOURCES.txt.
+
+Expanded native transition and exit references: RuneScape Wiki contributors.
+Retrieved 2026-10-21; article and annotated-map revision IDs are recorded in
+resources/DUNGEON_ROUTE_SOURCES.json. Native scenery coordinates, annotated exit
+points, and paired ladder lines are reference data under CC BY-NC-SA 3.0 as above.
+Image-map pixel positions are not bundled as game coordinates.
+
+Infested axe location regression fixtures: RuneScape Wiki contributors.
+Retrieved 2026-10-21 from https://runescape.wiki/w/Infested_axe .
+CC BY-NC-SA 3.0 under the Wiki reference license above.
+
+Embedded Monster Data Core snapshot (0.0.3)
+Source paths in the following notices refer to the upstream data-library repository.
+Runtime Lua files are bundled under src/data/library/.
+Monster Data Core contains static reference data and offline build tools.
+RuneScape Wiki contributors: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported.
+https://runescape.wiki/w/RuneScape:Copyrights
+https://creativecommons.org/licenses/by-nc-sa/3.0/
+Original source/revision details follow (historical plugin paths describe the source build).
+
+rxi/json.lua v0.1.2
+Source: https://github.com/rxi/json.lua
+Pinned revision: dbf4b2dd2eb7c23be2773c89eb059dadd6436f94
+License: MIT (full license retained in src/data/library/vendor/json.lua)
+Modified locally to scan JSON strings in chunks and avoid repeated string copies.
+No downloaded Lua is executed.
+
+Monster and drop reference information comes from the RuneScape Wiki.
+Wiki text remains subject to the Wiki's content license: https://runescape.wiki/w/RuneScape:Copyrights
+
+Bundled Slayer Codex reference: RuneScape Wiki contributors.
+Source: https://runescape.wiki/w/Slayer_Codex?oldid=37206498
+Retrieved 2026-10-21; selected table columns and page aliases extracted into Lua.
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported
+https://creativecommons.org/licenses/by-nc-sa/3.0/
+Rebuild with tools/build_slayer_codex.py from a saved source article.
+
+Bundled monster-name index: RuneScape Wiki contributors.
+Source: https://runescape.wiki/api.php (Bucket API, infobox_monster.page_name)
+Retrieved 2026-10-21; 2,462 unique mainspace page titles, filtered from 6,062 current variant rows.
+Removed content and pages without drops or useful combat information are excluded.
+Location qualifiers in page titles are retained. The full static bundle also includes monster statistics and drop records.
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported
+https://creativecommons.org/licenses/by-nc-sa/3.0/
+Rebuild with tools/build_monster_index.py from saved Bucket API pages.
+
+Bundled dungeon entrance reference: RuneScape Wiki contributors.
+Retrieved 2026-10-21; surface access coordinates and access labels in
+src/locations/dungeons/entrances.lua. These are entrance points, not interior map conversions.
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported
+https://creativecommons.org/licenses/by-nc-sa/3.0/
+Sources:
+https://runescape.wiki/w/Abandoned_Mine?oldid=37177590
+https://runescape.wiki/w/Ancient_Cavern?oldid=37125121
+https://runescape.wiki/w/Brimhaven_Dungeon?oldid=37122210
+https://runescape.wiki/w/Chaos_Tunnels?oldid=37175720
+https://runescape.wiki/w/Fremennik_Slayer_Dungeon?oldid=37122995
+https://runescape.wiki/w/God_Wars_Dungeon?oldid=37197200
+https://runescape.wiki/w/Heart_of_Gielinor?oldid=37187608
+https://runescape.wiki/w/Kuradal's_Dungeon?oldid=37130530
+https://runescape.wiki/w/Lair_of_Tarn_Razorlor_(dungeon)?oldid=37180063
+https://runescape.wiki/w/Lumbridge_Catacombs?oldid=37109974
+https://runescape.wiki/w/Morytania_Slayer_Tower_dungeon?oldid=37125018
+https://runescape.wiki/w/Polypore_Dungeon?oldid=37134559
+https://runescape.wiki/w/Taverley_Dungeon?oldid=37130519
+https://runescape.wiki/w/Whirlpool_(Baxtorian_Falls)?oldid=36789093
+
+Bundled map-coordinate transforms: RuneScape Wiki contributors.
+Selected maps extracted as numeric reference data into src/locations/dungeons/maps.lua.
+Source floors, coordinate offsets and coverage bounds are retained.
+Rebuild with tools/build_dungeon_maps.py from saved map configuration JSON.
+No downloaded Lua is executed. Route notes use the Abandoned Mine source above.
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported
+https://creativecommons.org/licenses/by-nc-sa/3.0/
+https://runescape.wiki/w/Module:Map_coordinates?oldid=37183103
+https://runescape.wiki/w/Module:Map_coordinates/transform-data?oldid=35507962
+https://runescape.wiki/w/Module:Map_coordinates/transform-data.json?oldid=37189800
+
+Additional verified entrance: RuneScape Wiki contributors.
+Pollnivneach Slayer Dungeon (well at 3359,2972), retrieved 2026-10-21.
+https://runescape.wiki/w/Pollnivneach_Slayer_Dungeon?oldid=37120649
+CC BY-NC-SA 3.0, under the dungeon reference license above.
+
+Polypore resource dungeon access reference: RuneScape Wiki contributors.
+Access via Polypore Dungeon; surface entrance coordinates use the main dungeon source above.
+https://runescape.wiki/w/Polypore_Dungeon_resource_dungeon?oldid=37156281
+Retrieved 2026-10-21; CC BY-NC-SA 3.0 under the dungeon reference license above.
+
+Expanded dungeon access reference: RuneScape Wiki contributors.
+Retrieved 2026-10-21; CC BY-NC-SA 3.0 under the dungeon reference license above.
+Article revision IDs and coordinate provenance: resources/DUNGEON_ENTRANCE_SOURCES.json.
+
+Expanded interior maps, dedicated map membership and resource-portal references
+use the map configuration and Resource dungeons revisions recorded in
+resources/DUNGEON_ENTRANCE_SOURCES.json. CC BY-NC-SA 3.0 as above.

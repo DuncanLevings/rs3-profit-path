@@ -1,0 +1,43 @@
+Profit Path: monster and drop reference snapshot
+
+RuneScape Wiki contributors
+https://runescape.wiki/
+https://runescape.wiki/w/RuneScape:Copyrights
+Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported
+https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+Derived from the local static snapshot bundled in DuncanLevings/rs3-monster-lookup:
+https://github.com/DuncanLevings/rs3-monster-lookup
+Its embedded data was built 2026-10-22. The inherited bundle does not provide
+individual article revision IDs; this snapshot is not a claim of current Wiki data.
+
+Profit Path retains monster identity, drop sections, rates, quantities, roll counts,
+conditions and notes. It omits monster stats, maps, locations, search indexes and
+historical prices, and records rows labelled Not sold as untradeable reference data.
+Repeated strings, drop rows and sections are shared in generated Lua tables.
+
+Editable source, exact input hashes and full inherited source notices are recorded
+in catalogue-source/monsters.json and catalogue-source/monster-source-notices.txt.
+These are maintainer inputs; runtime uses data/monsters.lua and monster_data.lua.
+No Monster Data Core runtime dependency or implementation code is bundled.
+
+Representative method records (summarised and normalised by Profit Path):
+https://runescape.wiki/w/Money_making_guide/Smelting_steel_bars?oldid=36866574
+https://runescape.wiki/w/Money_making_guide/Cutting_elder_logs?oldid=37041274
+https://runescape.wiki/w/Money_making_guide/Killing_abyssal_demons?oldid=37017140
+
+Additional item identifiers:
+https://runescape.wiki/w/Steel_bar?oldid=37134793
+https://runescape.wiki/w/Elder_logs?oldid=37166250
+https://runescape.wiki/w/Spring?oldid=37186141
+
+Retrieved 2026-10-28 using MediaWiki API. Wiki contributor attribution and the
+CC BY-NC-SA 3.0 content license above also apply to this derived reference data.
+
+Calculator reference reviewed 2026-10-28:
+https://runescape.wiki/w/Template:Mmgtable/doc?oldid=36863324
+https://runescape.wiki/w/Module:Mmgtable?oldid=37167449
+The source establishes per-hour/per-kill input distinctions, per-item output tax
+rounding and cost-based ROI. Profit Path's calculator is independently written.
+It uses GEPL instant-buy input and instant-sell output trade quotes instead of
+the Wiki's guide prices. Zero-cost ROI is shown as not applicable, not infinity.
