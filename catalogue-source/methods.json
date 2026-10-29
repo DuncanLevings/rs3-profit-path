@@ -317,7 +317,7 @@
         ]
       },
       "income": {
-        "coverage": "partial",
+        "coverage": "complete",
         "period": "hour",
         "rate": {
           "key": "logs_per_hour",
@@ -326,12 +326,14 @@
         },
         "inputs": [
           {
+            "item_id": 33234,
             "name": "Perfect plus potion",
             "quantity": 0.041666666666666664,
             "source_quantity": "1/6 * 1/4",
             "basis": "hour",
-            "valuation": "unresolved ingredient-cost formula",
-            "display_item_id": 33234
+            "pricing": "recipe",
+            "recipe": "Perfect plus potion",
+            "portion": 6
           }
         ],
         "outputs": [
@@ -346,9 +348,7 @@
         "assumptions": [
           "This method uses no wood spirits. Extra logs and costs from optional equipment are not included."
         ],
-        "unresolved": [
-          "Expand the source potioncost formula before showing a complete profit estimate."
-        ]
+        "unresolved": []
       },
       "instructions": [
         "Cut an elder tree, then move to another tree when it is depleted.",
@@ -472,19 +472,20 @@
         },
         "inputs": [
           {
+            "item_id": 48239,
             "name": "Aggroverload (6)",
             "quantity": 1.6666666666666667,
             "source_quantity": "10/6",
             "basis": "hour",
-            "valuation": "unresolved ingredient-cost formula",
-            "display_item_id": 48239
+            "pricing": "recipe",
+            "recipe": "Aggroverload",
+            "portion": 6
           },
           {
+            "item_id": 33186,
             "name": "Super prayer renewal potion (6)",
             "quantity": 9,
-            "basis": "hour",
-            "valuation": "unresolved item mapping",
-            "display_item_id": 33186
+            "basis": "hour"
           },
           {
             "item_id": 31613,
@@ -593,7 +594,6 @@
         ],
         "unresolved": [
           "Reconcile shared drop quantities and probabilities with this method revision.",
-          "Resolve potion-cost formulas and item IDs.",
           "Verify source-equivalent salvage valuation and spring-cleaner treatment before calculating a complete profit."
         ]
       },

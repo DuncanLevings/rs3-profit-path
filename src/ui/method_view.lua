@@ -10,6 +10,7 @@
 -- cursor out of it mid-typing.
 local Style = require("src/ui/view_style")
 local ItemIcon = require("src/ui/item_icon")
+local RecipeCost = require("src/methods/recipe_cost")
 
 local MethodView = {}
 
@@ -82,7 +83,7 @@ end
 --   * text colour on each requirement: met / unmet / unknown (from skill levels)
 --   * a border on each item icon: found in backpack, worn or bank / not found / can't tell
 -- Returns two refresh functions: one for requirement text, one for item borders.
-local function mountRequirements(parent, method, calculator)
+local function mountRequirements(parent, method, calculator, fitter)
     local groups = { Skills = {}, ["Required items"] = {}, ["Recommended items"] = {}, Quests = {}, Other = {} }
 
     -- Sort each top-level requirement into its section. Items split further into
@@ -148,20 +149,23 @@ local function mountRequirements(parent, method, calculator)
         local entries = definition.entries
         local options = { height = definition.height, scrollable = false, marginBottom = 6 }
 
-        -- Side-by-side item sections: each takes half the width, minus a small gutter.
-        if definition.isItems and bothItems then
+        -- Side-by-side item sections: each takes half the width, with the same
+        -- outer padding and middle gap as the Income tables.
+        local half = definition.isItems and bothItems
+
+        if half then
             options.height = itemHeight
-            options.width = -12
+            options.width = -(PAGE_PADDING + TABLE_GAP / 2)
             options.widthAnchor = 0.5
 
             if category == "Recommended items" then
                 options.inline = true
-                options.x = 4
+                options.x = TABLE_GAP / 2
                 options.xAnchor = 0.5
             end
         end
 
-        local section = parent:AddPanel(options)
+        local section = fitter:add(parent:AddPanel(options), options.height, half)
         section:AddText({ text = category, x = 12, y = 4, height = 26, colour = Style.gold })
 
         if #entries == 0 then
@@ -295,7 +299,15 @@ local function itemTable(panel, definitions, moneyColour)
         ItemIcon.add(panel, definition.display_item_id or definition.item_id, { x = 12, y = y + 2 })
 
         local quantity = panel:AddText({ text = "", x = 66, y = y + 10, width = 90, height = 24 })
-        local total = panel:AddText({ text = "", x = valueRight - 130, xAnchor = 1, y = y + 10, width = 130, height = 24, colour = moneyColour, alignHorizontal = ui.AlignMode.BOTTOMRIGHT })
+        -- Untradeable supplies are priced by what they cost to make; the tooltip
+        -- says so, and the Notes below name any ingredient counted as free.
+        local creationTip = definition.pricing == "recipe"
+            and "Creation cost: made from its ingredients at GE buy prices." or nil
+
+        local total = panel:AddText({
+            text = "", x = valueRight - 130, xAnchor = 1, y = y + 10, width = 130, height = 24,
+            colour = moneyColour, alignHorizontal = ui.AlignMode.BOTTOMRIGHT, tooltip = creationTip,
+        })
 
         rows[#rows + 1] = { quantity = quantity, total = total }
     end
@@ -318,8 +330,12 @@ end
 
 -- Builds the whole method screen inside `view`. `guarded` comes from the workbench:
 -- wrap every callback with it, so clicks on a screen we've left are ignored.
--- Returns a refresh(reason) function the workbench calls when the account changes.
-function MethodView.mount(view, method, calculator, guarded)
+-- `activeTab` (optional) reopens a tab, e.g. when the screen is rebuilt after the
+-- window is resized.
+--
+-- Returns two functions: refresh(reason), which the workbench calls when the
+-- account changes, and activeTab(), which says which tab is open right now.
+function MethodView.mount(view, method, calculator, guarded, activeTab)
     local title = method.title .. (method.variant and " - " .. method.variant or "")
     view:AddTitle({ text = title, absolute = true, x = 44, y = 10, width = -88, widthAnchor = 1, height = 28, alignHorizontal = ui.AlignMode.CENTRE })
 
@@ -328,13 +344,22 @@ function MethodView.mount(view, method, calculator, guarded)
         { text = "Income" }, { text = "Requirements" },
         { text = "How to do it" }, { text = "Getting there" },
     }, {
-        activeIndex = 1, absolute = true, y = HEADER_HEIGHT,
+        activeIndex = activeTab or 1,
+
+        -- x = 0 matters: without it PrettyUI starts absolute items at its 14-unit
+        -- default padding, which pushed the tabs right while keeping them full
+        -- width (an extra gap on the left, and the right edge cut off).
+        absolute = true, x = 0, y = HEADER_HEIGHT,
         width = 0, height = -HEADER_HEIGHT, widthAnchor = 1, heightAnchor = 1,
     })
 
     -- Income tab: the headline profit band first.
     local income = tabs:GetPage(1)
-    local summary = income:AddPanel({ height = 72, scrollable = false, marginTop = 4, marginBottom = 6 })
+    -- Panels on the Income and Requirements pages get their final width once the
+    -- whole screen is built (see Style.panelFitter).
+    local incomeFitter = Style.panelFitter(income, PAGE_PADDING, TABLE_GAP)
+
+    local summary = incomeFitter:add(income:AddPanel({ height = 72, scrollable = false, marginTop = 4, marginBottom = 6 }), 72)
 
     summary:AddText({ text = "Profit per hour (after tax)", x = 12, y = 4, width = -204, widthAnchor = 1, colour = Style.muted })
 
@@ -359,15 +384,17 @@ function MethodView.mount(view, method, calculator, guarded)
     -- TABLE_GAP/2 right of it.
     local halfWidth = -(PAGE_PADDING + TABLE_GAP / 2)
 
-    local inputs = income:AddPanel({ height = tableHeight, width = halfWidth, widthAnchor = 0.5, scrollable = false, marginTop = 0 })
+    local inputs = incomeFitter:add(income:AddPanel({
+        height = tableHeight, width = halfWidth, widthAnchor = 0.5, scrollable = false, marginTop = 0,
+    }), tableHeight, true)
 
-    local outputs = income:AddPanel({
+    local outputs = incomeFitter:add(income:AddPanel({
         height = tableHeight,
         x = TABLE_GAP / 2, xAnchor = 0.5,
         width = halfWidth, widthAnchor = 0.5,
         inline = true,
         scrollable = false,
-    })
+    }), tableHeight, true)
 
     inputs:AddText({ text = "Inputs", x = 12, y = 6, width = 88, colour = Style.gold, height = 26, tooltip = "Supply costs use instant-buy prices. Actual purchase prices may differ." })
     outputs:AddText({ text = "Outputs", x = 12, y = 6, width = 88, colour = Style.gold, height = 26, tooltip = "Outputs use instant-sell prices after tax. Your pace and actual sale prices affect profit." })
@@ -430,9 +457,26 @@ function MethodView.mount(view, method, calculator, guarded)
         income:AddText({ text = assumption, colour = Style.muted })
     end
 
+    -- One note per untradeable supply: how it's priced, and which ingredients
+    -- (if any) have no price at all and were counted as free.
+    for _, line in ipairs(method.income.inputs) do
+        if line.pricing == "recipe" then
+            local note = line.name .. " can't be traded, so it's priced by what it costs to make "
+                .. "(ingredients at GE buy prices)."
+            local free = RecipeCost.freeNames(line.recipe)
+
+            if #free > 0 then
+                note = note .. " Counted as free, since they have no price: " .. table.concat(free, ", ") .. "."
+            end
+
+            income:AddText({ text = note, colour = Style.muted })
+        end
+    end
+
     -- The other three tabs.
     local requirements = tabs:GetPage(2)
-    local refreshRequirements, refreshOwnership = mountRequirements(requirements, method, calculator)
+    local requirementsFitter = Style.panelFitter(requirements, PAGE_PADDING, TABLE_GAP)
+    local refreshRequirements, refreshOwnership = mountRequirements(requirements, method, calculator, requirementsFitter)
 
     local instructions = tabs:GetPage(3)
     instructions:AddTitle("Method steps")
@@ -487,7 +531,12 @@ function MethodView.mount(view, method, calculator, guarded)
         updateInputs(result.inputs or {}, result.cost)
     end
 
-    -- Everything exists now: allow input handling and fill in the first numbers.
+    -- Everything exists now, so we know whether each page grew a scrollbar: size
+    -- the panels to their pages' final widths, then allow input handling and fill
+    -- in the first numbers.
+    incomeFitter:fit()
+    requirementsFitter:fit()
+
     ready = true
 
     render()
@@ -496,7 +545,7 @@ function MethodView.mount(view, method, calculator, guarded)
 
     -- Skill changes can't affect item borders, and inventory changes can't affect
     -- skill levels or prices, so each reason only redoes the work it can change.
-    return function(reason)
+    local function refresh(reason)
         if reason ~= "inventory" then
             render()
             refreshRequirements()
@@ -506,6 +555,12 @@ function MethodView.mount(view, method, calculator, guarded)
             refreshOwnership()
         end
     end
+
+    local function currentTab()
+        return tabs:GetActiveIndex()
+    end
+
+    return refresh, currentTab
 end
 
 return MethodView

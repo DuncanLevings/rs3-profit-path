@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Keep panel padding correct when a page shows a scrollbar: Browse rows and Income/Requirements panels are sized to the page's final width after the screen is built (fixes clipped ROI text). Side-by-side item sections now use the same symmetric padding as the Income tables.
+- Detect window resizes with a per-tick size comparison while the window is visible (the ONRESIZE hook never fired for PrettyUI window resizes in game); the screen still rebuilds once after the size has held for 0.3 s.
+- Rebuild the current screen once after the window is resized (documented ONRESIZE hook, settles after 0.3 s), keeping filters, list scroll, the method tab and the draft rate; fix the method page's uneven side padding (tabs no longer pick up PrettyUI's default left padding); style Browse rows as cards with a lighter fill and an activity-coloured left bar.
+- Price the abyssal demon potions: Aggroverload (6) by creation cost and Super prayer renewal potion (6) at its GE price (item IDs confirmed on the Wiki). Profit stays unavailable until the loot is valued.
+- Price untradeable supplies by creation cost: a new Wiki recipe sweep (src/tools/wiki_recipes.py) imports 466 Herblore/Summoning recipes with untradeable outputs and their untradeable ingredients; the build validates them and generates data/recipes.lua (339 chosen recipes). Ingredients use GE instant-buy prices, follow nested recipes with dose scaling, and unpriceable ingredients count as free with a note. Elder logs' Perfect plus potion now uses this, so the method has a complete profit estimate.
 - Keep Browse method titles in their activity colour (PvM red, skilling green, production blue) under every activity filter, not only "All activities".
 - Title the window just "Profit Path"; the character name is no longer shown (settings still follow the character, and a future account page will show the binding).
 - Stop the "coin icon: item with quantity failed" message: the client has no two-argument SetAssociatedObject, so the coin now attaches the Coins item and sets its quantity as a property directly (the combination confirmed in game).

@@ -42,6 +42,14 @@ rounding and cost-based ROI. Profit Path's calculator is independently written.
 It uses GEPL instant-buy input and instant-sell output trade quotes instead of
 the Wiki's guide prices. Zero-cost ROI is shown as not applicable, not infinity.
 
+Creation-cost recipes (untradeable Herblore and Summoning supplies)
+Derived from the RuneScape Wiki's recipe and infobox_item structured data (Bucket API),
+retrieved 2026-10-29 with User-Agent "ProfitPath-development (Discord: Tatsuya)".
+https://runescape.wiki/w/Bucket:Recipe
+https://runescape.wiki/w/Bucket:Infobox_item
+Each recipe keeps its source page URL in catalogue-source/recipes.json. Wiki contributor
+attribution and the CC BY-NC-SA 3.0 licence above apply. Runtime uses data/recipes.lua.
+
 rsprite runtime dependency
 Profit Path uses the public API of the separately installed rsprite 0.1.2 library by sereselene.
 Project: https://github.com/sereselene/rsprite

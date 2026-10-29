@@ -194,6 +194,33 @@ class MethodTests(unittest.TestCase):
             }],
         }
 
+    def test_recipe_priced_rows_must_name_a_known_recipe_with_matching_doses(self):
+        recipes = catalogue.choose_recipes(recipe_fixture())
+        line = self.methods["methods"][0]["income"]["inputs"][0]
+        line.update({"pricing": "recipe", "recipe": "Potion", "portion": 4})
+        catalogue.methods_text(self.methods, self.monsters, recipes)
+
+        # The recipe has to exist...
+        line["recipe"] = "Missing potion"
+
+        with self.assertRaisesRegex(ValueError, "Unknown recipe"):
+            catalogue.methods_text(self.methods, self.monsters, recipes)
+
+        # ...doses have to be given when the recipe counts doses...
+        line["recipe"] = "Potion"
+        del line["portion"]
+
+        with self.assertRaisesRegex(ValueError, "Doses"):
+            catalogue.methods_text(self.methods, self.monsters, recipes)
+
+        # ...and only supplies (inputs) can be priced this way.
+        line["portion"] = 4
+        output = self.methods["methods"][0]["income"]["outputs"][0]
+        output.update({"pricing": "recipe", "recipe": "Potion", "portion": 4})
+
+        with self.assertRaisesRegex(ValueError, "Only input rows"):
+            catalogue.methods_text(self.methods, self.monsters, recipes)
+
     def test_ownership_variants_reject_invalid_native_ids(self):
         for aliases in ([], [True], [0], [-1], [1.5], "42"):
             with self.subTest(aliases=aliases):
@@ -406,13 +433,88 @@ class MethodTests(unittest.TestCase):
 
             # Point catalogue.py's paths at the temp files and pretend we ran `build`.
             with patch.multiple(catalogue, SOURCE=source, METHOD_SOURCE=methods,
-                                OUTPUT=output, METHOD_OUTPUT=method_output), \
+                                OUTPUT=output, METHOD_OUTPUT=method_output,
+                                RECIPE_SOURCE=root / "no-recipes.json"), \
                     patch.object(sys, "argv", ["catalogue.py", "build"]):
                 with self.assertRaisesRegex(ValueError, "source revision"):
                     catalogue.main()
 
             self.assertEqual(output.read_text(encoding="utf-8"), "old monsters")
             self.assertEqual(method_output.read_text(encoding="utf-8"), "old methods")
+
+
+def recipe_fixture():
+    """A tiny recipe source: Potion is made from Base (its own recipe), a GE herb
+    and a free flower. Potion also has a second, later recipe that must be ignored."""
+    def recipe(page, sequence, output, materials):
+        return {"page": page, "sequence": sequence, "url": "https://runescape.wiki/w/" + page,
+                "output": output, "materials": materials}
+
+    return {
+        "schema": 1, "retrieved": "2026-10-29", "licence": "Fixture licence.",
+        "recipes": [
+            recipe("Potion", 1, {"name": "Potion (4)", "quantity": 1, "portion": 4, "item_id": 100}, [
+                {"name": "Base (3)", "page": "Base", "quantity": 1, "portion": 3, "pricing": "recipe"},
+                {"name": "Herb", "page": "Herb", "quantity": 2, "pricing": "ge", "item_id": 200},
+                {"name": "Flower", "page": "Flower", "quantity": 1, "pricing": "free"},
+            ]),
+            recipe("Potion", 2, {"name": "Potion (4)", "quantity": 5, "portion": 4}, [
+                {"name": "Herb", "page": "Herb", "quantity": 1, "pricing": "ge", "item_id": 200},
+            ]),
+            recipe("Base", 1, {"name": "Base (3)", "quantity": 1, "portion": 3}, [
+                {"name": "Herb", "page": "Herb", "quantity": 1, "pricing": "ge", "item_id": 200},
+            ]),
+        ],
+    }
+
+
+class RecipeTests(unittest.TestCase):
+    # The build picks one recipe per item and refuses data the calculator couldn't
+    # price safely: loops, missing recipes and GE ingredients without an item ID.
+
+    def test_first_listed_recipe_is_chosen_and_the_runtime_copy_loads(self):
+        chosen = catalogue.choose_recipes(recipe_fixture())
+
+        self.assertEqual(chosen["Potion"]["sequence"], 1)
+
+        runtime = LuaRuntime().execute(catalogue.recipes_text(recipe_fixture()))
+        potion = runtime["Potion"]
+
+        self.assertEqual(potion["portion"], 4)
+        self.assertEqual(potion["materials"][1]["page"], "Base")
+        self.assertEqual(potion["materials"][2]["item_id"], 200)
+        self.assertEqual(potion["materials"][3]["pricing"], "free")
+
+    def test_recipe_loops_are_rejected(self):
+        source = recipe_fixture()
+        source["recipes"][2]["materials"].append(
+            {"name": "Potion (4)", "page": "Potion", "quantity": 1, "pricing": "recipe"})
+
+        with self.assertRaisesRegex(ValueError, "Recipe loop"):
+            catalogue.choose_recipes(source)
+
+    def test_missing_recipes_and_unidentified_ge_items_are_rejected(self):
+        source = recipe_fixture()
+        source["recipes"][0]["materials"][0]["page"] = "Nowhere"
+
+        with self.assertRaisesRegex(ValueError, "no recipe for"):
+            catalogue.choose_recipes(source)
+
+        source = recipe_fixture()
+        del source["recipes"][2]["materials"][0]["item_id"]
+
+        with self.assertRaisesRegex(ValueError, "needs an item ID"):
+            catalogue.choose_recipes(source)
+
+    def test_bad_quantities_and_pricing_are_rejected(self):
+        for field, value, message in (("quantity", 0, "above zero"), ("pricing", "guess", "unknown pricing"),
+                                      ("portion", 1.5, "whole number")):
+            with self.subTest(field=field):
+                source = recipe_fixture()
+                source["recipes"][0]["materials"][0][field] = value
+
+                with self.assertRaisesRegex(ValueError, message):
+                    catalogue.choose_recipes(source)
 
 
 if __name__ == "__main__":

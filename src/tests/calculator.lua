@@ -157,24 +157,138 @@ return function(test, equal, client, pretty)
         equal(Income.calculate(steel.income, 2000, prices).inputs[1].message, "Dependency error fixture")
     end)
 
-    -- methods[2] is elder logs (potion cost still unknown); methods[3] is abyssal
-    -- demons (loot not valued yet). Neither may show a total profit.
-    test("incomplete source recipes and unprocessed loot do not imply zero costs or revenue", function()
-        -- 320 logs x 1,000 = 320,000 minus tax 320 x 20 = 313,600.
-        local result = Income.calculate(require("data/methods").methods[2].income, 320, {
+    -- Made-up GE buy prices for every GE ingredient of a Perfect plus potion (6):
+    --   Overload (3) = 6 extremes x 10,000 + clean torstol 6,000 = 66,000
+    --   Overload (4) = 66,000 x 4/3 doses                         = 88,000
+    --   Perfect plus (6) = 88,000 + harmony moss 9,000 + crystal flask 3,000
+    --                      + crystal tree blossom (free)          = 100,000
+    -- Clean torstol's price is the oldest (time 10), so that's the row's timestamp.
+    local function perfectPlusQuotes()
+        local quotes = {
+            [269] = { status = "available", high = 6000, highTime = 10 },
+            [32947] = { status = "available", high = 9000, highTime = 50 },
+            [32843] = { status = "available", high = 3000, highTime = 50 },
+        }
+
+        for _, extreme in ipairs({ 15309, 15313, 15317, 15321, 15325, 55326 }) do
+            quotes[extreme] = { status = "available", high = 10000, highTime = 50 }
+        end
+
+        return quotes
+    end
+
+    test("untradeable supplies are priced from their recipe chain with doses and free ingredients", function()
+        local RecipeCost = require("src/methods/recipe_cost")
+        local quotes = perfectPlusQuotes()
+
+        local price, oldest = RecipeCost.price("Perfect plus potion", 6, quotes)
+        equal(price, 100000)
+        equal(oldest, 10)
+
+        -- Asking for 3 doses of overload is one recipe; 4 doses is 4/3 of one.
+        equal(RecipeCost.price("Overload", 3, quotes), 66000)
+        equal(RecipeCost.price("Overload", 4, quotes), 88000)
+
+        -- Only the blossom has no price; it's counted as free and named.
+        local free = RecipeCost.freeNames("Perfect plus potion")
+        equal(#free, 1)
+        equal(free[1], "Crystal tree blossom")
+
+        -- All nine GE ingredients (through Overload) are fetched up front.
+        local count = 0
+
+        for _ in pairs(RecipeCost.itemIds("Perfect plus potion")) do
+            count = count + 1
+        end
+
+        equal(count, 9)
+
+        -- One missing ingredient price means no price at all, and says which.
+        quotes[269] = nil
+        local missing, problem = RecipeCost.price("Perfect plus potion", 6, quotes)
+        equal(missing, nil)
+        assert(problem:find("Clean torstol", 1, true), problem)
+    end)
+
+    -- methods[2] is elder logs: its Perfect plus potion is priced by creation cost,
+    -- so with every price it has a full profit. Missing ingredient prices mean no
+    -- cost and no profit (never a pretend zero). methods[3] is abyssal demons (loot
+    -- not valued yet), which never has a total.
+    test("creation-cost supplies give a full profit while missing prices and unprocessed loot stay unknown", function()
+        local elder = require("data/methods").methods[2].income
+
+        -- 320 logs x 1,000 = 320,000 minus tax 320 x 20 = 313,600. The potion
+        -- (100,000 to make) is used at 1/24 of a potion an hour.
+        local quotes = perfectPlusQuotes()
+        quotes[29556] = { status = "available", low = 1000, lowTime = 50 }
+
+        local result = Income.calculate(elder, 320, quotes)
+
+        equal(result.status, "available")
+        equal(result.revenue, 313600)
+        assert(math.abs(result.cost - 100000 / 24) < 1e-6, "Potion cost per hour")
+        assert(math.abs(result.profit - (313600 - 100000 / 24)) < 1e-6, "Profit per hour")
+        equal(result.inputs[1].creationCost, true)
+        equal(result.inputs[1].timestamp, 10)
+
+        -- Same again with no ingredient prices: revenue only.
+        local noPotion = Income.calculate(elder, 320, {
             [29556] = { status = "available", low = 1000, lowTime = 50 },
         })
 
-        equal(result.status, "partial")
-        equal(result.revenue, 313600)
-        equal(result.cost, nil)
-        equal(result.profit, nil)
+        equal(noPotion.status, "partial")
+        equal(noPotion.revenue, 313600)
+        equal(noPotion.cost, nil)
+        equal(noPotion.profit, nil)
+        assert(noPotion.inputs[1].message:find("No GE price for", 1, true))
 
         local pvm = Income.calculate(require("data/methods").methods[3].income, 900, {})
 
         equal(pvm.status, "partial")
         equal(pvm.revenue, nil)
         equal(pvm.profit, nil)
+    end)
+
+    -- Abyssal demons: Aggroverload is untradeable (creation cost), Super prayer
+    -- renewal is a normal GE item. Every supply gets a value and the supply total
+    -- is known, but there's still no profit because the loot isn't valued yet.
+    test("abyssal demon potions are priced while unvalued loot still blocks profit", function()
+        local RecipeCost = require("src/methods/recipe_cost")
+        local demons = require("data/methods").methods[3].income
+
+        -- Every price 1,000 GP, for every GE item the supplies need.
+        local quotes = {}
+
+        local function price(itemId)
+            quotes[itemId] = { status = "available", high = 1000, highTime = 50, low = 1000, lowTime = 50 }
+        end
+
+        for itemId in pairs(RecipeCost.itemIds("Aggroverload")) do
+            price(itemId)
+        end
+
+        for _, itemId in ipairs({ 33186, 31613, 32341 }) do
+            price(itemId)
+        end
+
+        local result = Income.calculate(demons, 900, quotes)
+        local rows = {}
+
+        for _, row in ipairs(result.inputs) do
+            rows[row.name] = row
+        end
+
+        local aggroverload = rows["Aggroverload (6)"]
+        equal(aggroverload.creationCost, true)
+        assert(aggroverload.value and aggroverload.value > 0, "Aggroverload should have a creation cost")
+
+        local renewal = rows["Super prayer renewal potion (6)"]
+        equal(renewal.creationCost, nil)
+        equal(renewal.value, 9 * 1000)
+
+        assert(result.cost, "Every supply is priced, so the supply total is known")
+        equal(result.profit, nil)
+        equal(result.status, "partial")
     end)
 
     test("rate parser rejects empty negative nonfinite input and arithmetic overflow", function()
@@ -367,11 +481,12 @@ return function(test, equal, client, pretty)
         local income = tabs.pages[1]
         local rate = income.fields[1]
 
-        -- Opening fetched 3 prices (one per item). Typing a rate must not fetch more.
-        equal(calls, 6)
+        -- Browse fetched 13 prices (steel bars 3; elder logs 1 plus 9 Perfect plus
+        -- ingredients), then the method 3 more. Typing a rate must not fetch more.
+        equal(calls, 16)
 
         rate:SetText("1000", true)
-        equal(calls, 6)
+        equal(calls, 16)
 
         -- Save 1000, then type away and back. Being back on the saved value should
         -- show "Saved personal rate" again, not "not saved".
@@ -431,7 +546,7 @@ return function(test, equal, client, pretty)
 
         rate:SetText("5", true)
         income.buttons["Save rate"]()
-        equal(calls, 6)
+        equal(calls, 16)
 
         for key, value in pairs(state.db) do
             assert(key:find("profit-path.rate.v1/", 1, true) ~= 1)

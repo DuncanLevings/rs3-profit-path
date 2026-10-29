@@ -67,7 +67,15 @@ import catalogue
 monsters = json.loads(catalogue.SOURCE.read_text(encoding="utf-8"))
 
 catalogue.verify(monsters)
-catalogue.verify_methods(monsters)
+
+# Recipes (creation costs for untradeable supplies) feed the method checks, so
+# verify them first.
+recipes = catalogue.load_recipes()
+
+if recipes is not None:
+    catalogue.verify_recipes(recipes)
+
+catalogue.verify_methods(monsters, recipes)
 
 suite = unittest.defaultTestLoader.discover(str(ROOT / "src" / "tests"), pattern="test_*.py")
 

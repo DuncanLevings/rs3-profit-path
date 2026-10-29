@@ -46,6 +46,48 @@ function Style.rectangle(parent, options)
     return rectangle
 end
 
+-- Keeps panels the right width when their page grows a scrollbar.
+--
+-- The problem: a panel works out its inner width once, when it's created. If the
+-- page later gets taller than the window, PrettyUI adds a scrollbar and the page
+-- gets narrower. The panel's outline shrinks with it, but its insides keep the old
+-- width, so right-aligned text (like the ROI) gets cut off at the panel's edge.
+--
+-- The fix PrettyUI documents is Panel:SetSize. So a screen registers its panels
+-- here while it builds, then calls fit() once everything is added (by then we
+-- know whether a scrollbar appeared) and every panel is sized to the page's final
+-- width. `padding` is the page's side padding; `gap` is the space between two
+-- half-width panels sitting side by side.
+function Style.panelFitter(host, padding, gap)
+    local panels = {}
+    local fitter = {}
+
+    -- `half` = true for one of two side-by-side panels. Returns the panel.
+    function fitter:add(panel, height, half)
+        panels[#panels + 1] = { panel = panel, height = height, half = half }
+
+        return panel
+    end
+
+    function fitter:fit()
+        local width = host.content.width
+
+        -- Not measurable (shouldn't happen in game): leave the panels as built.
+        if type(width) ~= "number" then
+            return
+        end
+
+        local full = width - padding * 2
+        local half = math.floor(width / 2) - padding - math.floor((gap or 0) / 2)
+
+        for _, entry in ipairs(panels) do
+            entry.panel:SetSize(entry.half and half or full, entry.height)
+        end
+    end
+
+    return fitter
+end
+
 -- Draws one of our named sprites (see data/icons.lua). rsprite finds the sprite's ID
 -- and warns once if it's missing; PrettyUI draws it. If the sprite doesn't exist we
 -- just skip it, because every icon sits next to text that still makes sense alone.
@@ -238,6 +280,10 @@ function Style.compact(value)
     end
 
     local magnitude = math.abs(value)
+
+    if magnitude >= 1000000000 then
+        return string.format("%.1fb / h", value / 1000000000)
+    end
 
     if magnitude >= 1000000 then
         return string.format("%.1fm / h", value / 1000000)

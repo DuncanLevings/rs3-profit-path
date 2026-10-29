@@ -84,6 +84,13 @@ end
 local HEADER_HEIGHT = 144
 local RESULTS_Y = 150
 
+-- Method rows: a fill a little lighter than the page so each row reads as its
+-- own card, and the width of the activity-coloured bar on its left edge. Row
+-- content starts ROW_INSET in from the left so it clears the bar.
+local ROW_FILL = 0x2B2923FF
+local ROW_ACCENT_WIDTH = 4
+local ROW_INSET = 16
+
 -- A missing estimate is not zero GP/hour. Keep the reason next to the method so
 -- nobody mistakes a partial source model for an unprofitable activity.
 local function estimateText(method, estimate)
@@ -138,6 +145,12 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
             Event.Logic.Unsubscribe(owner)
         end
 
+        -- Keep the list's scroll position, so a rebuild (e.g. after the window is
+        -- resized) lands where the player was.
+        if results then
+            browser.scroll = results.scrollY
+        end
+
         clearResults()
 
         if header then
@@ -169,6 +182,12 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         end
 
         local rows = browser:rows()
+
+        -- Rows are sized to the list's final width once they're all added (see
+        -- Style.panelFitter: a scrollbar may appear partway through). The list's
+        -- side padding is 10.
+        local fitter = Style.panelFitter(results, 10)
+
         heading.content = browser.section == "favourites" and "Favourites" or "Browse methods"
 
         -- Only the active entry gets the gold native toggle treatment. Keep the
@@ -199,16 +218,29 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
             local estimate = browser.estimates[method.id]
             local available = estimate and estimate.status == "available"
             local name = method.title .. (method.variant and " - " .. method.variant or "")
-            local row = results:AddPanel({ height = 96, scrollable = false, marginBottom = 8 })
+            local row = fitter:add(results:AddPanel({ height = 96, scrollable = false, marginBottom = 8 }), 96)
 
             -- Titles always take their activity colour (PvM red, skilling green,
             -- production blue), whichever activity filter is selected, so a
             -- method looks the same in every list.
             local titleColour = Style.categories[method.category] or Style.text
 
+            -- Make each row stand out from the page: a slightly lighter fill, plus
+            -- a thin bar down the left edge in the activity colour. Drawn first so
+            -- they sit behind the text and buttons.
+            Style.rectangle(row, {
+                x = 0, y = 0, width = 0, height = 0, widthAnchor = 1, heightAnchor = 1,
+                colour = ROW_FILL,
+            })
+
+            Style.rectangle(row, {
+                x = 0, y = 0, width = ROW_ACCENT_WIDTH, height = 0, heightAnchor = 1,
+                colour = titleColour,
+            })
+
             -- Reserve the right column for profit. Anchored offsets let the title
             -- shrink with the window without running underneath the figure.
-            row:AddTitle({ text = name, x = 42, y = 6, width = -232, widthAnchor = 1, height = 28, colour = titleColour })
+            row:AddTitle({ text = name, x = ROW_INSET + 32, y = 6, width = -238, widthAnchor = 1, height = 28, colour = titleColour })
 
             -- Profit reads "[coin] 1.2M / H": coin at the start of the right
             -- column, the figure straight after it, both centred on one line.
@@ -237,7 +269,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
 
             row:AddText({
                 text = method.source_category,
-                x = 10, y = 36, width = -236, widthAnchor = 1, height = 24, colour = Style.muted,
+                x = ROW_INSET, y = 36, width = -242, widthAnchor = 1, height = 24, colour = Style.muted,
             })
 
             if available and estimate.roi then
@@ -256,7 +288,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
 
             row:AddText({
                 text = activity,
-                x = 10, y = 62, width = -102, widthAnchor = 1, height = 24, colour = Style.muted,
+                x = ROW_INSET, y = 62, width = -108, widthAnchor = 1, height = 24, colour = Style.muted,
             })
 
             row:AddSpriteButton("ARROW_RIGHT", rowAction(function()
@@ -273,10 +305,11 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
                 browser.scroll = results.scrollY
                 browser:toggleFavourite(method)
                 renderResults()
-            end), { x = 10, y = 8, size = 24, tooltip = favouriteText, toggleable = true, disabled = not isFavourite })
+            end), { x = ROW_INSET, y = 8, size = 24, tooltip = favouriteText, toggleable = true, disabled = not isFavourite })
         end
 
         results:AddText({ text = "RuneScape Wiki contributors / CC BY-NC-SA 3.0. GEPL trade estimates may use old trades.", colour = Style.muted })
+        fitter:fit()
         results:SetScrollPosition(browser.scroll)
     end
 

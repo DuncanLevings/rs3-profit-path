@@ -250,7 +250,7 @@ return function(test, equal, client, pretty)
 
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui:findButton("Open Profit Path")()
-        equal(calls, 3)
+        equal(calls, 13)
 
         local browse = prettyui.views[2]
 
@@ -275,16 +275,16 @@ return function(test, equal, client, pretty)
         header.fields[1]:SetText("steel", true)
         header.nativeLists[1]:SetEntrySelected(1, true)
         Event.Logic.emit({})
-        equal(calls, 3)
+        equal(calls, 13)
 
 
         prettyui:findMethod("Smelting steel bars")()
-        equal(calls, 6)
+        equal(calls, 16)
 
         local detail = prettyui.views[3]
         detail.tabs[1].pages[1].fields[1]:SetText("1000", true)
         detail.buttons["Back to methods"]()
-        equal(calls, 6)
+        equal(calls, 16)
 
         -- An unsaved draft must not leak into saved-rate list comparisons.
         local text = {}
@@ -448,10 +448,187 @@ return function(test, equal, client, pretty)
 
         equal(checkTitles(), 3)
 
+        -- Each row is its own card: a lighter fill behind everything, then a thin
+        -- bar down the left edge in the same activity colour as its title.
+        local rows = 0
+
+        for _, row in ipairs(prettyui.allViews) do
+            if not row.destroyed and row.buttons["View method"] then
+                local fill, accent = row.rectangles[1], row.rectangles[2]
+                local title
+
+                for _, label in ipairs(row.texts) do
+                    title = title or titles[label.content]
+                end
+
+                equal(fill.width, 0)
+                equal(accent.width, 4)
+                equal(accent.rgba, title, "Accent bar matches the title colour")
+                assert(fill.rgba ~= accent.rgba)
+                rows = rows + 1
+            end
+        end
+
+        equal(rows, 3)
+
         for _, category in ipairs({ "PvM", "Skilling", "Production" }) do
             sidebar.buttons[category]()
             equal(checkTitles(), 1, "One method under " .. category)
         end
+
+        PluginShutdown()
+    end)
+
+    -- Resizing: while the window is visible, each logic tick compares its size.
+    -- Nothing is rebuilt while the player is still dragging; once the size has held
+    -- for 15 ticks (0.3 s) the screen is rebuilt once, keeping the list's scroll.
+    -- The check only runs while the window is visible.
+    test("resizing rebuilds the screen once after the size settles and keeps the list scroll", function()
+        client()
+        prettyui = pretty()
+        gepl = nil
+
+        dofile("main.lua")
+
+        Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
+        prettyui:findButton("Open Profit Path")()
+
+        local window = prettyui.windows[1]
+        local firstScreen = prettyui.views[#prettyui.views]
+        list(firstScreen):SetScrollPosition(120)
+
+        local function ticks(count)
+            for _ = 1, count do
+                Event.Logic.emit({})
+            end
+        end
+
+        -- The size check runs while the window is open, and does nothing at the
+        -- size we built for.
+        equal(Event.Logic.count(), 1)
+        ticks(40)
+        equal(prettyui.views[#prettyui.views], firstScreen)
+
+        -- Dragging: the size keeps changing, so the countdown keeps restarting.
+        window:resize(900, 600)
+        ticks(10)
+        window:resize(910, 610)
+        ticks(15)
+        equal(prettyui.views[#prettyui.views], firstScreen, "No rebuild until the size has held for 15 ticks")
+
+        -- One more tick: held still long enough, so one rebuild.
+        ticks(1)
+        local rebuilt = prettyui.views[#prettyui.views]
+
+        assert(rebuilt ~= firstScreen and firstScreen.destroyed, "The screen should be rebuilt at the new size")
+        equal(list(rebuilt).scrollY, 120, "The list keeps its scroll position")
+
+        -- And only once: it now matches the size it was built for.
+        ticks(40)
+        equal(prettyui.views[#prettyui.views], rebuilt)
+
+        -- Hidden window: the check stops. Reopening starts it again.
+        window:Close()
+        equal(Event.Logic.count(), 0)
+        prettyui:findButton("Open Profit Path")()
+        equal(Event.Logic.count(), 1)
+
+        PluginShutdown()
+        equal(Event.Logic.count(), 0)
+    end)
+
+    -- When a page grows a scrollbar, PrettyUI narrows it, but panels keep the inner
+    -- width they were built with. So once a screen is built, every panel is sized
+    -- to its page's final width: full width minus the side padding, or half width
+    -- minus padding and half the middle gap for side-by-side panels.
+    test("panels are sized to their page's final width once the screen is built", function()
+        client()
+        prettyui = pretty()
+        gepl = nil
+
+        dofile("main.lua")
+
+        Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
+        prettyui:findButton("Open Profit Path")()
+
+        -- Browse rows: the fake list is 600 wide with 10 padding each side.
+        local rows = 0
+
+        for _, row in ipairs(prettyui.allViews) do
+            if not row.destroyed and row.buttons["View method"] then
+                equal(row.size.width, 580)
+                equal(row.size.height, 96)
+                rows = rows + 1
+            end
+        end
+
+        equal(rows, 3)
+
+        -- Method pages: 14 padding each side, 8 between side-by-side panels.
+        prettyui:findMethod("Cutting elder logs")()
+        local tabs = prettyui.views[#prettyui.views].tabs[1]
+        local income = tabs.pages[1]
+
+        equal(income.children[1].size.width, 572, "Summary band is full width")
+        equal(income.children[2].size.width, 282, "Inputs is half width")
+        equal(income.children[3].size.width, 282, "Outputs is half width")
+
+        -- Elder logs has both required and recommended items, side by side.
+        local halves, fulls = 0, 0
+
+        for _, section in ipairs(tabs.pages[2].children) do
+            if section.size.width == 282 then
+                halves = halves + 1
+            else
+                equal(section.size.width, 572)
+                fulls = fulls + 1
+            end
+        end
+
+        equal(halves, 2, "Required and recommended items share the row")
+        assert(fulls > 0)
+
+        PluginShutdown()
+    end)
+
+    -- A rebuilt method screen comes back on the same tab with the same draft rate,
+    -- and its tabs start at x = 0 so both sides get the same padding.
+    test("resizing a method screen keeps its tab and draft rate and the tabs are not offset", function()
+        client()
+        prettyui = pretty()
+        gepl = nil
+
+        dofile("main.lua")
+
+        Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
+        prettyui:findButton("Open Profit Path")()
+        prettyui:findMethod("Smelting steel bars")()
+
+        local window = prettyui.windows[1]
+        local detail = prettyui.views[#prettyui.views]
+        local tabs = detail.tabs[1]
+
+        equal(tabs.options.x, 0, "Tabs must not pick up PrettyUI's default left padding")
+
+        -- The player types a draft rate and switches to the Requirements tab.
+        tabs.pages[1].fields[1]:SetText("1500", true)
+        tabs.activeIndex = 2
+
+        window:resize(900, 600)
+
+        for _ = 1, 16 do
+            Event.Logic.emit({})
+        end
+
+        local rebuilt = prettyui.views[#prettyui.views]
+        assert(rebuilt ~= detail and detail.destroyed, "The method screen should be rebuilt")
+        equal(rebuilt.tabs[1].activeIndex, 2, "Same tab after the rebuild")
+        equal(rebuilt.tabs[1].pages[1].fields[1]:GetText(), "1500", "Draft rate survives")
+
+        -- Opening a different method starts on Income again.
+        rebuilt.buttons["Back to methods"]()
+        prettyui:findMethod("Cutting elder logs")()
+        equal(prettyui.views[#prettyui.views].tabs[1].activeIndex, 1)
 
         PluginShutdown()
     end)
@@ -536,7 +713,10 @@ return function(test, equal, client, pretty)
         Event.Logic.emit({})
         equal(state.db["profit-path.browser.v1"].sort, "roi", "Ignore stale queued events")
         equal(sort.selectionWrites, afterClick, "A successful click must not reset native selection")
-        equal(Event.Logic.count(), 0)
+
+        -- The dropdown's one-off callback is gone; only the window's size check
+        -- (which runs while the window is visible) is still listening.
+        equal(Event.Logic.count(), 1)
 
         state.failWrite = true
         sort:SetEntrySelected(0, true)
@@ -575,13 +755,13 @@ return function(test, equal, client, pretty)
         local income = detail.tabs[1].pages[1]
         local rate = income.fields[1]
         rate:SetText("1000", true)
-        equal(calls, 6)
+        equal(calls, 16)
         assert(not income.buttons["Refresh prices"])
 
         prettyui.windows[1]:Close()
         price = 50
         prettyui:findButton("Open Profit Path")()
-        equal(calls, 9)
+        equal(calls, 19)
         equal(rate:GetText(), "1000")
 
         local lines = {}
@@ -616,10 +796,22 @@ return function(test, equal, client, pretty)
         local income = detail.tabs[1].pages[1]
         equal(#income.fields, 1, "No manual character/profile field in the method")
 
+        -- The potion is shown as an icon in the table, never as a text row. Its
+        -- name only appears in the Notes, explaining how it's priced and which
+        -- ingredient counts as free.
+        local note
+
         for _, label in ipairs(income:allTexts()) do
             assert(not label.content:find("ROI unavailable", 1, true))
-            assert(not label.content:find("Perfect plus potion", 1, true))
+            assert(label.content ~= "Perfect plus potion", "Potion should be an icon, not a text row")
+
+            if label.content:find("Perfect plus potion can't be traded", 1, true) then
+                note = label.content
+            end
         end
+
+        assert(note, "Expected a creation-cost note for the untradeable potion")
+        assert(note:find("Crystal tree blossom", 1, true), "The note names the free ingredient")
 
         local names = {}
 

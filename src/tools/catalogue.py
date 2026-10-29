@@ -7,7 +7,8 @@ drop rows and sections. Only import needs an existing Monster Lookup checkout.
 #
 #   import-monsters  copy monster/drop data out of a local Monster Lookup checkout
 #                    into catalogue-source/monsters.json (readable, reviewable)
-#   build            turn the JSON sources into data/monsters.lua and data/methods.lua
+#   build            turn the JSON sources into data/monsters.lua, data/methods.lua and
+#                    data/recipes.lua (recipes come from src/tools/wiki_recipes.py)
 #   verify           rebuild in memory and check the files on disk still match, then
 #                    load every monster back through the real Lua reader
 #
@@ -30,6 +31,8 @@ SOURCE = ROOT / "catalogue-source" / "monsters.json"
 OUTPUT = ROOT / "data" / "monsters.lua"
 METHOD_SOURCE = ROOT / "catalogue-source" / "methods.json"
 METHOD_OUTPUT = ROOT / "data" / "methods.lua"
+RECIPE_SOURCE = ROOT / "catalogue-source" / "recipes.json"
+RECIPE_OUTPUT = ROOT / "data" / "recipes.lua"
 
 # One small shared Lua registry keeps UI aliases and build validation in sync.
 # This file is plain reference data, so loading it needs no game globals.
@@ -553,7 +556,134 @@ def verify(source):
           f"{compact_bytes:,} runtime bytes ({compact_bytes / compact_json_bytes:.1%} of equivalent compact JSON).")
 
 
-def validate_methods(source, monsters):
+# ---------------------------------------------------------------------------
+# Recipes: creation costs for untradeable supplies
+# ---------------------------------------------------------------------------
+#
+# catalogue-source/recipes.json comes from src/tools/wiki_recipes.py. The Wiki often
+# lists several recipes for one item (e.g. Overload: the standard one, the 120
+# Herblore batch, the unfinished-potion route). We use the FIRST one listed: it's
+# the standard recipe anyone can make. Other recipes stay in the source for later.
+
+RECIPE_PRICING = {"ge", "recipe", "free"}
+
+
+def choose_recipes(source):
+    """Validates the recipe source and returns {page: chosen recipe}."""
+    if source.get("schema") != 1 or not isinstance(source.get("recipes"), list):
+        raise ValueError("Unsupported recipe source")
+
+    chosen = {}
+
+    for recipe in source["recipes"]:
+        recipe = require_record(recipe, "Recipe")
+        require_text(recipe.get("page"), "Recipe page")
+
+        if not positive_integer(recipe.get("sequence")):
+            raise ValueError(f"Recipe {recipe['page']} needs a positive sequence")
+
+        output = require_record(recipe.get("output"), "Recipe output")
+
+        if not non_negative_number(output.get("quantity")) or output["quantity"] <= 0:
+            raise ValueError(f"Recipe {recipe['page']} output quantity must be above zero")
+
+        if "portion" in output and not positive_integer(output["portion"]):
+            raise ValueError(f"Recipe {recipe['page']} output portion must be a whole number")
+
+        if not isinstance(recipe.get("materials"), list) or not recipe["materials"]:
+            raise ValueError(f"Recipe {recipe['page']} has no materials")
+
+        for material in recipe["materials"]:
+            material = require_record(material, "Recipe material")
+            require_text(material.get("name"), "Recipe material name")
+
+            if not non_negative_number(material.get("quantity")) or material["quantity"] <= 0:
+                raise ValueError(f"{recipe['page']}: {material['name']} quantity must be above zero")
+
+            if "portion" in material and not positive_integer(material["portion"]):
+                raise ValueError(f"{recipe['page']}: {material['name']} portion must be a whole number")
+
+            if material.get("pricing") not in RECIPE_PRICING:
+                raise ValueError(f"{recipe['page']}: {material['name']} has unknown pricing")
+
+            if material["pricing"] == "ge" and not positive_integer(material.get("item_id")):
+                raise ValueError(f"{recipe['page']}: GE-priced {material['name']} needs an item ID")
+
+        # Lowest sequence wins; the source is sorted, but don't rely on that.
+        current = chosen.get(recipe["page"])
+
+        if current is None or recipe["sequence"] < current["sequence"]:
+            chosen[recipe["page"]] = recipe
+
+    # Every "follow this recipe" ingredient must have a recipe, and following them
+    # must never loop back round (A needs B needs A would never finish pricing).
+    def walk(page, path):
+        if page in path:
+            raise ValueError("Recipe loop: " + " -> ".join(path + [page]))
+
+        for material in chosen[page]["materials"]:
+            if material["pricing"] == "recipe":
+                if material.get("page") not in chosen:
+                    raise ValueError(f"{page}: no recipe for {material['name']}")
+
+                walk(material["page"], path + [page])
+
+    for page in chosen:
+        walk(page, [])
+
+    return chosen
+
+
+def recipes_text(source):
+    """The runtime copy: just the chosen recipe per page, with the fields the
+    calculator uses. Wiki bookkeeping (cost markers, other recipes) stays in the
+    JSON source."""
+    chosen = choose_recipes(source)
+    runtime = {}
+
+    for page, recipe in sorted(chosen.items()):
+        output = recipe["output"]
+        entry = {"name": output["name"], "quantity": output["quantity"], "url": recipe["url"], "materials": []}
+
+        for key in ("portion", "item_id"):
+            if key in output:
+                entry[key] = output[key]
+
+        for material in recipe["materials"]:
+            kept = {"name": material["name"], "quantity": material["quantity"], "pricing": material["pricing"]}
+
+            if material["pricing"] == "ge":
+                kept["item_id"] = material["item_id"]
+
+            if material["pricing"] == "recipe":
+                kept["page"] = material["page"]
+
+            if "portion" in material:
+                kept["portion"] = material["portion"]
+
+            entry["materials"].append(kept)
+
+        runtime[page] = entry
+
+    return ("-- Generated by src/tools/catalogue.py from catalogue-source/recipes.json; do not edit.\n"
+            "-- " + source.get("licence", "RuneScape Wiki contributors, CC BY-NC-SA 3.0.")
+            + " See THIRD_PARTY_NOTICES.txt.\n"
+            "return " + readable_lua(runtime) + "\n")
+
+
+def verify_recipes(source):
+    expected = recipes_text(source)
+
+    if RECIPE_OUTPUT.read_text(encoding="utf-8") != expected:
+        raise ValueError("Generated recipes are out of date; run build")
+
+    LuaRuntime().execute(expected)
+
+    print(f"Verified {len(choose_recipes(source))} creation-cost recipes "
+          f"({len(source['recipes'])} in the source, retrieved {source.get('retrieved')}).")
+
+
+def validate_methods(source, monsters, recipes=None):
     """Check the fields consumed by native views and the pure requirement/calculator code."""
     # The plugin reads these fields without re-checking them, so anything wrong has
     # to be caught here. Roughly in order: items, method identity and display text,
@@ -694,6 +824,24 @@ def validate_methods(source, monsters):
                 elif income["coverage"] == "complete":
                     raise ValueError("Complete income cannot have unresolved item valuations")
 
+                # Untradeable supplies are priced by what they cost to make. The row
+                # names the recipe (a Wiki page) and the doses it's counted in, so
+                # e.g. a 6-dose potion made by a 6-dose recipe costs one recipe.
+                if "pricing" in line:
+                    if line["pricing"] != "recipe" or direction != "inputs":
+                        raise ValueError("Only input rows can be priced by recipe")
+
+                    recipe = (recipes or {}).get(line.get("recipe"))
+
+                    if recipe is None:
+                        raise ValueError(f"Unknown recipe for income row: {line.get('recipe')}")
+
+                    if ("portion" in line) != ("portion" in recipe["output"]):
+                        raise ValueError(f"Doses for {line['name']} must match its recipe's output")
+
+                    if "portion" in line and not positive_integer(line["portion"]):
+                        raise ValueError(f"Invalid dose count for {line['name']}")
+
                 # GE tax is only paid when selling, so it only belongs on outputs.
                 if "tax_denominator" in line:
                     if not positive_integer(line["tax_denominator"]):
@@ -747,19 +895,28 @@ def validate_methods(source, monsters):
     json_text(source)
 
 
-def methods_text(source, monsters):
-    validate_methods(source, monsters)
+def methods_text(source, monsters, recipes=None):
+    validate_methods(source, monsters, recipes)
 
     return ("-- Generated by src/tools/catalogue.py; do not edit.\n"
             "-- RuneScape Wiki contributors, CC BY-NC-SA 3.0. See THIRD_PARTY_NOTICES.txt.\n"
             "return " + readable_lua(source) + "\n")
 
 
-def verify_methods(monsters):
+def load_recipes():
+    """The recipe source, or None if it hasn't been imported (it's optional)."""
+    if not RECIPE_SOURCE.exists():
+        return None
+
+    return json.loads(RECIPE_SOURCE.read_text(encoding="utf-8"))
+
+
+def verify_methods(monsters, recipe_source):
     # Same idea as verify(): the file on disk must match a fresh build, and the
     # generated Lua must actually load.
     source = json.loads(METHOD_SOURCE.read_text(encoding="utf-8"))
-    expected = methods_text(source, monsters)
+    recipes = choose_recipes(recipe_source) if recipe_source else None
+    expected = methods_text(source, monsters, recipes)
 
     if METHOD_OUTPUT.read_text(encoding="utf-8") != expected:
         raise ValueError("Generated methods are out of date; run build")
@@ -782,16 +939,22 @@ def main():
         import_monsters(args.checkout)
 
     source = json.loads(SOURCE.read_text(encoding="utf-8"))
+    recipe_source = load_recipes()
 
     if args.command in {"import-monsters", "build"}:
-        # Build both outputs in memory first. Only once both pass validation do we
-        # write either, so a bad method can't leave new monsters next to old methods.
+        # Build every output in memory first. Only once all pass validation do we
+        # write any, so a bad method or recipe can't leave a mix of old and new data.
         generated = build_text(source)
         generated_methods = None
+        generated_recipes = None
+
+        if recipe_source is not None:
+            generated_recipes = recipes_text(recipe_source)
 
         if METHOD_SOURCE.exists():
             methods = json.loads(METHOD_SOURCE.read_text(encoding="utf-8"))
-            generated_methods = methods_text(methods, source)
+            recipes = choose_recipes(recipe_source) if recipe_source else None
+            generated_methods = methods_text(methods, source, recipes)
 
         OUTPUT.parent.mkdir(parents=True, exist_ok=True)
         OUTPUT.write_text(generated, encoding="utf-8", newline="\n")
@@ -799,11 +962,17 @@ def main():
         if generated_methods is not None:
             METHOD_OUTPUT.write_text(generated_methods, encoding="utf-8", newline="\n")
 
+        if generated_recipes is not None:
+            RECIPE_OUTPUT.write_text(generated_recipes, encoding="utf-8", newline="\n")
+
     # Always finish with a full verify, even straight after a build.
     verify(source)
 
+    if recipe_source is not None:
+        verify_recipes(recipe_source)
+
     if METHOD_SOURCE.exists():
-        verify_methods(source)
+        verify_methods(source, recipe_source)
 
 
 if __name__ == "__main__":

@@ -18,6 +18,21 @@ local Diagnostics = require("src/ui/diagnostics")
 local BrowseView = require("src/ui/browse_view")
 local UI = {}
 
+-- Window resizing. PrettyUI views size their inner content once, when they're
+-- built (its docs say to call SetSize again "if the available space changes").
+-- Rather than chase every nested panel, we wait until the player stops dragging
+-- the window edge, then rebuild the current screen once at the new size.
+--
+-- How we notice: while the window is open and visible, each logic tick reads its
+-- content size and compares two numbers. That's all it costs; the check stops
+-- whenever the window is hidden or closed. (We first tried the native ONRESIZE
+-- hook, but it never fired for PrettyUI's window resizes in game.)
+local RESIZE_EVENT = "profit-path-resize"
+
+-- How long the size must stay put before we rebuild: 15 logic ticks is 0.3 s
+-- (the client runs a fixed 50 logic ticks per second).
+local RESIZE_SETTLE_TICKS = 15
+
 -- `library` is PrettyUI. `calculator` is main.lua's controller; we just call it and
 -- show its results, with no money logic in here.
 function UI.new(library, account, inspectQuote, inspectQuest, calculator, browser)
@@ -51,6 +66,13 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
         self.methodRefresh = nil
         self.browseRefresh = nil
 
+        -- Remember which method tab was open, so a rebuild (e.g. after a resize)
+        -- comes back to the same tab. Picking a different method clears it.
+        if self.methodActiveTab then
+            self.methodTab = self.methodActiveTab()
+            self.methodActiveTab = nil
+        end
+
         diagnostics:unmount()
 
         if self.browseUnmount then
@@ -66,6 +88,9 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
     -- Fully destroys the window (unlike the window's own Close button, which only hides it).
     function self:destroyWindow()
         self:clearView()
+
+        -- No window, nothing to watch.
+        self:stopResizeWatch()
 
         local window = self.window
         self.window = nil
@@ -98,6 +123,9 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
         self:clearView()
 
         local generation = self.generation
+
+        -- The size we built for, so the resize check knows when it's out of date.
+        self.mountedWidth, self.mountedHeight = parent.width, parent.height
 
         -- The anchors make the view stretch with the window when it's resized. The
         -- browser and method screens turn scrolling off here because their child
@@ -133,6 +161,10 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
                 self.browseUnmount, self.browseRefresh = BrowseView.mount(library, view, browser, guarded, function(method)
                     calculator:select(method)
                     self.method = method
+
+                    -- A different method starts on its Income tab.
+                    self.methodTab = nil
+
                     navigate("method")
                 end)
             else
@@ -183,7 +215,7 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
                         disabled = not browser.favourites[self.method.id],
                     })
 
-                    self.methodRefresh = MethodView.mount(view, self.method, calculator, guarded)
+                    self.methodRefresh, self.methodActiveTab = MethodView.mount(view, self.method, calculator, guarded, self.methodTab)
                 elseif self.screen == "diagnostics" then
                     diagnostics:mount(view, guarded)
                 else
@@ -197,6 +229,62 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
             self:clearView()
             error(failure, 0)
         end
+    end
+
+    -- Runs once per logic tick while the window is visible. Usually the window is
+    -- the size we built for, so this returns after a couple of comparisons. After a
+    -- resize it waits until the size has held for RESIZE_SETTLE_TICKS (so we don't
+    -- rebuild on every step of a drag), then rebuilds the current screen once.
+    function self:checkSize()
+        local window = self.window
+
+        if not window or not self.view or not self.interactive then
+            return
+        end
+
+        local width, height = window.content.width, window.content.height
+
+        -- Still changing (or first look): restart the countdown.
+        if width ~= self.seenWidth or height ~= self.seenHeight then
+            self.seenWidth, self.seenHeight = width, height
+            self.stableTicks = 0
+            return
+        end
+
+        -- Same size we built for: nothing to do. This is the usual case.
+        if width == self.mountedWidth and height == self.mountedHeight then
+            return
+        end
+
+        self.stableTicks = self.stableTicks + 1
+
+        if self.stableTicks >= RESIZE_SETTLE_TICKS then
+            self:mount(window.content)
+        end
+    end
+
+    -- Starts the per-tick size check, if it isn't running already.
+    function self:startResizeWatch()
+        if self.watchingResize then
+            return
+        end
+
+        self.watchingResize = true
+        self.seenWidth, self.seenHeight = nil, nil
+
+        Event.Logic.Subscribe(RESIZE_EVENT, function()
+            self:checkSize()
+        end)
+    end
+
+    -- Stops it again: the window is hidden, closed or gone.
+    function self:stopResizeWatch()
+        if not self.watchingResize then
+            return
+        end
+
+        self.watchingResize = false
+        Event.Logic.Unsubscribe(RESIZE_EVENT)
     end
 
     -- Shows the workbench window, creating it the first time. Returns true, or
@@ -227,6 +315,7 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
             end
 
             self.window:Show()
+            self:startResizeWatch()
 
             if self.browseRefresh then
                 self.browseRefresh()
@@ -273,6 +362,7 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
                 onClose = function(window)
                     if self.window == window then
                         self.interactive = false
+                        self:stopResizeWatch()
                     end
                 end,
             })
@@ -285,6 +375,7 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
 
             self:mount(self.window.content)
             self.window:Show()
+            self:startResizeWatch()
         end)
 
         if not ok then

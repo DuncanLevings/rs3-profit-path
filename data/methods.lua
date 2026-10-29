@@ -243,15 +243,17 @@ return {
                 ["assumptions"] = {
                     "This method uses no wood spirits. Extra logs and costs from optional equipment are not included.",
                 },
-                ["coverage"] = "partial",
+                ["coverage"] = "complete",
                 ["inputs"] = {
                     {
                         ["basis"] = "hour",
-                        ["display_item_id"] = 33234,
+                        ["item_id"] = 33234,
                         ["name"] = "Perfect plus potion",
+                        ["portion"] = 6,
+                        ["pricing"] = "recipe",
                         ["quantity"] = 0.041666666666666664,
+                        ["recipe"] = "Perfect plus potion",
                         ["source_quantity"] = "1/6 * 1/4",
-                        ["valuation"] = "unresolved ingredient-cost formula",
                     },
                 },
                 ["outputs"] = {
@@ -269,9 +271,7 @@ return {
                     ["key"] = "logs_per_hour",
                     ["unit"] = "logs/hour",
                 },
-                ["unresolved"] = {
-                    "Expand the source potioncost formula before showing a complete profit estimate.",
-                },
+                ["unresolved"] = {},
             },
             ["instructions"] = {
                 "Cut an elder tree, then move to another tree when it is depleted.",
@@ -375,18 +375,19 @@ return {
                 ["inputs"] = {
                     {
                         ["basis"] = "hour",
-                        ["display_item_id"] = 48239,
+                        ["item_id"] = 48239,
                         ["name"] = "Aggroverload (6)",
+                        ["portion"] = 6,
+                        ["pricing"] = "recipe",
                         ["quantity"] = 1.6666666666666667,
+                        ["recipe"] = "Aggroverload",
                         ["source_quantity"] = "10/6",
-                        ["valuation"] = "unresolved ingredient-cost formula",
                     },
                     {
                         ["basis"] = "hour",
-                        ["display_item_id"] = 33186,
+                        ["item_id"] = 33186,
                         ["name"] = "Super prayer renewal potion (6)",
                         ["quantity"] = 9,
-                        ["valuation"] = "unresolved item mapping",
                     },
                     {
                         ["basis"] = "action",
@@ -497,7 +498,6 @@ return {
                 },
                 ["unresolved"] = {
                     "Reconcile shared drop quantities and probabilities with this method revision.",
-                    "Resolve potion-cost formulas and item IDs.",
                     "Verify source-equivalent salvage valuation and spring-cleaner treatment before calculating a complete profit.",
                 },
             },

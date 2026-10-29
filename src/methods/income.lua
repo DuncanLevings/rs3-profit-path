@@ -8,6 +8,11 @@
 -- Opening/reopening reads GEPL's cached getter. That getter owns cache expiry
 -- and the in-flight fetch guard; we never force updateDatabase or run HTTP here.
 -- Typing a new rate reuses those same prices, so we never hit GEPL per keystroke.
+--
+-- Untradeable supplies (rows with pricing = "recipe") have no GE price of their own;
+-- recipe_cost.lua prices them from their ingredients instead.
+local RecipeCost = require("src/methods/recipe_cost")
+
 local Income = {}
 
 -- True for real numbers from 0 upwards. Rejects nil, strings, infinity and NaN
@@ -82,13 +87,35 @@ end
 
 -- Fetches one quote per distinct item in the method. If an item is both an input
 -- and an output we only ask once, so both sides use the exact same snapshot.
+--
+-- A recipe-priced row doesn't need its own item's price (it can't be traded);
+-- instead we fetch every GE ingredient in its recipe, all the way down.
 function Income.captureQuotes(library, model)
     local quotes = {}
 
+    local function fetch(itemId)
+        if not quotes[itemId] then
+            quotes[itemId] = Income.inspectQuote(library, itemId)
+        end
+    end
+
     for _, lines in ipairs({ model.inputs, model.outputs }) do
         for _, line in ipairs(lines) do
-            if line.item_id and not quotes[line.item_id] then
-                quotes[line.item_id] = Income.inspectQuote(library, line.item_id)
+            if line.pricing == "recipe" then
+                -- Sorted so the fetch order (and any test counting it) is stable.
+                local ids = {}
+
+                for itemId in pairs(RecipeCost.itemIds(line.recipe)) do
+                    ids[#ids + 1] = itemId
+                end
+
+                table.sort(ids)
+
+                for _, itemId in ipairs(ids) do
+                    fetch(itemId)
+                end
+            elseif line.item_id then
+                fetch(line.item_id)
             end
         end
     end
@@ -131,14 +158,27 @@ function Income.calculate(model, rate, quotes)
                 overflow = true
             end
 
-            local quote = line.item_id and quotes[line.item_id]
-            local usable = quote and (quote.status == "available" or quote.status == "partial")
-            local price = usable and quote[side] or nil
-            local timestamp = usable and quote[side .. "Time"] or nil
+            local quote, price, timestamp, recipeProblem
+
+            if line.pricing == "recipe" then
+                -- Priced from its ingredients. On failure the second value is why.
+                price, timestamp = RecipeCost.price(line.recipe, line.portion, quotes)
+
+                if not price then
+                    recipeProblem, timestamp = timestamp, nil
+                end
+            else
+                quote = line.item_id and quotes[line.item_id]
+
+                local usable = quote and (quote.status == "available" or quote.status == "partial")
+                price = usable and quote[side] or nil
+                timestamp = usable and quote[side .. "Time"] or nil
+            end
 
             local row = {
                 name = line.name, itemId = line.item_id, quantity = quantity, basis = line.basis,
                 unitPrice = price, timestamp = timestamp,
+                creationCost = line.pricing == "recipe" or nil,
             }
 
             if quantity == 0 then
@@ -163,7 +203,7 @@ function Income.calculate(model, rate, quotes)
             else
                 -- No usable price, so this side can't have a total. Say why.
                 complete = false
-                row.message = line.valuation or (quote and quote.message) or "Price unavailable."
+                row.message = recipeProblem or line.valuation or (quote and quote.message) or "Price unavailable."
             end
 
             if row.value then

@@ -255,7 +255,7 @@ local function client(database)
         return sprite
     end }
 
-    ui.Hook = { ONSELECTIONCHANGED = "selection" }
+    ui.Hook = { ONSELECTIONCHANGED = "selection", ONRESIZE = "resize" }
     ui.AlignMode = { BOTTOMRIGHT = "right", CENTRE = "centre" }
     ui.Rectangle = { new = function(parent)
         local rectangle = {}
@@ -403,7 +403,15 @@ local function pretty()
     -- One drawable surface: a SimpleView, or a tab page (tab pages are surfaces too).
     local function surface()
         local view = { texts = {}, buttons = {}, fields = {}, tabs = {}, combos = {}, children = {}, destroyed = false, scrollY = 0 }
-        view.content = { testOwner = view }
+
+        -- Every surface pretends its content area is 600 wide, so panel fitting
+        -- (Style.panelFitter) has something to measure.
+        view.content = { testOwner = view, width = 600 }
+
+        -- Records the last size set (PrettyUI's documented SetSize).
+        function view:SetSize(width, height)
+            self.size = { width = width, height = height }
+        end
 
         function view:AddText(text)
             local label = { content = type(text) == "table" and text.text or text, options = text }
@@ -571,7 +579,7 @@ local function pretty()
         end
 
         function view:AddTabs(entries, options)
-            local tabs = { entries = entries, pages = {}, activeIndex = options.activeIndex }
+            local tabs = { entries = entries, pages = {}, activeIndex = options.activeIndex, options = options }
 
             for index in ipairs(entries) do
                 tabs.pages[index] = surface()
@@ -579,6 +587,10 @@ local function pretty()
 
             function tabs:GetPage(index)
                 return self.pages[index]
+            end
+
+            function tabs:GetActiveIndex()
+                return self.activeIndex
             end
 
             self.tabs[#self.tabs + 1] = tabs
@@ -644,6 +656,12 @@ local function pretty()
             options = options, hidden = false, destroyed = false,
             content = { width = options.width - 20, height = options.height - 48 },
         }
+
+        -- Test helper: the player drags the window edge, so the content area gets
+        -- a new size (what PrettyUI's Window:SetSize does).
+        function window:resize(width, height)
+            self.content.width, self.content.height = width, height
+        end
 
         function window:Show()
             assert(not self.destroyed, "Show after destruction")
