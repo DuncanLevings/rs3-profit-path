@@ -5,7 +5,8 @@
 --   low  = the latest instant-sell price -> what you'd get for your outputs
 -- Each side comes with its own timestamp, which can be old for rarely traded items.
 --
--- Prices are only grabbed when a method opens or the player hits Refresh prices.
+-- Opening/reopening reads GEPL's cached getter. That getter owns cache expiry
+-- and the in-flight fetch guard; we never force updateDatabase or run HTTP here.
 -- Typing a new rate reuses those same prices, so we never hit GEPL per keystroke.
 local Income = {}
 

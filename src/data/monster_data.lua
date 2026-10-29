@@ -6,7 +6,7 @@
 -- numbers. This reader turns one monster back into normal named fields when asked.
 --
 -- Important: the field positions (row[1], row[2]...) must match the *_FIELDS lists
--- in tools/catalogue.py. Change one and you must change the other; the catalogue
+-- in src/tools/catalogue.py. Change one and you must change the other; the catalogue
 -- `verify` command round-trips every monster to catch any mismatch.
 --
 -- Every call returns brand-new tables, so one caller editing a result can't

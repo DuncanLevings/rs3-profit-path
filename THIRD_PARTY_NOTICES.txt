@@ -41,3 +41,9 @@ The source establishes per-hour/per-kill input distinctions, per-item output tax
 rounding and cost-based ROI. Profit Path's calculator is independently written.
 It uses GEPL instant-buy input and instant-sell output trade quotes instead of
 the Wiki's guide prices. Zero-cost ROI is shown as not applicable, not infinity.
+
+rsprite runtime dependency
+Profit Path uses the public API of the separately installed rsprite 0.1.2 library by sereselene.
+Project: https://github.com/sereselene/rsprite
+Licence: PolyForm Strict 1.0.0, as supplied with rsprite. Its source code is not copied or bundled here.
+The small native sprite-name registry references RuneScape game assets, copyright Jagex Ltd.; Profit Path does not distribute these images.

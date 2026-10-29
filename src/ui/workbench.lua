@@ -1,4 +1,5 @@
--- Everything on screen, apart from the method tabs (those are in method_view.lua).
+-- Owns the launcher, window frame and navigation. browse_view.lua draws the
+-- browser columns; method_view.lua draws the method tabs.
 --
 -- There are two separate pieces, each with its own lifetime:
 --   * the launcher: a small page in the Plugins ribbon with an "Open" button
@@ -12,29 +13,28 @@
 -- view we bump it, and every button callback remembers the generation it was made
 -- in. A click that arrives late (say, after we've moved to another screen) sees the
 -- number has changed and does nothing, instead of poking UI that no longer exists.
-local MethodView = require("method_view")
-local Diagnostics = require("diagnostics")
+local MethodView = require("src/ui/method_view")
+local Diagnostics = require("src/ui/diagnostics")
+local BrowseView = require("src/ui/browse_view")
 local UI = {}
 
 -- `library` is PrettyUI. `calculator` is main.lua's controller; we just call it and
 -- show its results, with no money logic in here.
-function UI.new(library, account, inspectQuote, inspectQuest, methods, calculator)
+function UI.new(library, account, inspectQuote, inspectQuest, calculator, browser)
     local self = { active = true, generation = 0, screen = "browse" }
     local diagnostics = Diagnostics.new(account, inspectQuote, inspectQuest)
 
     -- Re-reads whatever the current screen shows. `reason` says what changed:
     -- "skills", "inventory", or nil for "refresh everything" (e.g. on reopen).
-    -- Method requirements only use skills, and inventory changes can fire on every
-    -- action while skilling, so we skip the method refresh for those.
+    -- Inventory changes can fire on every action. The method view updates only
+    -- item borders for those, keeping skill reads out of that hot path.
     function self:refresh(reason)
         if not self.view or not self.interactive then
             return
         end
 
         if self.methodRefresh then
-            if reason ~= "inventory" then
-                self.methodRefresh()
-            end
+            self.methodRefresh(reason)
         elseif self.screen == "diagnostics" then
             diagnostics:refresh()
         end
@@ -49,8 +49,14 @@ function UI.new(library, account, inspectQuote, inspectQuest, methods, calculato
         local view = self.view
         self.view = nil
         self.methodRefresh = nil
+        self.browseRefresh = nil
 
         diagnostics:unmount()
+
+        if self.browseUnmount then
+            self.browseUnmount()
+            self.browseUnmount = nil
+        end
 
         if view then
             view:Destroy()
@@ -94,11 +100,11 @@ function UI.new(library, account, inspectQuote, inspectQuest, methods, calculato
         local generation = self.generation
 
         -- The anchors make the view stretch with the window when it's resized. The
-        -- method screen turns scrolling off here because its tabs scroll themselves;
-        -- two nested scroll areas would fight each other.
+        -- browser and method screens turn scrolling off here because their child
+        -- views scroll themselves; two nested scroll areas would fight each other.
         local view = library.SimpleView.new(parent, {
             width = 0, height = 0, widthAnchor = 1, heightAnchor = 1,
-            scrollable = self.screen ~= "method",
+            scrollable = self.screen == "diagnostics",
         })
 
         self.view = view
@@ -124,33 +130,48 @@ function UI.new(library, account, inspectQuote, inspectQuest, methods, calculato
             end
 
             if self.screen == "browse" then
-                view:AddTitle("Browse methods")
-                view:AddText("Development catalogue: three methods. Choose one to inspect its income and requirements.")
+                self.browseUnmount, self.browseRefresh = BrowseView.mount(library, view, browser, guarded, function(method)
+                    calculator:select(method)
+                    self.method = method
+                    navigate("method")
+                end)
+            else
+                local backOptions = { tooltip = "Back to methods", size = 24 }
 
-                -- Temporary: remove this button along with diagnostics.lua.
-                view:AddSimpleButton("Diagnostics", guarded(function()
-                    navigate("diagnostics")
-                end))
-
-                for _, method in ipairs(methods) do
-                    view:AddTitle(method.title .. (method.variant and " - " .. method.variant or ""))
-                    view:AddText(method.source_category .. " | Intensity: " .. method.intensity
-                        .. " | Income model: " .. method.income.coverage)
-
-                    view:AddSimpleButton("Open " .. method.title, guarded(function()
-                        calculator:select(method)
-                        self.method = method
-                        navigate("method")
-                    end))
+                -- Detail navigation shares the title row. Diagnostics keeps its
+                -- normal flow layout so its temporary probe controls don't overlap.
+                if self.screen == "method" then
+                    backOptions.absolute = true
+                    backOptions.x = 10
+                    backOptions.y = 10
                 end
 
-                view:AddText("Reference data: RuneScape Wiki contributors, CC BY-NC-SA 3.0. Estimates use GEPL trade prices.")
-            else
-                view:AddSimpleButton("Back to methods", guarded(function()
+                view:AddSpriteButton("ARROW_LEFT", guarded(function()
+                    if self.screen == "method" then
+                        browser:returnFromMethod(self.method, calculator.quotes)
+                    end
+
                     navigate("browse")
-                end))
+                end), backOptions)
 
                 if self.screen == "method" then
+                    -- Update only the button, not the screen: rebuilding here would
+                    -- throw away the player's draft rate and selected detail tab.
+                    local favouriteButton
+
+                    local function favouriteLabel()
+                        return browser.favourites[self.method.id] and "Remove favourite" or "Add favourite"
+                    end
+
+                    favouriteButton = view:AddSpriteButton("STAR", guarded(function()
+                        browser:loadFavourites()
+                        browser:toggleFavourite(self.method)
+                        favouriteButton:SetTooltip(favouriteLabel())
+                        favouriteButton:SetDisabled(not browser.favourites[self.method.id])
+                        calculator.message = browser.message
+                        self.methodRefresh()
+                    end), { absolute = true, x = -36, xAnchor = 1, y = 10, size = 24, tooltip = favouriteLabel(), toggleable = true, disabled = not browser.favourites[self.method.id] })
+
                     self.methodRefresh = MethodView.mount(view, self.method, calculator, guarded)
                 elseif self.screen == "diagnostics" then
                     diagnostics:mount(view, guarded)
@@ -174,11 +195,33 @@ function UI.new(library, account, inspectQuote, inspectQuest, methods, calculato
             return false, "Profit Path has stopped."
         end
 
-        -- Already made? Just unhide it. The screen, tab and any typed rate are kept.
+        local identified, problem = calculator:useCharacter()
+
+        if not identified then
+            return false, problem
+        end
+
+        -- Opening is the price-refresh boundary. Hidden windows retain their
+        -- controls, draft rate and tab; only captured prices and labels change.
         if self.window then
+            local wasHidden = not self.interactive
             self.interactive = true
+
+            if wasHidden then
+                if self.screen == "method" then
+                    calculator:refreshPrices()
+                else
+                    browser:refreshEstimates()
+                end
+            end
+
             self.window:Show()
-            self:refresh()
+
+            if self.browseRefresh then
+                self.browseRefresh()
+            else
+                self:refresh()
+            end
 
             return true
         end
@@ -197,7 +240,7 @@ function UI.new(library, account, inspectQuote, inspectQuest, methods, calculato
 
         local ok, failure = pcall(function()
             self.window = library.Window.new(gameArea, {
-                title = "Profit Path",
+                title = "Profit Path / " .. calculator.characterName,
                 width = width,
                 height = height,
 
@@ -219,6 +262,12 @@ function UI.new(library, account, inspectQuote, inspectQuest, methods, calculato
                     end
                 end,
             })
+
+            if self.screen == "method" then
+                calculator:refreshPrices()
+            else
+                browser:refreshEstimates()
+            end
 
             self:mount(self.window.content)
             self.window:Show()
@@ -260,6 +309,20 @@ function UI.new(library, account, inspectQuote, inspectQuest, methods, calculato
                     status.content = opened and "" or problem
                 end
             end, { width = 220 })
+
+            -- Temporary: the development probes live in the launcher, never in
+            -- the player's browsing sidebar. Remove with diagnostics.lua.
+            launcher:AddSimpleButton("Diagnostics", function()
+                if self.active and self.launcher == launcher then
+                    local opened, problem = self:openWindow()
+                    status.content = opened and "" or problem
+
+                    if opened then
+                        self.screen = "diagnostics"
+                        self:mount(self.window.content)
+                    end
+                end
+            end, { width = 120, inline = true })
         end)
 
         if not ok then

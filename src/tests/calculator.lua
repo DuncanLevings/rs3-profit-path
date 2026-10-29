@@ -1,15 +1,26 @@
--- Calculator, saved-rate and whole-plugin tests. tests/run.lua loads this file and
+-- Calculator, saved-rate and whole-plugin tests. src/tests/run.lua loads this file and
 -- passes in its helpers: test, equal, the fake client() and the fake pretty() UI.
 --
 -- Prices here are fixed made-up numbers (see quotes() below), so every expected
 -- result can be worked out by hand. The steel-bar maths is written out in the
 -- first calculator test.
 return function(test, equal, client, pretty)
-    local Income = require("income")
-    local Preferences = require("preferences")
+    local Income = require("src/methods/income")
+    local Preferences = require("src/storage/preferences")
 
     -- methods[1] is the steel-bar method in the generated catalogue.
     local steel = require("data/methods").methods[1]
+
+    -- Read evidence across nested visual panels without depending on their order.
+    local function textContent(surface)
+        local lines = {}
+
+        for _, label in ipairs(surface:allTexts()) do
+            lines[#lines + 1] = label.content
+        end
+
+        return table.concat(lines, "\n")
+    end
 
     -- Fake GEPL quotes for the three steel-bar items. A fresh copy each call, so a
     -- test can change one without affecting the next.
@@ -28,7 +39,7 @@ return function(test, equal, client, pretty)
 
     test("method skill evidence reads only mapped skills while logged in", function()
         local state = client()
-        local account = require("account").new(function() end)
+        local account = require("src/game/account").new(function() end)
 
         -- Unknown skill names are skipped instead of erroring.
         local skills = account:readSkills({ SMITHING = true, UNMAPPED = true })
@@ -334,7 +345,7 @@ return function(test, equal, client, pretty)
 
         Event.ContentLayerReady.emit({ component = { width = 900, height = 700 } })
         prettyui.views[1].buttons["Open Profit Path"]()
-        prettyui.views[2].buttons["Open Smelting steel bars"]()
+        prettyui:findMethod("Smelting steel bars")()
 
         -- Income opens first and the tabs are in the agreed order.
         local detail = prettyui.views[3]
@@ -344,15 +355,15 @@ return function(test, equal, client, pretty)
         equal(tabs.entries[1].text, "Income")
         equal(tabs.entries[2].text, "Requirements")
 
-        -- fields[1] is the profile box, fields[2] the rate box.
+        -- fields[1] is the rate box; profile controls come after the breakdown.
         local income = tabs.pages[1]
-        local rate = income.fields[2]
+        local rate = income.fields[1]
 
         -- Opening fetched 3 prices (one per item). Typing a rate must not fetch more.
-        equal(calls, 3)
+        equal(calls, 6)
 
         rate:SetText("1000", true)
-        equal(calls, 3)
+        equal(calls, 6)
 
         -- Save 1000, then type away and back. Being back on the saved value should
         -- show "Saved personal rate" again, not "not saved".
@@ -362,7 +373,7 @@ return function(test, equal, client, pretty)
 
         local savedLabelFound = false
 
-        for _, label in ipairs(income.texts) do
+        for _, label in ipairs(income:allTexts()) do
             if label.content:find("Saved personal rate", 1, true) then
                 savedLabelFound = true
             end
@@ -372,8 +383,8 @@ return function(test, equal, client, pretty)
 
         local saved
 
-        for _, value in pairs(state.db) do
-            if type(value) == "table" then
+        for key, value in pairs(state.db) do
+            if key:find("profit-path.rate.v1/", 1, true) == 1 then
                 saved = value.value
             end
         end
@@ -384,26 +395,26 @@ return function(test, equal, client, pretty)
         rate:SetText("invalid", true)
         income.buttons["Save rate"]()
 
-        for _, value in pairs(state.db) do
-            if type(value) == "table" then
+        for key, value in pairs(state.db) do
+            if key:find("profit-path.rate.v1/", 1, true) == 1 then
                 equal(value.value, 1000)
             end
         end
 
         local combined = {}
 
-        for _, label in ipairs(income.texts) do
+        for _, label in ipairs(income:allTexts()) do
             combined[#combined + 1] = label.content
         end
 
-        assert(table.concat(combined):find("19000.00 GP/hour", 1, true))
+        assert(table.concat(combined):find("19,000/hour", 1, true))
 
         -- Reset puts 2000 back in the box and deletes the saved record.
         income.buttons["Reset to source rate"]()
         equal(rate:GetText(), "2000")
 
-        for _, value in pairs(state.db) do
-            assert(type(value) ~= "table")
+        for key, value in pairs(state.db) do
+            assert(key:find("profit-path.rate.v1/", 1, true) ~= 1)
         end
 
         -- After Back, the old screen is destroyed and its controls must do nothing.
@@ -412,10 +423,10 @@ return function(test, equal, client, pretty)
 
         rate:SetText("5", true)
         income.buttons["Save rate"]()
-        equal(calls, 3)
+        equal(calls, 6)
 
-        for _, value in pairs(state.db) do
-            assert(type(value) ~= "table")
+        for key, value in pairs(state.db) do
+            assert(key:find("profit-path.rate.v1/", 1, true) ~= 1)
         end
 
         PluginShutdown()
@@ -444,11 +455,11 @@ return function(test, equal, client, pretty)
         equal(window.options.resizable, true)
         equal(window.options.scrollable, false)
 
-        prettyui.views[2].buttons["Open Smelting steel bars"]()
+        prettyui:findMethod("Smelting steel bars")()
 
         local detail = prettyui.views[3]
         local income = detail.tabs[1].pages[1]
-        local rate = income.fields[2]
+        local rate = income.fields[1]
 
         -- Type a draft, then close (hide) the window. Buttons on a hidden window
         -- must do nothing, so this Save doesn't write.
@@ -456,7 +467,7 @@ return function(test, equal, client, pretty)
         window:Close()
 
         income.buttons["Save rate"]()
-        equal(next(state.db), nil)
+        assert(state.db["profit-path.characters.v1"])
 
         -- The client remounts the launcher. The old launcher goes; the window stays.
         Event.ContentLayerReady.emit({ component = { width = 700, height = 450 } })
@@ -505,7 +516,7 @@ return function(test, equal, client, pretty)
         gepl = nil
 
         -- Every skill reads as `level`, which we can change mid-test.
-        local level = 30
+        local level = 10
         Player.GetLevelUncapped = function()
             return level
         end
@@ -514,14 +525,18 @@ return function(test, equal, client, pretty)
 
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui.views[1].buttons["Open Profit Path"]()
-        prettyui.views[2].buttons["Open Smelting steel bars"]()
+        prettyui:findMethod("Smelting steel bars")()
 
         local requirements = prettyui.views[3].tabs[1].pages[2]
-        assert(requirements.texts[1].content:find("Observed SMITHING: 30", 1, true))
+        local skillLabel = requirements.children[1].texts[2]
+        equal(skillLabel.content, "20 Smithing")
+        equal(skillLabel.rgba, require("src/ui/view_style").bad)
 
         level = 40
         Event.SkillTransmit.emit({ skill = SkillType.SMITHING })
-        assert(requirements.texts[1].content:find("Observed SMITHING: 40", 1, true))
+        equal(skillLabel.content, "20 Smithing")
+        equal(skillLabel.rgba, require("src/ui/view_style").good)
+        assert(not textContent(requirements):find("Your level:", 1, true))
 
         -- After shutdown the listener is gone, and firing the event is harmless.
         PluginShutdown()
@@ -547,7 +562,7 @@ return function(test, equal, client, pretty)
 
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui.views[1].buttons["Open Profit Path"]()
-        prettyui.views[2].buttons["Open Smelting steel bars"]()
+        prettyui:findMethod("Smelting steel bars")()
 
         local afterOpen = reads
 
@@ -565,9 +580,9 @@ return function(test, equal, client, pretty)
     test("unknown navigation fails visibly and cleans up instead of opening diagnostics", function()
         client()
 
-        local account = require("account").new(function() end)
+        local account = require("src/game/account").new(function() end)
         local library = pretty()
-        local screen = require("ui").new(library, account)
+        local screen = require("src/ui/workbench").new(library, account)
 
         screen.screen = "misspelled-screen"
 
@@ -654,7 +669,7 @@ return function(test, equal, client, pretty)
         local current = prettyui.views[3]
         prettyui.windows[1]:Close()
 
-        current.buttons["Open Smelting steel bars"]()
+        prettyui:findMethod("Smelting steel bars")()
         equal(#prettyui.views, 4)
 
         PluginShutdown()

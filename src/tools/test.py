@@ -1,9 +1,9 @@
 """Run the isolated Lua 5.4 tests and check repository file policy."""
-# One command to check everything: `python tools/test.py`. It stops at the first
+# One command to check everything: `python src/tools/test.py`. It stops at the first
 # failure. In order:
 #   1. repo policy: only README.md and CHANGELOG.md are allowed as Markdown
 #   2. the manifest still asks for no permissions or URLs
-#   3. every Lua file parses, then the Lua behavior tests run (tests/run.lua)
+#   3. every Lua file parses, then the Lua behavior tests run (src/tests/run.lua)
 #   4. generated data matches its sources, then the Python tests run
 # The Lua tests use fake client/PrettyUI objects. They don't replace in-game testing.
 from pathlib import Path
@@ -16,7 +16,7 @@ import unittest
 from lupa.lua54 import LuaRuntime
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 
 # Ask git which files belong to the repo (tracked plus new, minus ignored), so local
@@ -27,7 +27,9 @@ listed = subprocess.run(
     stdout=subprocess.PIPE,
 ).stdout.decode("utf-8")
 
-files = [Path(name) for name in listed.split("\0") if name]
+# A moved tracked file stays in git's list until staging. Check files present in
+# this working tree, including their new untracked paths, rather than old paths.
+files = [Path(name) for name in listed.split("\0") if name and (ROOT / name).is_file()]
 
 for relative in files:
     if relative.suffix.lower() == ".md" and relative.as_posix() not in {"README.md", "CHANGELOG.md"}:
@@ -40,20 +42,25 @@ manifest = json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))
 assert manifest["requiredPermissions"] == []
 assert manifest["optionalPermissions"] == []
 assert manifest["urls"] == {}
+assert manifest["requiredDependencies"]["rsprite"] == "rsprite"
 
 # The client runs Lua 5.4, so make sure the embedded runtime is 5.4 as well.
 lua = LuaRuntime(unpack_returned_tuples=True)
 assert lua.eval("_VERSION") == "Lua 5.4"
 
+# Confirmed in the beta client: the standard utf8 global is not exposed. Keep
+# behavior tests in that environment so ordinary desktop Lua can't mask its use.
+lua.globals().utf8 = None
+
 for relative in files:
     if relative.suffix == ".lua":
         lua.execute("assert(load(...))", (ROOT / relative).read_text(encoding="utf-8"))
 
-lua.execute((ROOT / "tests" / "run.lua").read_text(encoding="utf-8"))
+lua.execute((ROOT / "src" / "tests" / "run.lua").read_text(encoding="utf-8"))
 
 print("Lua 5.4 syntax, manifest, and repository Markdown policy passed.")
 
-sys.path.insert(0, str(ROOT / "tools"))
+sys.path.insert(0, str(ROOT / "src" / "tools"))
 import catalogue
 
 # monsters.json is about 12 MB, so read it once and share it between both checks.
@@ -62,7 +69,7 @@ monsters = json.loads(catalogue.SOURCE.read_text(encoding="utf-8"))
 catalogue.verify(monsters)
 catalogue.verify_methods(monsters)
 
-suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="test_*.py")
+suite = unittest.defaultTestLoader.discover(str(ROOT / "src" / "tests"), pattern="test_*.py")
 
 if not unittest.TextTestRunner(verbosity=1).run(suite).wasSuccessful():
     raise SystemExit(1)

@@ -3,8 +3,8 @@
 -- owner when something changed, passing a reason: "skills", "inventory" or
 -- "game_state". It never does money maths or decides recommendations.
 --
--- Heads up: we still don't know if the bank is always fully sent to us, or which
--- inventory config is the equipment slots. Those need in-game probes first.
+-- Bank data may be unavailable while closed. Item borders only describe readable
+-- backpack, worn gear and bank contents; they never establish full account ownership.
 local Account = {}
 
 function Account.new(onChanged)
@@ -17,6 +17,7 @@ function Account.new(onChanged)
         inspection = nil,
         questInspection = nil,
         lastInventoryName = nil,
+        ownershipCache = {},
     }
 
     -- Every event we subscribe to, so destroy() can unsubscribe all of them.
@@ -40,6 +41,12 @@ function Account.new(onChanged)
         end
 
         local inventoryConfig = event.inv
+
+        for name, snapshot in pairs(self.ownershipCache) do
+            if snapshot.configId == inventoryConfig.id then
+                self.ownershipCache[name] = nil
+            end
+        end
 
         self.lastInventoryName = inventoryConfig.configName
         self.eventCount = self.eventCount + 1
@@ -75,6 +82,90 @@ function Account.new(onChanged)
         return skills
     end
 
+    -- Read only our own visible name. Don't retain the entity proxy and never
+    -- use the tracking ID: it needs a permission this plugin doesn't request.
+    function self:readCharacterName()
+        if not self.active or not Player.IsAvailable() then
+            return nil, "Enter a game world before opening Profit Path."
+        end
+
+        local ok, name = pcall(function()
+            local player = Player.GetEntity()
+
+            if player and player.isValid then
+                return player.displayName
+            end
+        end)
+
+        if not ok then
+            return nil, "Character name could not be read: " .. tostring(name)
+        end
+
+        if type(name) ~= "string" or not name:find("%S") then
+            return nil, "Character name is not available yet. Try opening again in a moment."
+        end
+
+        return name
+    end
+
+    -- Read only the requested item totals, caching them until that inventory
+    -- changes. INV/WORN/BANK are verified config names (also used by Skill Tips).
+    -- Completeness here covers these three containers, not Diango or other stores.
+    function self:readOwnership(wanted)
+        local totals = {}
+
+        if next(wanted) == nil then
+            return { counts = totals, complete = false }
+        end
+
+        local complete = self.active and Player.IsAvailable()
+
+        if not complete then
+            return { counts = totals, complete = false }
+        end
+
+        for _, name in ipairs({ "INV", "WORN", "BANK" }) do
+            local snapshot = self.ownershipCache[name]
+            local ok, read = pcall(function()
+                local definition = config.Inv[name]
+                local inventory = definition and Inventory.Find(definition)
+
+                if not inventory or not inventory.isValid then
+                    return nil
+                end
+
+                local counts = snapshot and snapshot.counts or {}
+
+                for itemId in pairs(wanted) do
+                    if counts[itemId] == nil then
+                        local total = inventory:GetTotal(itemId)
+
+                        if type(total) ~= "number" or total < 0 or total >= math.huge or total % 1 ~= 0 then
+                            return nil
+                        end
+
+                        counts[itemId] = total
+                    end
+                end
+
+                return { configId = definition.id, counts = counts }
+            end)
+
+            if ok and read then
+                self.ownershipCache[name] = read
+
+                for itemId in pairs(wanted) do
+                    totals[itemId] = (totals[itemId] or 0) + read.counts[itemId]
+                end
+            else
+                self.ownershipCache[name] = nil
+                complete = false
+            end
+        end
+
+        return { counts = totals, complete = complete }
+    end
+
     -- Safe to call twice. Unsubscribes first, so no event can arrive mid-teardown.
     function self:destroy()
         if not self.active then
@@ -82,6 +173,7 @@ function Account.new(onChanged)
         end
 
         self.active = false
+        self.ownershipCache = {}
 
         for _, event in ipairs(subscriptions) do
             event.Unsubscribe("profit-path-account")
@@ -215,8 +307,8 @@ function Account.new(onChanged)
         return result
     end
 
-    -- Inventory events only feed the diagnostics probe for now. Later, item
-    -- ownership checks will use these same subscriptions to know when to re-read.
+    -- Inventory events invalidate only the affected presence cache. Native item
+    -- totals are re-read on demand while a method is visible, never each frame.
     subscribe(Event.InventoryAdded, function(event)
         inventoryChanged("Added", event)
     end)
@@ -246,6 +338,7 @@ function Account.new(onChanged)
         self.questInspection = nil
         self.lastInventoryName = nil
         self.lastEvent = "Game state changed; inspect inventories again."
+        self.ownershipCache = {}
 
         notify("game_state")
     end)

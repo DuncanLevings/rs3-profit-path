@@ -1,7 +1,7 @@
 """Data-pipeline cases independent of the installed game and source checkout."""
-# Tests for tools/catalogue.py: packing monsters, reading them back, and rejecting
+# Tests for src/tools/catalogue.py: packing monsters, reading them back, and rejecting
 # bad method data. They use small hand-made fixtures, not the real 12 MB data, so
-# they run fast and each case is easy to follow. tools/test.py runs them.
+# they run fast and each case is easy to follow. src/tools/test.py runs them.
 import copy
 from pathlib import Path
 import sys
@@ -46,7 +46,7 @@ def reader(source):
     lua = LuaRuntime(unpack_returned_tuples=True)
     lua.globals().package.loaded["data/monsters"] = lua.execute(catalogue.build_text(source))
 
-    return lua.execute((catalogue.ROOT / "monster_data.lua").read_text(encoding="utf-8"))
+    return lua.execute((catalogue.ROOT / "src" / "data" / "monster_data.lua").read_text(encoding="utf-8"))
 
 
 class CatalogueTests(unittest.TestCase):
@@ -194,6 +194,50 @@ class MethodTests(unittest.TestCase):
             }],
         }
 
+    def test_ownership_variants_reject_invalid_native_ids(self):
+        for aliases in ([], [True], [0], [-1], [1.5], "42"):
+            with self.subTest(aliases=aliases):
+                self.methods["items"]["42"]["ownership_ids"] = aliases
+
+                with self.assertRaisesRegex(ValueError, "ownership IDs"):
+                    catalogue.methods_text(self.methods, self.monsters)
+
+        self.methods["items"]["42"]["ownership_ids"] = [42, 43]
+        catalogue.methods_text(self.methods, self.monsters)
+
+    def test_flexible_equipment_cannot_turn_an_example_into_a_fixed_item(self):
+        access = self.methods["methods"][0]["requirements"]["access"]
+        requirement = {"kind": "gear", "text": "Use your best suitable tool",
+                       "equipment_scope": "flexible"}
+        access["children"] = [requirement]
+        catalogue.methods_text(self.methods, self.monsters)
+
+        requirement["display_items"] = [42]
+
+        with self.assertRaisesRegex(ValueError, "Flexible equipment"):
+            catalogue.methods_text(self.methods, self.monsters)
+
+        requirement["equipment_scope"] = "specific"
+        catalogue.methods_text(self.methods, self.monsters)
+
+        for scope in (None, "guess", True, [], {}):
+            requirement["equipment_scope"] = scope
+
+            with self.assertRaisesRegex(ValueError, "equipment scope"):
+                catalogue.methods_text(self.methods, self.monsters)
+
+    def test_requirement_icons_must_resolve_to_known_sprite_names(self):
+        requirement = self.methods["methods"][0]["requirements"]["access"]["children"][0]
+
+        for icon in ("../save", "missing_icon", 42, []):
+            requirement["display_icon"] = icon
+
+            with self.assertRaisesRegex(ValueError, "icon name"):
+                catalogue.methods_text(self.methods, self.monsters)
+
+        requirement["display_icon"] = "perk_honed"
+        catalogue.methods_text(self.methods, self.monsters)
+
     def test_validates_monster_selection_and_explicit_units(self):
         text = catalogue.methods_text(self.methods, self.monsters)
 
@@ -240,6 +284,19 @@ class MethodTests(unittest.TestCase):
         self.methods["methods"].append(copy.deepcopy(self.methods["methods"][0]))
 
         with self.assertRaisesRegex(ValueError, "duplicate method"):
+            catalogue.methods_text(self.methods, self.monsters)
+
+    def test_icon_references_are_validated_separately_from_income_items(self):
+        method = self.methods["methods"][0]
+        method["requirements"]["access"]["display_items"] = [999]
+
+        with self.assertRaisesRegex(ValueError, "display item"):
+            catalogue.methods_text(self.methods, self.monsters)
+
+        del method["requirements"]["access"]["display_items"]
+        method["income"]["inputs"][0]["display_item_id"] = 999
+
+        with self.assertRaisesRegex(ValueError, "display item"):
             catalogue.methods_text(self.methods, self.monsters)
 
     def test_invalid_rates_are_not_emitted(self):

@@ -1,4 +1,4 @@
--- Profit Path's Lua behavior tests. tools/test.py runs this file inside an embedded
+-- Profit Path's Lua behavior tests. src/tools/test.py runs this file inside an embedded
 -- Lua 5.4, outside the game.
 --
 -- There's no real client here, so we build fakes: client() swaps in pretend versions
@@ -8,10 +8,10 @@
 --
 -- Passing here means the logic is right. It doesn't prove anything renders or
 -- behaves correctly in the real client; that still needs checking in game.
-local Account = require("account")
-local Income = require("income")
-local UI = require("ui")
-local Requirements = require("requirements")
+local Account = require("src/game/account")
+local Income = require("src/methods/income")
+local UI = require("src/ui/workbench")
+local Requirements = require("src/game/requirements")
 
 local passed = 0
 
@@ -74,12 +74,12 @@ local function client(database)
 
     Event = {}
 
-    for _, name in ipairs({ "InventoryAdded", "InventoryUpdated", "InventoryRemoved", "SkillTransmit", "GameStateChanged", "ContentLayerReady" }) do
+    for _, name in ipairs({ "InventoryAdded", "InventoryUpdated", "InventoryRemoved", "SkillTransmit", "GameStateChanged", "ContentLayerReady", "Logic" }) do
         Event[name] = event()
     end
 
     -- Fixture IDs are arbitrary; only BANK/INV names are used by production code.
-    config = { Inv = { BANK = { id = 100, configName = "BANK" }, INV = { id = 101, configName = "INV" } } }
+    config = { Inv = { BANK = { id = 100, configName = "BANK" }, INV = { id = 101, configName = "INV" }, WORN = { id = 102, configName = "WORN" } } }
     config.Quest = { FIXTURE_QUEST = {
         name = "Fixture quest", deprecated = false, hasFinishedQuest = true, hasStartedQuest = true,
     } }
@@ -99,6 +99,9 @@ local function client(database)
         GetLevelUncapped = function(skill)
             assert(state.available, "Skill read while logged out")
             return skill == 5 and 92 or 96
+        end,
+        GetEntity = function()
+            return { isValid = state.available, displayName = state.characterName or "Fixture" }
         end,
     }
 
@@ -164,6 +167,23 @@ local function client(database)
         return state.permitted
     end }
 
+    -- The fake exposes only the lookup API we use. No search index, drawing or
+    -- startup work should be requested from rsprite for this fixed set of icons.
+    local spriteIDs = {}
+    state.spriteLookups = {}
+    local nextSpriteID = 1000
+
+    for _, name in pairs(require("data/icons")) do
+        spriteIDs[name] = nextSpriteID
+        nextSpriteID = nextSpriteID + 1
+    end
+
+    rsprite = { version = "0.1.2", Get = function(name)
+        assert(type(name) == "string", "rsprite.Get expects a native sprite name")
+        state.spriteLookups[name] = (state.spriteLookups[name] or 0) + 1
+        return spriteIDs[name]
+    end }
+
     -- Whatever a test puts in state.inventory is what every inventory lookup returns.
     Inventory = { Find = function()
         return state.inventory
@@ -172,11 +192,95 @@ local function client(database)
     -- The game area our window hangs off. Tests can set state.gameArea = nil to
     -- simulate it not existing.
     state.gameArea = { width = 1280, height = 900, interfaceID = 1 }
-    id = { Component = { TOPLEVEL_V2__GAME_AREA = 123 } }
+    id = { Component = { TOPLEVEL_V2__GAME_AREA = 123 }, StyleSheet = { DROPDOWN_DEFAULT = 456 } }
     ui = { Interfaces = { GetComponent = function(_, componentId)
         equal(componentId, id.Component.TOPLEVEL_V2__GAME_AREA)
         return state.gameArea
     end } }
+
+    ui.Hook = { ONSELECTIONCHANGED = "selection" }
+    ui.AlignMode = { BOTTOMRIGHT = "right", CENTRE = "centre" }
+    ui.Rectangle = { new = function(parent)
+        local rectangle = {}
+
+        function rectangle:SetPos(x, y)
+            self.x, self.y = x, y
+        end
+
+        function rectangle:SetSize(width, height)
+            self.width, self.height = width, height
+        end
+
+        parent.testOwner.rectangles = parent.testOwner.rectangles or {}
+        table.insert(parent.testOwner.rectangles, rectangle)
+
+        return rectangle
+    end }
+    ui.SelectionChangeEvent = { SELECTED = 1, DESELECTED = 0 }
+    ui.List = { new = function(parent)
+        local list = { selectedID = nil, entries = {} }
+        parent.testOwner.nativeLists = parent.testOwner.nativeLists or {}
+        table.insert(parent.testOwner.nativeLists, list)
+
+        function list:SetPos(x, y)
+            self.x, self.y = x, y
+        end
+
+        function list:SetSize(width, height)
+            self.width, self.height = width, height
+        end
+
+        function list:SetEntries(entries, selectedID)
+            self.entries = entries
+            self.selectedID = selectedID
+            return true
+        end
+
+        function list:Add(label, id)
+            self.entries[label] = id
+            return true
+        end
+
+        function list:GetEntrySelected(id)
+            return self.selectedID == id
+        end
+
+        function list:Subscribe(_, callback)
+            self.callback = callback
+        end
+
+        -- Native lists report both deselection and selection. Reproduce those
+        -- events, including on programmatic rollback after a failed settings save.
+        function list:SetEntrySelected(id, selected)
+            self.selectionWrites = (self.selectionWrites or 0) + 1
+            if not selected or self.selectedID == id then
+                return true
+            end
+
+            local previous = self.selectedID
+            if self.callback then
+                self.callback(self, previous, ui.SelectionChangeEvent.DESELECTED)
+                self.callback(self, id, ui.SelectionChangeEvent.SELECTED)
+            end
+
+            -- Reproduce the client's problematic ordering: the hook can precede
+            -- the update of the selected-entry collection.
+            self.selectedID = id
+            self.selectedEntries = { { id = id, selected = true } }
+
+            return true
+        end
+
+        return list
+    end }
+
+    config.Obj = { FromID = function(itemId)
+        local item = require("data/methods").items[tostring(itemId)]
+
+        if item then
+            return { id = itemId, name = item.name }
+        end
+    end }
 
     return state
 end
@@ -197,16 +301,55 @@ end
 -- buttons by calling them directly. It also asserts nothing is destroyed twice.
 -- Set library.failTitle = true to make AddTitle throw, to simulate a failed build.
 local function pretty()
-    local library = { views = {}, windows = {}, failTitle = false }
+    -- views contains top-level screens; allViews also includes the browser's
+    -- nested columns. Tests find actions by label instead of layout coordinates.
+    local library = { views = {}, allViews = {}, windows = {}, failTitle = false }
+
+    function library:findButton(label)
+        for index = #self.allViews, 1, -1 do
+            local view = self.allViews[index]
+
+            if not view.destroyed and view.buttons[label] then
+                return view.buttons[label]
+            end
+        end
+
+        error("No live button: " .. label)
+    end
+
+    -- Method actions share a short label; identify the containing row by its
+    -- title, just as a player would, rather than assuming a list position.
+    function library:findMethod(title)
+        for index = #self.allViews, 1, -1 do
+            local row = self.allViews[index]
+
+            if not row.destroyed and row.buttons["View method"] then
+                for _, label in ipairs(row.texts) do
+                    if label.content:find(title, 1, true) then
+                        return row.buttons["View method"]
+                    end
+                end
+            end
+        end
+    end
 
     -- One drawable surface: a SimpleView, or a tab page (tab pages are surfaces too).
     local function surface()
-        local view = { texts = {}, buttons = {}, fields = {}, tabs = {}, destroyed = false }
+        local view = { texts = {}, buttons = {}, fields = {}, tabs = {}, combos = {}, children = {}, destroyed = false, scrollY = 0 }
+        view.content = { testOwner = view }
 
         function view:AddText(text)
-            local label = { content = type(text) == "table" and text.text or text }
+            local label = { content = type(text) == "table" and text.text or text, options = text }
             self.texts[#self.texts + 1] = label
+
             return label
+        end
+
+        function view:AddSprite(resource, options)
+            local sprite = { resource = resource, options = options }
+            self.sprites = self.sprites or {}
+            table.insert(self.sprites, sprite)
+            return sprite
         end
 
         function view:AddTitle(text)
@@ -217,9 +360,120 @@ local function pretty()
             return self:AddText(text)
         end
 
-        -- Buttons are stored by label, so a test clicks with view.buttons["Save rate"]().
-        function view:AddSimpleButton(text, callback)
+        -- Buttons are stored by label, so a test clicks with view.buttons["Save"]().
+        function view:AddSimpleButton(text, callback, options)
+            local sprite = type(text) == "number" and text or nil
+            text = sprite and options.tooltip or text
             self.buttons[text] = callback
+
+            -- PrettyUI exposes SetText on its button; keep the lookup in sync.
+            local button = { active = options and options.active == true, sprite = sprite }
+
+            function button:SetActive(active)
+                self.active = active
+            end
+
+            -- SetText updates the surface's lookup, not a field on the button.
+            local owner = self
+            button.SetText = function(_, replacement)
+                owner.buttons[text] = nil
+                owner.buttons[replacement] = callback
+                text = replacement
+            end
+
+            self.buttonControls = self.buttonControls or {}
+            self.buttonControls[text] = button
+
+            return button
+        end
+
+        -- Sprite actions are located by their tooltip, rather than a visible text
+        -- caption. SetDisabled on a toggle controls its state, not its clickability.
+        function view:AddSpriteButton(sprite, callback, options)
+            local button = self:AddSimpleButton(options.tooltip, callback, options)
+            button.sprite = sprite
+
+            function button:SetDisabled(disabled)
+                self.disabled = disabled
+            end
+
+            function button:SetTooltip(text)
+                self:SetText(text)
+            end
+
+            return button
+        end
+
+        -- Panels are owned children. Native destruction of a parent tears these
+        -- down too; tests also record them for finding actions and evidence.
+        function view:AddPanel(options)
+            local panel = surface()
+            panel.options = options
+            self.children[#self.children + 1] = panel
+            library.allViews[#library.allViews + 1] = panel
+
+            return panel
+        end
+
+        function view:AddItemSlot(object, options)
+            local slot = { object = object, tooltip = options.tooltip, options = options }
+            self.items = self.items or {}
+            self.items[#self.items + 1] = slot
+
+            function slot:SetTooltip(text)
+                self.tooltip = text
+            end
+
+            return slot
+        end
+
+        -- Collect visible copy without coupling behavior checks to layout nesting.
+        function view:allTexts()
+            local labels = {}
+
+            for _, label in ipairs(self.texts) do
+                labels[#labels + 1] = label
+            end
+
+            for _, child in ipairs(self.children) do
+                if not child.destroyed then
+                    for _, label in ipairs(child:allTexts()) do
+                        labels[#labels + 1] = label
+                    end
+                end
+            end
+
+            return labels
+        end
+
+        function view:SetScrollPosition(y)
+            self.scrollY = y
+        end
+
+        -- Selection changes can be silent, which lets a failed save restore the
+        -- old control without accidentally writing a second time.
+        function view:AddComboBox(options)
+            local control = { selectedID = options.selectedID }
+            local ids = {}
+
+            -- PrettyUI forwards these IDs to native ComboField, which takes Int,
+            -- not strings. Checking this catches a mock/native mismatch early.
+            for _, entry in ipairs(options.entries) do
+                assert(math.type(entry.id) == "integer", "Combo IDs must be integers")
+                ids[entry.id] = true
+            end
+
+            function control:Select(id, notify)
+                assert(ids[id], "Unknown combo selection")
+                self.selectedID = id
+
+                if notify and options.onChange then
+                    options.onChange(self, id)
+                end
+            end
+
+            self.combos[#self.combos + 1] = control
+            return control
         end
 
         -- Mirrors the real TextField: SetText only fires onChange when notify is true.
@@ -270,6 +524,12 @@ local function pretty()
 
             self.destroyed = true
 
+            for _, child in ipairs(self.children) do
+                if not child.destroyed then
+                    child:Destroy()
+                end
+            end
+
             for _, tabs in ipairs(self.tabs) do
                 for _, page in ipairs(tabs.pages) do
                     page:Destroy()
@@ -283,7 +543,11 @@ local function pretty()
     -- Also checks the size options the plugin passes: views that fill the window
     -- use anchors, and the launcher matches its parent's size.
     library.SimpleView = { new = function(parent, options)
-        if options.widthAnchor == 1 then
+        if options.x ~= nil then
+            -- Nested columns use a fixed sidebar and anchored offsets for the
+            -- remaining width/height; they're not standalone screens.
+            assert(parent.testOwner)
+        elseif options.widthAnchor == 1 then
             equal(options.width, 0)
             equal(options.height, 0)
             equal(options.heightAnchor, 1)
@@ -294,7 +558,14 @@ local function pretty()
 
         local view = surface()
         view.options = options
-        library.views[#library.views + 1] = view
+        library.allViews[#library.allViews + 1] = view
+
+        if parent.testOwner then
+            local children = parent.testOwner.children
+            children[#children + 1] = view
+        else
+            library.views[#library.views + 1] = view
+        end
 
         return view
     end }
@@ -942,7 +1213,7 @@ test("plugin enable/remount/shutdown cycles release all owned resources", functi
 
         -- views[2] is the launcher, views[3] the Browse screen, views[4] Diagnostics.
         prettyui.views[2].buttons["Open Profit Path"]()
-        prettyui.views[3].buttons.Diagnostics()
+        prettyui:findButton("Diagnostics")()
 
         local latest = prettyui.views[4]
         latest.fields[2].text = "FIXTURE_QUEST"
@@ -970,8 +1241,62 @@ test("plugin enable/remount/shutdown cycles release all owned resources", functi
     end
 end)
 
+-- Bank availability and item absence must never be treated as the same thing.
+test("item presence caches requested totals and invalidates the changed container", function()
+    client()
+    local calls = 0
+    local bankAvailable = false
+    local backpackCount = 1
+    local inventories = {}
+
+    for _, name in ipairs({ "INV", "WORN", "BANK" }) do
+        inventories[name] = {
+            isValid = true,
+            GetTotal = function(_, itemId)
+                calls = calls + 1
+                return name == "INV" and itemId == 42 and backpackCount or 0
+            end,
+        }
+    end
+
+    Inventory.Find = function(definition)
+        if definition.configName == "BANK" and not bankAvailable then
+            return nil
+        end
+
+        return inventories[definition.configName]
+    end
+
+    local account = Account.new(function() end)
+    local wanted = { [42] = true, [43] = true }
+    local first = account:readOwnership(wanted)
+    equal(first.counts[42], 1)
+    equal(first.complete, false)
+    equal(calls, 4)
+    account:readOwnership(wanted)
+    equal(calls, 4)
+
+    bankAvailable = true
+    local complete = account:readOwnership(wanted)
+    equal(complete.complete, true)
+    equal(complete.counts[43], 0)
+    equal(calls, 6)
+
+    backpackCount = 0
+    Event.InventoryUpdated.emit({ inv = config.Inv.INV })
+    equal(account:readOwnership(wanted).counts[42], 0)
+    equal(calls, 8)
+
+    Event.GameStateChanged.emit({})
+    account:readOwnership(wanted)
+    equal(calls, 14)
+    account:destroy()
+    equal(account:readOwnership(wanted).complete, false)
+end)
+
 -- The calculator, saved-rate and window tests live in their own file but share
 -- these helpers.
-dofile("tests/calculator.lua")(test, equal, client, pretty)
+dofile("src/tests/calculator.lua")(test, equal, client, pretty)
+dofile("src/tests/browser.lua")(test, equal, client, pretty)
 
 print(string.format("%d behavior tests passed.", passed))
