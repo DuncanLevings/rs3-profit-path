@@ -1012,22 +1012,13 @@ return function(test, equal, client, pretty)
         local income = detail.tabs[1].pages[1]
         equal(#income:allFields(), 1, "No manual character/profile field in the method")
 
-        -- The potion is shown as an icon in the table, never as a text row. Its
-        -- name only appears in the Notes, explaining how it's priced and which
-        -- ingredient counts as free.
-        local note
-
+        -- The potion stays an icon; creation-cost explanations are no longer
+        -- printed in Notes. Pricing itself is covered by the calculation tests.
         for _, label in ipairs(income:allTexts()) do
             assert(not label.content:find("ROI unavailable", 1, true))
             assert(label.content ~= "Perfect plus potion", "Potion should be an icon, not a text row")
-
-            if label.content:find("Perfect plus potion can't be traded", 1, true) then
-                note = label.content
-            end
+            assert(not label.content:find("can't be traded", 1, true), "Creation-cost prose omitted from Notes")
         end
-
-        assert(note, "Expected a creation-cost note for the untradeable potion")
-        assert(note:find("Crystal tree blossom", 1, true), "The note names the free ingredient")
 
         local names = {}
 

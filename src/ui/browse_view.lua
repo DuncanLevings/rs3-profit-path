@@ -49,12 +49,12 @@ local difficultyEntries, difficultyValues = filterEntries(Browser.difficultyLeve
 local intensityEntries, intensityValues = filterEntries(Browser.intensityLevels)
 
 -- Keep readiness separate from profit: missing requirements do not erase an
--- estimate, and unknown checks are a distinct filter rather than a failed check.
+-- estimate. Unknown checks stay in All; they are not treated as missing.
 local readinessEntries = {
     { id = 0, label = "All" }, { id = 1, label = "Met" },
-    { id = 2, label = "Missing" }, { id = 3, label = "Needs checking" },
+    { id = 2, label = "Missing" },
 }
-local readinessValues = { [0] = "any", [1] = "met", [2] = "unmet", [3] = "unknown" }
+local readinessValues = { [0] = "any", [1] = "met", [2] = "unmet" }
 
 -- The reverse of `values`: which entry ID shows this filter value ("Any" if
 -- somehow it isn't in the list).
@@ -344,11 +344,6 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
 
             if method.difficulty then
                 activity = activity .. "  /  Difficulty: " .. method.difficulty
-            end
-
-            -- Wiki imports are marked, so nobody mistakes them for checked methods.
-            if method.research and method.research.income == "wiki" then
-                activity = activity .. "  /  Partly researched"
             end
 
             row:AddText({

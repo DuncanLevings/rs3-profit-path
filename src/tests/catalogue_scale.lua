@@ -114,7 +114,7 @@ return function(test, equal, client, pretty)
             end
         end
 
-        assert(table.concat(labels, " / "):find("Partly researched", 1, true), "Browse row should say Partly researched")
+        assert(not table.concat(labels, " / "):find("researched", 1, true), "Browse rows omit research status")
 
         prettyui:findMethod(imported.title)()
         local detail = prettyui.views[#prettyui.views]
@@ -130,7 +130,8 @@ return function(test, equal, client, pretty)
 
         local all = table.concat(texts, " / ")
         assert(all:find("Pace (% of guide)", 1, true), "Pace label")
-        assert(all:find("Partly researched: imported from the Wiki guide", 1, true), "Research note")
+        assert(not all:find("Partly researched", 1, true), "Method omits research-status note")
+        assert(not all:find("not yet reviewed", 1, true), "Method omits review-status note")
         assert(all:find("Steps haven't been written", 1, true), "Steps note")
         equal(pages[1]:allFields()[1]:GetText(), "100")
 

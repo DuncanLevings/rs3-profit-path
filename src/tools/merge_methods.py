@@ -891,7 +891,6 @@ def convert_income(guide, ctx, pvm):
         rate = {"key": unit.split("/")[0] + "_per_hour", "unit": unit, "default": guide["kph"]}
         assumptions = [f"Assumes the guide's {guide['kph']:,} {unit.split('/')[0]} per hour. Adjust it to your own pace."]
 
-    assumptions.append(f"Imported from the Wiki guide on {retrieved}; not yet reviewed for Profit Path.")
     income = {"coverage": "complete", "period": "run" if recurring else "hour", "rate": rate,
               "inputs": [], "outputs": [], "assumptions": assumptions, "unresolved": []}
 

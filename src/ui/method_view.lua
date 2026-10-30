@@ -10,7 +10,6 @@
 -- cursor out of it mid-typing.
 local Style = require("src/ui/view_style")
 local ItemIcon = require("src/ui/item_icon")
-local RecipeCost = require("src/methods/recipe_cost")
 local Loot = require("src/methods/loot")
 local Dropdown = require("src/ui/dropdown")
 
@@ -583,7 +582,7 @@ local function itemTable(panel, definitions, moneyColour, period)
 
         local quantity = panel:AddText({ text = "", x = 66, y = y + 10, width = 90, height = 24 })
         -- Untradeable supplies are priced by what they cost to make; the tooltip
-        -- says so, and the Notes below name any ingredient counted as free.
+        -- says so when the player hovers over the value.
         local creationTip = definition.pricing == "recipe"
             and "Creation cost: made from its ingredients at GE buy prices." or definition.valuation_note
 
@@ -692,44 +691,6 @@ local function mountTitle(view, method, guarded, versions, onVersion)
     })
 
     return release
-end
-
--- What hasn't been researched for a method, as short phrases for the Notes and
--- for Browse. Curated methods (and any method without research data) have none.
-function MethodView.researchGaps(method)
-    local research = method.research
-
-    if not research or research.income ~= "wiki" then
-        return {}
-    end
-
-    local gaps = { "imported from the Wiki guide and not yet reviewed here" }
-
-    if research.unknown_checks > 0 then
-        gaps[#gaps + 1] = research.unknown_checks .. " requirement" .. (research.unknown_checks == 1 and "" or "s")
-            .. " can't be checked yet"
-    end
-
-    -- How the drops compare with the monster's drop table (see the catalogue build).
-    local drops = {
-        ["drops partly checked"] = "rare drops use the Wiki's figures for this setup",
-        -- Mismatches are listed in the catalogue report for maintainers; players
-        -- just see that these are the Wiki's own figures.
-        ["drops differ"] = "drops use the Wiki's own figures",
-        ["setting-specific"] = "drops depend on enrage, killstreak or hard mode; these are the Wiki's figures for this setting",
-        ["no drop table"] = "drops use the Wiki's own figures",
-        ["wiki drops"] = "drops use the Wiki's own figures",
-    }
-
-    if drops[research.pvm] then
-        gaps[#gaps + 1] = drops[research.pvm]
-    end
-
-    if research.unpriced > 0 then
-        gaps[#gaps + 1] = research.unpriced .. " item" .. (research.unpriced == 1 and "" or "s") .. " can't be priced"
-    end
-
-    return gaps
 end
 
 -- Builds the whole method screen inside `view`. `guarded` comes from the workbench:
@@ -913,32 +874,8 @@ function MethodView.mount(view, method, calculator, guarded, options)
 
     income:AddTitle("Notes")
 
-    -- A method imported from the Wiki says so, and says what nobody has checked
-    -- yet, so a Wiki estimate never looks like a verified one.
-    local gaps = MethodView.researchGaps(method)
-
-    if #gaps > 0 then
-        income:AddText({ text = "Partly researched: " .. table.concat(gaps, "; ") .. ".", colour = Style.gold })
-    end
-
     for _, assumption in ipairs(method.income.assumptions) do
         income:AddText({ text = assumption, colour = Style.muted })
-    end
-
-    -- One note per untradeable supply: how it's priced, and which ingredients
-    -- (if any) have no price at all and were counted as free.
-    for _, line in ipairs(method.income.inputs) do
-        if line.pricing == "recipe" then
-            local note = line.name .. " can't be traded, so it's priced by what it costs to make "
-                .. "(ingredients at GE buy prices)."
-            local free = RecipeCost.freeNames(line.recipe)
-
-            if #free > 0 then
-                note = note .. " Counted as free, since they have no price: " .. table.concat(free, ", ") .. "."
-            end
-
-            income:AddText({ text = note, colour = Style.muted })
-        end
     end
 
     -- The other three tabs. Each is drawn once, when its turn comes or when it's
