@@ -675,3 +675,84 @@ class SplitLineTests(unittest.TestCase):
         self.assertEqual(line["kind"], "all")
         self.assertEqual(line["children"][0]["minimum_tier"], 70)
         self.assertEqual(line["text"], text)
+
+class ChoiceTests(unittest.TestCase):
+    """Guides whose rows depend on GE prices become choices made from live prices."""
+
+    def shop_guide(self, coins=170, runes=10):
+        # Bought air runes (10 at 17 GP = 170 coins); mind runes weren't worth it.
+        return guide(recurring={"every": "1 week", "minutes": 10},
+                     inputs=[["Coins", coins, "run", "value", 1]],
+                     outputs=[["Air rune", runes, "run", "ge", 20], ["Mind rune", 0, "run", "ge", 4]])
+
+    def shops(self):
+        return {"revision": 123, "shops": [{"name": "Air rune", "stock": 10, "free": 0, "price": 17},
+                                           {"name": "Mind rune", "stock": 5, "free": 0, "price": 17}]}
+
+    def context(self):
+        ctx = context()
+        ctx.meta["items"].update({"Air rune": 556, "Mind rune": 558, "Bones": 526, "Big bones": 532})
+        return ctx
+
+    def test_a_shop_run_buys_each_item_at_its_shop_price_or_not_at_all(self):
+        ctx = self.context()
+        ctx.income_choices = {("Money making guide/Fixture", ""): self.shops()}
+        income = merge_methods.convert_guide(self.shop_guide(), ctx, "recurring")["income"]
+
+        self.assertEqual(income["choices"], [
+            {"label": "Air rune", "options": ["Buy from the shops", "Don't buy"], "picked": 1},
+            {"label": "Mind rune", "options": ["Buy from the shops", "Don't buy"], "picked": 2},
+        ])
+
+        # One Coins supply stays: the plugin adds it up from the items it buys.
+        coins, = income["inputs"]
+        self.assertEqual((coins["name"], coins["pricing"], coins["unit_value"], coins["shop_coins"]),
+                         ("Coins", "fixed", 1, True))
+
+        # Each item carries its shop price. Mind runes are still listed, so the
+        # plugin can buy them if prices change.
+        self.assertEqual([(line["name"], line["quantity"], line["option"], line["shop_price"])
+                          for line in income["outputs"]], [("Air rune", 0.1, 1, 17), ("Mind rune", 0.05, 1, 17)])
+        self.assertIn("Bought from the shops at 17 GP each", income["outputs"][0]["valuation_note"])
+
+        catalogue.validate_methods({"schema": 1, "items": ctx.items,
+                                    "methods": [merge_methods.convert_guide(self.shop_guide(), ctx, "recurring")]},
+                                   {"monsters": []})
+
+    def test_shop_research_that_doesnt_reproduce_the_guide_is_refused(self):
+        ctx = self.context()
+        ctx.income_choices = {("Money making guide/Fixture", ""): self.shops()}
+
+        # The coins don't add up to what the bought items cost.
+        with self.assertRaisesRegex(ValueError, "spent 999"):
+            merge_methods.convert_guide(self.shop_guide(coins=999), ctx, "recurring")
+
+        # An amount that's neither the stock nor nothing.
+        with self.assertRaisesRegex(ValueError, "neither bought"):
+            merge_methods.convert_guide(self.shop_guide(runes=7), ctx, "recurring")
+
+        # Research for another revision of the page.
+        ctx.income_choices[("Money making guide/Fixture", "")]["revision"] = 122
+
+        with self.assertRaisesRegex(ValueError, "another revision"):
+            merge_methods.convert_guide(self.shop_guide(), ctx, "recurring")
+
+    def test_alternatives_keep_every_option_and_the_guides_own_pick(self):
+        ctx = self.context()
+        research = {"revision": 123, "choices": [{"label": "Bones to use", "options": [
+            {"label": "Bones", "inputs": [["Bones", 100]]},
+            {"label": "Big bones", "inputs": [["Big bones", 100]]}]}]}
+        ctx.income_choices = {("Money making guide/Fixture", ""): research}
+        bananas = guide(inputs=[["Big bones", 100, "hour", "ge", 300], ["Logs", 5, "hour", "ge", 50]])
+        income = merge_methods.convert_guide(bananas, ctx, "production")["income"]
+
+        # Both bones, where the guide's one was; the guide picked big bones.
+        self.assertEqual(income["choices"][0]["picked"], 2)
+        self.assertEqual([(line["name"], line.get("option")) for line in income["inputs"]],
+                         [("Bones", 1), ("Big bones", 2), ("Logs", None)])
+
+        # Research that matches none of the imported rows is out of date.
+        bananas["inputs"][0][1] = 90
+
+        with self.assertRaisesRegex(ValueError, "no option of 'Bones to use'"):
+            merge_methods.convert_guide(bananas, ctx, "production")

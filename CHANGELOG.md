@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.13-dev - 2026-10-30
+
+- 21 Wiki guides that choose from GE prices now make those choices from live prices instead of keeping the Wiki's answer from import day. Shop runs (Buying runes, Mega shop run daily and weekly, Buying feathers, farm shops, vials of water, yak-hide and the Stonemason) buy each item only while the GE pays more after tax than the shop charges; the Coins supply now adds up the shop price of whichever items are bought, and each item's hover shows its shop price. Bones to Bananas, Casting fruitfall, the Anachronia agility codexes, Cutting willow logs and six potion guides (3-dose or 4-dose) pick whichever option pays more. Options that aren't used stay listed at 0, and hovering a row says whether it's used and why. Before, Buying runes showed air, mind, earth, death and blood runes at 0 forever.
+- New `wiki_choices.py` researches the shop runs by asking the Wiki to expand each guide's own stock and price formulas. `catalogue-source/research/income-choices.json` holds that research and the hand-researched alternatives, pinned to each guide's revision. The merge checks it against the imported guides, including each shop run's Coins total.
+- Item IDs were looked up for the options guides didn't pick on import day (Double Escape codex, Super antipoison (3), Super attack (4)).
+
 ## 0.8.12-dev - 2026-10-30
 
 - An item with no price no longer hides a method's profit when most of the other items on its side have prices: K'ril Tsutsaroth's Steam battlestaff, a tiny share of the drops, made every K'ril method "Not estimated". Missing outputs now count as 0 GP, which can only understate the profit, and the status line, the Browse tooltip and each row's hover say what was left out. Coins and other fixed values don't count towards the majority. Supplies follow the same rule: Killing Araxxi's Antipoison++ (4), with no recent instant-buy trades, made the method "Not estimated". A supply counted as 0 can overstate the profit a little, and its row's hover says so. A missing price for the only row on a side, or most of them, still blocks the total. The status line under the profit is shorter and starts after its label, so a long message no longer runs into it.

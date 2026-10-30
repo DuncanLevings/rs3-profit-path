@@ -1066,6 +1066,27 @@ def validate_methods(source, monsters, recipes=None):
         require_text_list(income.get("assumptions"), "Income assumptions")
         require_text_list(income.get("unresolved"), "Unresolved income")
 
+        # Choices the plugin makes from live prices (which items a shop run buys,
+        # which dose to sell). Rows name their choice and option by number.
+        choices = income.get("choices", [])
+
+        if not isinstance(choices, list):
+            raise ValueError("Income choices must be a list")
+
+        for choice in choices:
+            choice = require_record(choice, "Income choice")
+            require_text(choice.get("label"), "Income choice label")
+            require_text_list(choice.get("options"), "Income choice options")
+
+            if len(choice["options"]) < 2:
+                raise ValueError(f"Income choice {choice['label']} needs at least two options")
+
+            # The guide's own pick, used when live prices can't settle the choice.
+            if not positive_integer(choice.get("picked")) or choice["picked"] > len(choice["options"]):
+                raise ValueError(f"Income choice {choice['label']} needs the guide's pick")
+
+        used = set()
+
         # Each supply/output row: a name, a quantity, and whether that quantity is per
         # action or per hour. A "complete" model can't have rows we can't price.
         for direction in ("inputs", "outputs"):
@@ -1084,6 +1105,26 @@ def validate_methods(source, monsters, recipes=None):
 
                 if line.get("basis") not in {"action", "hour"} or not non_negative_number(line.get("quantity")):
                     raise ValueError("Invalid income quantity/basis")
+
+                if "choice" in line or "option" in line:
+                    choice = line.get("choice")
+
+                    if (not positive_integer(choice) or choice > len(choices) or not positive_integer(line.get("option"))
+                            or line["option"] > len(choices[choice - 1]["options"])):
+                        raise ValueError(f"Income row {line['name']} names a choice or option that doesn't exist")
+
+                    used.add(choice)
+
+                # A shop run: bought outputs carry their shop price, and one Coins
+                # supply (a fixed 1 GP each) adds up what's spent on them.
+                if "shop_price" in line:
+                    if direction != "outputs" or "choice" not in line or not non_negative_number(line["shop_price"]):
+                        raise ValueError(f"Only a choice's output can have a shop price: {line['name']}")
+
+                if "shop_coins" in line:
+                    if (line["shop_coins"] is not True or direction != "inputs" or line.get("pricing") != "fixed"
+                            or line.get("unit_value") != 1):
+                        raise ValueError(f"Shop coins must be a fixed 1 GP supply: {line['name']}")
 
                 if "item_id" in line:
                     if not positive_integer(line["item_id"]) or str(line["item_id"]) not in items:
@@ -1123,6 +1164,15 @@ def validate_methods(source, monsters, recipes=None):
 
                     if direction != "outputs":
                         raise ValueError("Sale tax is only valid on output rows")
+
+        if len(used) != len(choices):
+            raise ValueError(f"Every income choice needs at least one row: {method_id}")
+
+        shop_coins = sum(1 for line in income["inputs"] if "shop_coins" in line)
+        shop_prices = any("shop_price" in line for line in income["outputs"])
+
+        if shop_coins > 1 or (shop_coins == 1) != shop_prices:
+            raise ValueError(f"A shop run needs exactly one shop Coins row: {method_id}")
 
         # PvM methods point at rows in the shared monster data instead of copying them.
         # Each selector must still match exactly the expected number of drop rows; if

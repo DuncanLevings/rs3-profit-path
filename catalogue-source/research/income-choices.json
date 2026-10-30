@@ -1,0 +1,1131 @@
+{
+ "schema": 1,
+ "about": "Price-dependent choices in Wiki guides, re-made from live prices by the plugin. \"shops\" entries come from src/tools/wiki_choices.py; \"choices\" entries are researched by hand from each guide's wikitext at the pinned revision. merge_methods.py checks both against the imported guide.",
+ "guides": [
+  {
+   "page": "Money making guide/Buying feathers",
+   "version": "",
+   "revision": 37053425,
+   "shops": [
+    {
+     "name": "Feather",
+     "stock": 525500,
+     "free": 0,
+     "price": 6
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Buying items from farm shops",
+   "version": "",
+   "revision": 37035844,
+   "shops": [
+    {
+     "name": "Empty sack",
+     "stock": 250,
+     "free": 0,
+     "price": 1
+    },
+    {
+     "name": "Bucket",
+     "stock": 28000,
+     "free": 0,
+     "price": 2
+    },
+    {
+     "name": "Plant pot",
+     "stock": 28000,
+     "free": 0,
+     "price": 1
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Buying runes",
+   "version": "",
+   "revision": 37111592,
+   "shops": [
+    {
+     "name": "Air rune",
+     "stock": 52500,
+     "free": 0,
+     "price": 17
+    },
+    {
+     "name": "Mind rune",
+     "stock": 39900,
+     "free": 0,
+     "price": 17
+    },
+    {
+     "name": "Water rune",
+     "stock": 52500,
+     "free": 0,
+     "price": 17
+    },
+    {
+     "name": "Earth rune",
+     "stock": 52500,
+     "free": 0,
+     "price": 17
+    },
+    {
+     "name": "Fire rune",
+     "stock": 52500,
+     "free": 0,
+     "price": 17
+    },
+    {
+     "name": "Body rune",
+     "stock": 39900,
+     "free": 0,
+     "price": 16
+    },
+    {
+     "name": "Cosmic rune",
+     "stock": 2800,
+     "free": 0,
+     "price": 232
+    },
+    {
+     "name": "Chaos rune",
+     "stock": 13440,
+     "free": 0,
+     "price": 140
+    },
+    {
+     "name": "Astral rune",
+     "stock": 700,
+     "free": 0,
+     "price": 220
+    },
+    {
+     "name": "Nature rune",
+     "stock": 8400,
+     "free": 0,
+     "price": 372
+    },
+    {
+     "name": "Law rune",
+     "stock": 4900,
+     "free": 0,
+     "price": 378
+    },
+    {
+     "name": "Death rune",
+     "stock": 8400,
+     "free": 0,
+     "price": 310
+    },
+    {
+     "name": "Blood rune",
+     "stock": 4200,
+     "free": 0,
+     "price": 550
+    },
+    {
+     "name": "Soul rune",
+     "stock": 2100,
+     "free": 0,
+     "price": 410
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Buying supplies from the Stonemason",
+   "version": "",
+   "revision": 36522786,
+   "shops": [
+    {
+     "name": "Limestone brick",
+     "stock": 500,
+     "free": 0,
+     "price": 21
+    },
+    {
+     "name": "Marble block",
+     "stock": 30,
+     "free": 0,
+     "price": 325000
+    },
+    {
+     "name": "Gold leaf",
+     "stock": 30,
+     "free": 0,
+     "price": 130000
+    },
+    {
+     "name": "Magic stone",
+     "stock": 30,
+     "free": 0,
+     "price": 975000
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Buying vials of water",
+   "version": "",
+   "revision": 37034878,
+   "shops": [
+    {
+     "name": "Vial of water",
+     "stock": 38150,
+     "free": 0,
+     "price": 10
+    },
+    {
+     "name": "Bomb vial",
+     "stock": 900,
+     "free": 0,
+     "price": 5
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Buying yak-hide",
+   "version": "",
+   "revision": 37035853,
+   "shops": [
+    {
+     "name": "Yak-hide",
+     "stock": 3500,
+     "free": 0,
+     "price": 50
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Mega shop run",
+   "version": "Daily",
+   "revision": 37077302,
+   "shops": [
+    {
+     "name": "Air rune",
+     "stock": 7500,
+     "free": 60,
+     "price": 17
+    },
+    {
+     "name": "Water rune",
+     "stock": 7500,
+     "free": 0,
+     "price": 17
+    },
+    {
+     "name": "Earth rune",
+     "stock": 7500,
+     "free": 0,
+     "price": 17
+    },
+    {
+     "name": "Fire rune",
+     "stock": 7500,
+     "free": 0,
+     "price": 17
+    },
+    {
+     "name": "Mind rune",
+     "stock": 5700,
+     "free": 60,
+     "price": 17
+    },
+    {
+     "name": "Body rune",
+     "stock": 5700,
+     "free": 0,
+     "price": 16
+    },
+    {
+     "name": "Chaos rune",
+     "stock": 1920,
+     "free": 0,
+     "price": 140
+    },
+    {
+     "name": "Cosmic rune",
+     "stock": 400,
+     "free": 0,
+     "price": 232
+    },
+    {
+     "name": "Astral rune",
+     "stock": 100,
+     "free": 0,
+     "price": 220
+    },
+    {
+     "name": "Nature rune",
+     "stock": 1200,
+     "free": 0,
+     "price": 372
+    },
+    {
+     "name": "Death rune",
+     "stock": 1200,
+     "free": 0,
+     "price": 310
+    },
+    {
+     "name": "Law rune",
+     "stock": 700,
+     "free": 0,
+     "price": 378
+    },
+    {
+     "name": "Blood rune",
+     "stock": 600,
+     "free": 0,
+     "price": 550
+    },
+    {
+     "name": "Soul rune",
+     "stock": 300,
+     "free": 0,
+     "price": 410
+    },
+    {
+     "name": "Feather",
+     "stock": 68357,
+     "free": 0,
+     "price": 6
+    },
+    {
+     "name": "Yak-hide",
+     "stock": 500,
+     "free": 0,
+     "price": 50
+    },
+    {
+     "name": "Flies",
+     "stock": 200,
+     "free": 0,
+     "price": 10
+    },
+    {
+     "name": "Nuts",
+     "stock": 10,
+     "free": 0,
+     "price": 10
+    },
+    {
+     "name": "Beetle bits",
+     "stock": 10,
+     "free": 0,
+     "price": 10
+    },
+    {
+     "name": "Vial of water",
+     "stock": 5600,
+     "free": 0,
+     "price": 10
+    },
+    {
+     "name": "Bomb vial",
+     "stock": 300,
+     "free": 0,
+     "price": 5
+    },
+    {
+     "name": "Raw rabbit",
+     "stock": 85,
+     "free": 0,
+     "price": 67
+    },
+    {
+     "name": "Raw beef",
+     "stock": 185,
+     "free": 0,
+     "price": 59
+    },
+    {
+     "name": "Raw bird meat",
+     "stock": 185,
+     "free": 0,
+     "price": 63
+    },
+    {
+     "name": "Raw rat meat",
+     "stock": 10,
+     "free": 0,
+     "price": 39
+    },
+    {
+     "name": "Raw bear meat",
+     "stock": 10,
+     "free": 0,
+     "price": 8
+    },
+    {
+     "name": "Raw chicken",
+     "stock": 10,
+     "free": 0,
+     "price": 60
+    },
+    {
+     "name": "Cooked rabbit",
+     "stock": 10,
+     "free": 0,
+     "price": 19
+    },
+    {
+     "name": "Cooked meat",
+     "stock": 10,
+     "free": 0,
+     "price": 30
+    },
+    {
+     "name": "Cooked chicken",
+     "stock": 10,
+     "free": 0,
+     "price": 12
+    },
+    {
+     "name": "Empty sack",
+     "stock": 250,
+     "free": 0,
+     "price": 1
+    },
+    {
+     "name": "Bucket",
+     "stock": 4000,
+     "free": 0,
+     "price": 2
+    },
+    {
+     "name": "Plant pot",
+     "stock": 4000,
+     "free": 0,
+     "price": 1
+    },
+    {
+     "name": "Steel 2h crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 345
+    },
+    {
+     "name": "Iron crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 279
+    },
+    {
+     "name": "Bronze crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 204
+    },
+    {
+     "name": "Steel crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 345
+    },
+    {
+     "name": "Mithril 2h crossbow",
+     "stock": 10,
+     "free": 0,
+     "price": 451
+    },
+    {
+     "name": "Adamant 2h crossbow",
+     "stock": 4,
+     "free": 0,
+     "price": 567
+    },
+    {
+     "name": "Iron 2h crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 279
+    },
+    {
+     "name": "Mithril crossbow",
+     "stock": 10,
+     "free": 0,
+     "price": 451
+    },
+    {
+     "name": "Bronze 2h crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 204
+    },
+    {
+     "name": "Adamant crossbow",
+     "stock": 4,
+     "free": 0,
+     "price": 567
+    },
+    {
+     "name": "Off-hand steel crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 345
+    },
+    {
+     "name": "Off-hand adamant crossbow",
+     "stock": 4,
+     "free": 0,
+     "price": 567
+    },
+    {
+     "name": "Off-hand mithril crossbow",
+     "stock": 10,
+     "free": 0,
+     "price": 451
+    },
+    {
+     "name": "Off-hand bronze crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 204
+    },
+    {
+     "name": "Off-hand iron crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 279
+    },
+    {
+     "name": "Limestone brick",
+     "stock": 750,
+     "free": 0,
+     "price": 21
+    },
+    {
+     "name": "Pineapple",
+     "stock": 20,
+     "free": 0,
+     "price": 2
+    },
+    {
+     "name": "Seaweed",
+     "stock": 40,
+     "free": 0,
+     "price": 2
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Mega shop run",
+   "version": "Weekly",
+   "revision": 37077302,
+   "shops": [
+    {
+     "name": "Air rune",
+     "stock": 52500,
+     "free": 60,
+     "price": 17
+    },
+    {
+     "name": "Water rune",
+     "stock": 52500,
+     "free": 0,
+     "price": 17
+    },
+    {
+     "name": "Earth rune",
+     "stock": 52500,
+     "free": 0,
+     "price": 17
+    },
+    {
+     "name": "Fire rune",
+     "stock": 52500,
+     "free": 0,
+     "price": 17
+    },
+    {
+     "name": "Mind rune",
+     "stock": 39900,
+     "free": 60,
+     "price": 17
+    },
+    {
+     "name": "Body rune",
+     "stock": 39900,
+     "free": 0,
+     "price": 16
+    },
+    {
+     "name": "Chaos rune",
+     "stock": 13440,
+     "free": 0,
+     "price": 140
+    },
+    {
+     "name": "Cosmic rune",
+     "stock": 2800,
+     "free": 0,
+     "price": 232
+    },
+    {
+     "name": "Astral rune",
+     "stock": 700,
+     "free": 0,
+     "price": 220
+    },
+    {
+     "name": "Nature rune",
+     "stock": 8400,
+     "free": 0,
+     "price": 372
+    },
+    {
+     "name": "Death rune",
+     "stock": 8400,
+     "free": 0,
+     "price": 310
+    },
+    {
+     "name": "Law rune",
+     "stock": 4900,
+     "free": 0,
+     "price": 378
+    },
+    {
+     "name": "Blood rune",
+     "stock": 4200,
+     "free": 0,
+     "price": 550
+    },
+    {
+     "name": "Soul rune",
+     "stock": 2100,
+     "free": 0,
+     "price": 410
+    },
+    {
+     "name": "Feather",
+     "stock": 478500,
+     "free": 0,
+     "price": 6
+    },
+    {
+     "name": "Yak-hide",
+     "stock": 3500,
+     "free": 0,
+     "price": 50
+    },
+    {
+     "name": "Flies",
+     "stock": 200,
+     "free": 0,
+     "price": 10
+    },
+    {
+     "name": "Nuts",
+     "stock": 10,
+     "free": 0,
+     "price": 10
+    },
+    {
+     "name": "Beetle bits",
+     "stock": 10,
+     "free": 0,
+     "price": 10
+    },
+    {
+     "name": "Vial of water",
+     "stock": 39200,
+     "free": 0,
+     "price": 10
+    },
+    {
+     "name": "Bomb vial",
+     "stock": 900,
+     "free": 0,
+     "price": 5
+    },
+    {
+     "name": "Raw rabbit",
+     "stock": 385,
+     "free": 0,
+     "price": 67
+    },
+    {
+     "name": "Raw beef",
+     "stock": 1085,
+     "free": 0,
+     "price": 59
+    },
+    {
+     "name": "Raw bird meat",
+     "stock": 1085,
+     "free": 0,
+     "price": 63
+    },
+    {
+     "name": "Raw rat meat",
+     "stock": 10,
+     "free": 0,
+     "price": 39
+    },
+    {
+     "name": "Raw bear meat",
+     "stock": 10,
+     "free": 0,
+     "price": 8
+    },
+    {
+     "name": "Raw chicken",
+     "stock": 10,
+     "free": 0,
+     "price": 60
+    },
+    {
+     "name": "Cooked rabbit",
+     "stock": 10,
+     "free": 0,
+     "price": 19
+    },
+    {
+     "name": "Cooked meat",
+     "stock": 10,
+     "free": 0,
+     "price": 30
+    },
+    {
+     "name": "Cooked chicken",
+     "stock": 10,
+     "free": 0,
+     "price": 12
+    },
+    {
+     "name": "Empty sack",
+     "stock": 250,
+     "free": 0,
+     "price": 1
+    },
+    {
+     "name": "Bucket",
+     "stock": 28000,
+     "free": 0,
+     "price": 2
+    },
+    {
+     "name": "Plant pot",
+     "stock": 28000,
+     "free": 0,
+     "price": 1
+    },
+    {
+     "name": "Steel 2h crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 345
+    },
+    {
+     "name": "Iron crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 279
+    },
+    {
+     "name": "Bronze crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 204
+    },
+    {
+     "name": "Steel crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 345
+    },
+    {
+     "name": "Mithril 2h crossbow",
+     "stock": 10,
+     "free": 0,
+     "price": 451
+    },
+    {
+     "name": "Adamant 2h crossbow",
+     "stock": 4,
+     "free": 0,
+     "price": 567
+    },
+    {
+     "name": "Iron 2h crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 279
+    },
+    {
+     "name": "Mithril crossbow",
+     "stock": 10,
+     "free": 0,
+     "price": 451
+    },
+    {
+     "name": "Bronze 2h crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 204
+    },
+    {
+     "name": "Adamant crossbow",
+     "stock": 4,
+     "free": 0,
+     "price": 567
+    },
+    {
+     "name": "Off-hand steel crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 345
+    },
+    {
+     "name": "Off-hand adamant crossbow",
+     "stock": 4,
+     "free": 0,
+     "price": 567
+    },
+    {
+     "name": "Off-hand mithril crossbow",
+     "stock": 10,
+     "free": 0,
+     "price": 451
+    },
+    {
+     "name": "Off-hand bronze crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 204
+    },
+    {
+     "name": "Off-hand iron crossbow",
+     "stock": 20,
+     "free": 0,
+     "price": 279
+    },
+    {
+     "name": "Limestone brick",
+     "stock": 750,
+     "free": 0,
+     "price": 21
+    },
+    {
+     "name": "Pineapple",
+     "stock": 140,
+     "free": 0,
+     "price": 2
+    },
+    {
+     "name": "Seaweed",
+     "stock": 280,
+     "free": 0,
+     "price": 2
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Casting Bones to Bananas",
+   "version": "",
+   "revision": 36768853,
+   "choices": [
+    {
+     "label": "Bones to use",
+     "options": [
+      {
+       "label": "Bones",
+       "inputs": [
+        [
+         "Bones",
+         72800
+        ]
+       ]
+      },
+      {
+       "label": "Big bones",
+       "inputs": [
+        [
+         "Big bones",
+         72800
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Casting fruitfall",
+   "version": "",
+   "revision": 36971588,
+   "choices": [
+    {
+     "label": "Special move restore",
+     "options": [
+      {
+       "label": "Summoning potions",
+       "inputs": [
+        [
+         "Summoning potion (4)",
+         120
+        ]
+       ]
+      },
+      {
+       "label": "Spiritual prayer potions",
+       "inputs": [
+        [
+         "Spiritual prayer potion (6)",
+         80
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Running the Anachronia Agility Course for codex pages",
+   "version": "",
+   "revision": 36682755,
+   "choices": [
+    {
+     "label": "Codex to make",
+     "options": [
+      {
+       "label": "Double Surge codex",
+       "outputs": [
+        [
+         "Double Surge codex",
+         0.016
+        ]
+       ]
+      },
+      {
+       "label": "Double Escape codex",
+       "outputs": [
+        [
+         "Double Escape codex",
+         0.016
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Cutting willow logs",
+   "version": "",
+   "revision": 36902555,
+   "choices": [
+    {
+     "label": "Willow wood spirits",
+     "options": [
+      {
+       "label": "Sell the logs you cut",
+       "outputs": [
+        [
+         "Willow logs",
+         840
+        ]
+       ]
+      },
+      {
+       "label": "Trade wood spirits for more logs",
+       "inputs": [
+        [
+         "Willow wood spirit",
+         840
+        ]
+       ],
+       "outputs": [
+        [
+         "Willow logs",
+         1680
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Making prayer potions",
+   "version": "",
+   "revision": 36714418,
+   "choices": [
+    {
+     "label": "Dose to sell",
+     "options": [
+      {
+       "label": "3-dose potions",
+       "outputs": [
+        [
+         "Prayer potion (3)",
+         3027.0
+        ]
+       ]
+      },
+      {
+       "label": "4-dose potions",
+       "outputs": [
+        [
+         "Prayer potion (4)",
+         2270.25
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Making summoning potions",
+   "version": "",
+   "revision": 36714420,
+   "choices": [
+    {
+     "label": "Dose to sell",
+     "options": [
+      {
+       "label": "3-dose potions",
+       "outputs": [
+        [
+         "Summoning potion (3)",
+         3027.0
+        ]
+       ]
+      },
+      {
+       "label": "4-dose potions",
+       "outputs": [
+        [
+         "Summoning potion (4)",
+         2270.25
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Making super antipoisons",
+   "version": "",
+   "revision": 36896295,
+   "choices": [
+    {
+     "label": "Dose to sell",
+     "options": [
+      {
+       "label": "3-dose potions",
+       "outputs": [
+        [
+         "Super antipoison (3)",
+         3002.075
+        ]
+       ]
+      },
+      {
+       "label": "4-dose potions",
+       "outputs": [
+        [
+         "Super antipoison (4)",
+         2251.55625
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Making super attack potions",
+   "version": "",
+   "revision": 36714422,
+   "choices": [
+    {
+     "label": "Dose to sell",
+     "options": [
+      {
+       "label": "3-dose potions",
+       "outputs": [
+        [
+         "Super attack (3)",
+         3027.0
+        ]
+       ]
+      },
+      {
+       "label": "4-dose potions",
+       "outputs": [
+        [
+         "Super attack (4)",
+         2270.25
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Making super defence potions",
+   "version": "",
+   "revision": 36714423,
+   "choices": [
+    {
+     "label": "Dose to sell",
+     "options": [
+      {
+       "label": "3-dose potions",
+       "outputs": [
+        [
+         "Super defence (3)",
+         3027.0
+        ]
+       ]
+      },
+      {
+       "label": "4-dose potions",
+       "outputs": [
+        [
+         "super defence (4)",
+         2270.25
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "page": "Money making guide/Making super strength potions",
+   "version": "",
+   "revision": 36714425,
+   "choices": [
+    {
+     "label": "Dose to sell",
+     "options": [
+      {
+       "label": "3-dose potions",
+       "outputs": [
+        [
+         "Super strength (3)",
+         3027.0
+        ]
+       ]
+      },
+      {
+       "label": "4-dose potions",
+       "outputs": [
+        [
+         "Super strength (4)",
+         2270.25
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "shops_retrieved": "2026-10-30"
+}

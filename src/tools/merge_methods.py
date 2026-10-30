@@ -528,6 +528,177 @@ def load_access_research():
     return records
 
 
+def load_income_choices():
+    """{(page, version): research} for guides whose rows depend on prices (see
+    src/tools/wiki_choices.py). An empty dict before any research."""
+    path = catalogue.ROOT / "catalogue-source" / "research" / "income-choices.json"
+
+    if not path.exists():
+        return {}
+
+    document = json.loads(path.read_text(encoding="utf-8"))
+
+    if document.get("schema") != 1 or not isinstance(document.get("guides"), list):
+        raise ValueError("Unsupported income choice research")
+
+    records = {}
+
+    for entry in document["guides"]:
+        key = (entry["page"], entry["version"].casefold())
+
+        if key in records:
+            raise ValueError("Duplicate income choice research: " + str(key))
+
+        if not catalogue.positive_integer(entry.get("revision")):
+            raise ValueError("Income choice research needs a revision: " + str(key))
+
+        for item in entry.get("shops", []):
+            catalogue.require_text(item.get("name"), "Shop item name")
+
+            if not (catalogue.non_negative_number(item.get("stock")) and item["stock"] > 0
+                    and catalogue.non_negative_number(item.get("free"))
+                    and catalogue.non_negative_number(item.get("price"))):
+                raise ValueError(f"Shop item {item['name']} needs a stock, free amount and price")
+
+        for choice in entry.get("choices", []):
+            catalogue.require_text(choice.get("label"), "Choice label")
+
+            if not isinstance(choice.get("options"), list) or len(choice["options"]) < 2:
+                raise ValueError(f"Choice {choice['label']} needs at least two options")
+
+            for option in choice["options"]:
+                catalogue.require_text(option.get("label"), "Choice option label")
+
+        records[key] = entry
+
+    return records
+
+
+def apply_choices(guide, research):
+    """Re-makes a guide's price-dependent rows as choices the plugin settles live.
+
+    Returns (inputs, outputs, choices): the rows as (row, tag) pairs, where a tag
+    says which choice and option a row belongs to, and the choices themselves
+    ({label, options: [label, ...], picked}). `picked` is the option the guide
+    chose on import day, which stands when live prices can't settle it. Raises
+    if the research doesn't reproduce the imported guide (out of date or wrong).
+    """
+    rows = {direction: [(list(row), {}) for row in guide[direction]] for direction in ("inputs", "outputs")}
+    choices = []
+
+    if research is None:
+        return rows["inputs"], rows["outputs"], choices
+
+    page = guide["page"]
+
+    if research["revision"] != guide["revision"]:
+        raise ValueError(f"Income choice research is for another revision of {page}; "
+                         "run src/tools/wiki_choices.py (shops) or re-check the hand-researched choices")
+
+    def basis_of(direction, names):
+        # New rows share the basis of the rows they replace (or the guide's first row).
+        for row, _ in rows[direction]:
+            if row[0] in names:
+                return row[2]
+
+        return (guide["outputs"] or guide["inputs"])[0][2]
+
+    def replace(direction, names, new_rows):
+        # Imported rows with these names go; the new rows take the first one's place
+        # (or go at the end). Rows already made into choices are never replaced.
+        old = [index for index, (row, tag) in enumerate(rows[direction]) if row[0] in names and not tag]
+        at = old[0] if old else len(rows[direction])
+        kept = [pair for index, pair in enumerate(rows[direction]) if index not in old]
+        at -= sum(1 for index in old if index < at)
+        rows[direction] = kept[:at] + new_rows + kept[at:]
+
+    # Shop runs: each item is bought (its stock, at its shop price) or not. The
+    # guide's Coins is what it spent on the items it bought, so it has to match.
+    shops = research.get("shops", [])
+
+    if shops:
+        imported = {row[0]: row[1] for row, _ in rows["outputs"]}
+        coins = [row for row, _ in rows["inputs"] if row[0] == "Coins"]
+        spent = 0
+
+        if len(coins) != 1:
+            raise ValueError(f"{page}: a shop run needs exactly one Coins supply row")
+
+        for item in shops:
+            name, stock, free, price = item["name"], item["stock"], item["free"], item["price"]
+            bought = imported.get(name)
+
+            picked = 1 if bought == free + stock else 2
+
+            if picked == 1:
+                spent += stock * price
+            elif bought != free:
+                raise ValueError(f"{page}: {name} was imported as {bought}, neither bought ({free + stock}) "
+                                 f"nor not bought ({free}); re-run src/tools/wiki_choices.py")
+
+            basis = basis_of("outputs", {name})
+            index = len(choices) + 1
+            choices.append({"label": name, "options": ["Buy from the shops", "Don't buy"], "picked": picked})
+
+            # Anything you get anyway (Mega shop run's free runes) stays an ordinary row.
+            # The bought stock carries its shop price, so the plugin knows what it costs.
+            note = (f"Bought from the shops at {price:,} GP each: the item's value, which the Wiki guide uses "
+                    "as the shop price.")
+            new_outputs = [([name, free, basis, "ge", 0], {})] if free else []
+            new_outputs.append(([name, stock, basis, "ge", 0],
+                                {"choice": index, "option": 1, "shop_price": price, "valuation_note": note}))
+            replace("outputs", {name}, new_outputs)
+
+        if abs(coins[0][1] - spent) > 0.5:
+            raise ValueError(f"{page}: the guide spent {coins[0][1]:,} coins, but its bought items cost "
+                             f"{spent:,}; the shop research is out of date")
+
+        # The guide's Coins row stays, as what's spent in the shops. The plugin adds
+        # it up from whichever items it buys at live prices.
+        coin_rows = [pair for pair in rows["inputs"] if pair[0][0] == "Coins"]
+        coin_rows[0][1].update({"shop_coins": True, "valuation_note":
+                                "Spent in the shops: the shop price of each item bought (hover an output for its price)."})
+
+    # Alternatives: the option whose rows match the import is the guide's own pick.
+    for choice in research.get("choices", []):
+        index = len(choices) + 1
+        options = choice["options"]
+        named = {direction: {row[0] for option in options for row in option.get(direction, [])}
+                 for direction in ("inputs", "outputs")}
+
+        def matches(option):
+            for direction in ("inputs", "outputs"):
+                wanted = collections.Counter()
+
+                for name, quantity in option.get(direction, []):
+                    wanted[name] += quantity
+
+                for name in named[direction]:
+                    found = sum(row[1] for row, tag in rows[direction] if row[0] == name and not tag)
+
+                    if abs(found - wanted[name]) > 1e-6:
+                        return False
+
+            return True
+
+        picked = next((number for number, option in enumerate(options, 1) if matches(option)), None)
+
+        if picked is None:
+            raise ValueError(f"{page}: no option of '{choice['label']}' matches the imported rows")
+
+        choices.append({"label": choice["label"], "options": [option["label"] for option in options], "picked": picked})
+
+        for direction in ("inputs", "outputs"):
+            basis = basis_of(direction, named[direction])
+            new_rows = [([name, quantity, basis, "ge", 0], {"choice": index, "option": number})
+                        for number, option in enumerate(options, 1) for name, quantity in option.get(direction, [])]
+
+            if new_rows or named[direction]:
+                replace(direction, named[direction], new_rows)
+
+    return rows["inputs"], rows["outputs"], choices
+
+
 class Context:
     """Shared lookups while converting guides, plus the items table they fill in."""
 
@@ -541,6 +712,7 @@ class Context:
         self.achievements = achievements or {}
         self.guide_content = {"guides": {}, "locations": {}}
         self.access_research = {}
+        self.income_choices = {}
 
         # Wiki advice links found while converting the current method. They're
         # dropped (bare page names can't be clicked in game); only the guide's own
@@ -1081,8 +1253,17 @@ def convert_income(guide, ctx, pvm):
     if recurring:
         income["recurrence"] = {"every": recurring["every"].lower(), "minutes": recurring["minutes"]}
 
+    # Rows that depend on prices become choices the plugin makes from live prices.
+    research = ctx.income_choices.get((guide["page"], (guide.get("version") or "").casefold()))
+    tagged = dict(zip(("inputs", "outputs", "choices"), apply_choices(guide, research)))
+
+    if tagged["choices"]:
+        income["choices"] = tagged["choices"]
+        assumptions.append("Some rows are choices the Wiki guide makes from GE prices (which items to buy, "
+                           "which dose to sell). Profit Path makes them again from live prices.")
+
     for direction in ("inputs", "outputs"):
-        for name, quantity, basis, pricing, value, *note in guide[direction]:
+        for (name, quantity, basis, pricing, value, *note), tag in tagged[direction]:
             # Per-hour and per-run guides store amounts per 1% of pace or yield.
             line = {"name": name,
                     "quantity": quantity / 100 if pace else quantity,
@@ -1118,6 +1299,16 @@ def convert_income(guide, ctx, pvm):
 
                 if item_id:
                     line["item_id"] = item_id
+
+            # A row that only counts when its option is picked, or a shop run's
+            # Coins, which add up the items bought (see apply_choices).
+            if "choice" in tag:
+                line["choice"] = tag["choice"]
+                line["option"] = tag["option"]
+
+            for key in ("shop_price", "shop_coins", "valuation_note"):
+                if key in tag:
+                    line[key] = tag[key]
 
             income[direction].append(line)
 
@@ -1341,6 +1532,7 @@ def merge(recipe_source=None, monsters=None):
                   catalogue.load_quests(), load_outfits(), load_achievements())
     ctx.guide_content = load_guide_content()
     ctx.access_research = load_access_research()
+    ctx.income_choices = load_income_choices()
 
     # Tool tiers, so "Crystal pickaxe or better" knows what "better" is.
     pickaxes = load_pickaxes()

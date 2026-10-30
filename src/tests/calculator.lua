@@ -292,6 +292,100 @@ return function(test, equal, client, pretty)
         assert(math.abs(halfRows["Elder wood spirit"].quantity - 130) < 1e-9)
     end)
 
+    -- Guides that choose from GE prices (which shop items to buy, which dose to
+    -- sell) have those choices made again from live prices. Every option's rows
+    -- stay listed; the losers count as 0, and each row says why when hovered.
+    -- The models are small copies of Buying runes and Making prayer potions.
+    test("a guide's price choices are made again from live prices", function()
+        local function shopItem(choice, name, itemId)
+            return { name = name, item_id = itemId, quantity = 525, basis = "action", tax_denominator = 50,
+                     shop_price = 17, valuation_note = "Bought from the shops at 17 GP each.",
+                     choice = choice, option = 1 }
+        end
+
+        local options = { "Buy from the shops", "Don't buy" }
+        local runes = {
+            coverage = "complete",
+            choices = {
+                { label = "Air rune", options = options, picked = 2 },
+                { label = "Mind rune", options = options, picked = 1 },
+                { label = "Death rune", options = options, picked = 2 },
+            },
+            -- What's spent in the shops, added up from the items bought.
+            inputs = { { name = "Coins", item_id = 995, quantity = 0, basis = "action", pricing = "fixed",
+                         unit_value = 1, shop_coins = true } },
+            outputs = { shopItem(1, "Air rune", 556), shopItem(2, "Mind rune", 558), shopItem(3, "Death rune", 560) },
+        }
+
+        -- Air runes sell for 20 (shop 17), mind runes for 10. Death runes have no
+        -- price, so that choice keeps the guide's own pick (not bought).
+        local prices = {
+            [556] = { status = "available", low = 20, lowTime = 50, high = 21, highTime = 50 },
+            [558] = { status = "available", low = 10, lowTime = 50, high = 11, highTime = 50 },
+        }
+        local result = Income.calculate(runes, 100, prices)
+
+        -- Air runes: bought at 17 and sold at 20 (no tax under 50 GP), though the
+        -- guide skipped them on import day. Only they are paid for.
+        equal(result.outputs[1].value, 52500 * 20)
+        equal(result.inputs[1].quantity, 52500 * 17)
+        assert(result.outputs[1].choiceNote:find("Used", 1, true), result.outputs[1].choiceNote)
+        assert(result.outputs[1].choiceNote:find("Bought from the shops at 17 GP each.", 1, true))
+
+        -- Mind runes: the shop charges more than the GE pays, so they're not bought,
+        -- though the guide bought them.
+        equal(result.outputs[2].quantity, 0)
+        assert(result.outputs[2].choiceNote:find('"Don\'t buy" pays more', 1, true), result.outputs[2].choiceNote)
+
+        -- Death runes: no price to compare, so the guide's pick stands, and the
+        -- row says so. Not buying them leaves nothing unpriced.
+        equal(result.outputs[3].quantity, 0)
+        assert(result.outputs[3].choiceNote:find("no live prices", 1, true), result.outputs[3].choiceNote)
+        equal(result.status, "available")
+        equal(result.profit, 52500 * 3)
+
+        -- Prices turn: mind runes now pay 30, so they're bought (and paid for) too.
+        prices[558].low = 30
+        local turned = Income.calculate(runes, 100, prices)
+        equal(turned.outputs[2].quantity, 52500)
+        equal(turned.inputs[1].quantity, 2 * 52500 * 17)
+
+        -- No rate, no shopping.
+        equal(Income.calculate(runes, 0, prices).inputs[1].quantity, 0)
+
+        -- An alternative: sell whichever dose pays more. Each 3-dose potion made
+        -- is 3/4 of a 4-dose one, as in the Wiki guide.
+        local prayer = {
+            coverage = "complete",
+            choices = { { label = "Dose to sell", options = { "3-dose potions", "4-dose potions" }, picked = 1 } },
+            inputs = {},
+            outputs = {
+                { name = "Prayer potion (3)", item_id = 139, quantity = 4, basis = "action", tax_denominator = 50,
+                  choice = 1, option = 1 },
+                { name = "Prayer potion (4)", item_id = 2434, quantity = 3, basis = "action", tax_denominator = 50,
+                  choice = 1, option = 2 },
+            },
+        }
+
+        local function sell(three, four)
+            return {
+                [139] = { status = "available", low = three, lowTime = 50, high = three, highTime = 50 },
+                [2434] = { status = "available", low = four, lowTime = 50, high = four, highTime = 50 },
+            }
+        end
+
+        -- 4 x 9,000 is less than 3 x 13,000: sell 4-dose potions.
+        local fours = Income.calculate(prayer, 1, sell(9000, 13000))
+        equal(fours.outputs[1].quantity, 0)
+        equal(fours.outputs[2].quantity, 3)
+
+        -- 4 x 11,000 beats it: back to the guide's 3-dose pick.
+        local threes = Income.calculate(prayer, 1, sell(11000, 13000))
+        equal(threes.outputs[1].quantity, 4)
+        equal(threes.outputs[2].quantity, 0)
+        assert(threes.outputs[2].choiceNote:find('"3-dose potions" pays more', 1, true))
+    end)
+
     -- Abyssal demons: Aggroverload is untradeable (creation cost), Super prayer
     -- renewal is a normal GE item. Every supply gets a value and the supply total
     -- is known, but missing sell quotes still prevent total revenue/profit.

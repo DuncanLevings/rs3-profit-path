@@ -588,7 +588,8 @@ local function itemTable(panel, definitions, moneyColour, period)
         local row = rows[index]
 
         if value then
-            local tooltip = value.message or row.note
+            -- A row in one of a guide's price choices says whether it's used and why.
+            local tooltip = value.message or value.choiceNote or row.note
 
             if not row.total or tooltip ~= row.tooltip then
                 addValue(row, tooltip)

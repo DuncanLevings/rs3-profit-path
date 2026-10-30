@@ -64,6 +64,10 @@ ACHIEVEMENTS = ROOT / "catalogue-source" / "research" / "achievements.json"
 EQUIPMENT = ROOT / "catalogue-source" / "research" / "equipment.json"
 PICKAXES = ROOT / "catalogue-source" / "research" / "pickaxes.json"
 
+# Price-dependent choices (see wiki_choices.py). Their items need IDs too, even
+# the ones the guide didn't pick on the day we imported it.
+CHOICES = ROOT / "catalogue-source" / "research" / "income-choices.json"
+
 API = "https://runescape.wiki/api.php"
 
 # The Wiki asks tools to identify themselves. Agreed with Duncan for this project.
@@ -599,10 +603,11 @@ def is_obsolete(row):
     return "obsolete" in row
 
 
-def build(rows, revisions, item_ids, retrieved, families=None, item_names=None):
+def build(rows, revisions, item_ids, retrieved, families=None, item_names=None, extra_names=frozenset()):
     """Parses and checks everything, returning (guides.jsonl text, meta record).
 
     `families` maps a dose-less potion name to every dose's item ID (see lookup_items).
+    `extra_names` are income items from our own research (see choice_names).
 
     Obsolete guides are left out entirely: they describe methods that no longer
     work, so they'd only be noise in Browse. meta.json still counts them."""
@@ -650,16 +655,35 @@ def build(rows, revisions, item_ids, retrieved, families=None, item_names=None):
         "unlabelled_versions": sorted(unlabelled),
     }
 
-    set_item_tables(meta, guides, item_ids, families, item_names)
+    set_item_tables(meta, guides, item_ids, families, item_names, extra_names)
 
     text = "".join(json.dumps(guide, ensure_ascii=False, separators=(",", ":")) + "\n" for guide in guides)
 
     return text, meta
 
 
-def set_item_tables(meta, guides, item_ids, families=None, item_names=None):
-    """Fills in meta.json's item tables (and their counts) for these guides."""
-    names = sorted({row[0] for guide in guides for row in guide["inputs"] + guide["outputs"]})
+def choice_names():
+    """Every item named in the income choices research, e.g. Big bones as well as
+    the Bones a guide picked on import day."""
+    if not CHOICES.exists():
+        return set()
+
+    names = set()
+
+    for entry in json.loads(CHOICES.read_text(encoding="utf-8"))["guides"]:
+        names.update(item["name"] for item in entry.get("shops", []))
+
+        for choice in entry.get("choices", []):
+            for option in choice["options"]:
+                names.update(row[0] for row in option.get("inputs", []) + option.get("outputs", []))
+
+    return names
+
+
+def set_item_tables(meta, guides, item_ids, families=None, item_names=None, extra_names=frozenset()):
+    """Fills in meta.json's item tables (and their counts) for these guides, plus
+    any `extra_names` our own research needs."""
+    names = sorted({row[0] for guide in guides for row in guide["inputs"] + guide["outputs"]} | set(extra_names))
     unresolved = [name for name in names if name not in item_ids]
 
     # Requirement "items" are often not items at all (outfits, perks, abilities),
@@ -691,12 +715,12 @@ def refresh_items():
     Returns (old items, new items)."""
     meta = json.loads(META.read_text(encoding="utf-8"))
     guides = [json.loads(line) for line in GUIDES.read_text(encoding="utf-8").splitlines()]
-    names = {row[0] for guide in guides for row in guide["inputs"] + guide["outputs"]}
+    names = {row[0] for guide in guides for row in guide["inputs"] + guide["outputs"]} | choice_names()
 
     old = dict(meta["items"])
     item_ids, families, item_names = fetch_item_ids((names | requirement_names(guides)) - {""})
 
-    set_item_tables(meta, guides, item_ids, families, item_names)
+    set_item_tables(meta, guides, item_ids, families, item_names, choice_names())
     meta["items_retrieved"] = datetime.date.today().isoformat()
 
     META.write_text(json.dumps(meta, indent=1, ensure_ascii=False, sort_keys=False) + "\n", encoding="utf-8", newline="\n")
@@ -1062,7 +1086,7 @@ def verify_snapshot():
     if meta.get("schema") != 1 or meta["counts"]["guides"] != len(guides):
         raise ValueError("meta.json doesn't match guides.jsonl; re-run wiki_methods.py")
 
-    names = {row[0] for guide in guides for row in guide["inputs"] + guide["outputs"]}
+    names = {row[0] for guide in guides for row in guide["inputs"] + guide["outputs"]} | choice_names()
     names |= requirement_names(guides)
     listed = set(meta["items"]) | set(meta["unresolved"]) | set(meta["unresolved_requirement_items"])
 
@@ -1137,11 +1161,11 @@ def main():
     current = [row for row in rows if not is_obsolete(row)]
     revisions = fetch_revisions({row["page_name"] for row in current})
     parsed = [parse_guide(row, revisions) for row in current]
-    names = {income[0] for guide in parsed for income in guide["inputs"] + guide["outputs"]}
+    names = {income[0] for guide in parsed for income in guide["inputs"] + guide["outputs"]} | choice_names()
     item_ids, families, item_names = fetch_item_ids((names | requirement_names(parsed)) - {""})
 
     # Build and check everything before writing anything.
-    text, meta = build(rows, revisions, item_ids, retrieved, families, item_names)
+    text, meta = build(rows, revisions, item_ids, retrieved, families, item_names, choice_names())
 
     OUTPUT.mkdir(parents=True, exist_ok=True)
     GUIDES.write_text(text, encoding="utf-8", newline="\n")

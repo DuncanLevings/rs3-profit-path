@@ -310,6 +310,9 @@ function Income.calculate(model, rate, quotes)
                 name = line.name, itemId = line.item_id, quantity = quantity, basis = line.basis,
                 unitPrice = price, timestamp = timestamp,
                 creationCost = line.pricing == "recipe" or nil,
+
+                -- Why a choice's row is (or isn't) used; see choose() below.
+                choiceNote = line.choiceNote,
             }
 
             if quantity == 0 then
@@ -399,13 +402,154 @@ function Income.calculate(model, rate, quotes)
         return total, tax
     end
 
-    local outputLines = Loot.outputs(model)
+    -- Some guides make choices from GE prices: which items a shop run buys, which
+    -- dose of a potion to sell. Those are made again here, from live prices. Each
+    -- option's rows are priced on their own, and the one that comes out furthest
+    -- ahead wins (a tie keeps the guide's own pick). The other options' rows stay
+    -- in the tables but count as 0, and every row says why when hovered.
+    --
+    -- If any option can't be priced, there's nothing fair to compare, so the
+    -- guide's own pick (from the day we imported it) stands.
+    --
+    -- Returns the input and output lines to price, with the losers set to 0.
+    -- What a shop run spends on these output lines, at this rate.
+    local function shopSpend(lines)
+        local spent = 0
 
-    calculated.inputs, calculated.cost = calculateLines(model.inputs, "high")
+        for _, line in ipairs(lines) do
+            if line.shop_price then
+                spent = spent + line.quantity * (line.basis == "action" and rate or 1) * line.shop_price
+            end
+        end
+
+        return spent
+    end
+
+    local function choose(inputs, outputs)
+        if not model.choices then
+            return inputs, outputs
+        end
+
+        local picked, byPrice = {}, {}
+
+        for index, choice in ipairs(model.choices) do
+            local values = {}
+            local comparable = true
+
+            for option = 1, #choice.options do
+                local optionInputs, optionOutputs = {}, {}
+
+                for _, line in ipairs(inputs) do
+                    if line.choice == index and line.option == option then
+                        optionInputs[#optionInputs + 1] = line
+                    end
+                end
+
+                for _, line in ipairs(outputs) do
+                    if line.choice == index and line.option == option then
+                        optionOutputs[#optionOutputs + 1] = line
+                    end
+                end
+
+                -- An option with no rows ("Don't buy") is simply worth 0. Items bought
+                -- in a shop cost their shop price too.
+                local _, cost = calculateLines(optionInputs, "high")
+                local _, revenue = calculateLines(optionOutputs, "low")
+
+                if cost and revenue then
+                    values[option] = revenue - cost - shopSpend(optionOutputs)
+                else
+                    comparable = false
+                end
+            end
+
+            local best = choice.picked
+
+            if comparable then
+                for option = 1, #choice.options do
+                    if values[option] > values[best] then
+                        best = option
+                    end
+                end
+            end
+
+            picked[index] = best
+            byPrice[index] = comparable
+        end
+
+        -- A copy of each choice's row, set to 0 if its option lost, saying why.
+        local function settle(lines)
+            local settled = {}
+
+            for _, line in ipairs(lines) do
+                if line.choice then
+                    local choice = model.choices[line.choice]
+                    local winner = choice.options[picked[line.choice]]
+                    local copy = {}
+
+                    for key, value in pairs(line) do
+                        copy[key] = value
+                    end
+
+                    if line.option ~= picked[line.choice] then
+                        copy.quantity = 0
+                        copy.choiceNote = byPrice[line.choice]
+                            and ('Not used: "' .. winner .. '" pays more at current prices.')
+                            or ('Not used: the Wiki guide picks "' .. winner .. '", and there are no live prices to compare.')
+                    else
+                        copy.choiceNote = byPrice[line.choice]
+                            and ('Used: "' .. winner .. '" pays the most at current prices.')
+                            or ('Used: the Wiki guide picks "' .. winner .. '", and there are no live prices to compare.')
+                    end
+
+                    -- The row's usual note (a shop price, say) still applies.
+                    if line.valuation_note then
+                        copy.choiceNote = copy.choiceNote .. " " .. line.valuation_note
+                    end
+
+                    settled[#settled + 1] = copy
+                else
+                    settled[#settled + 1] = line
+                end
+            end
+
+            return settled
+        end
+
+        local settledOutputs = settle(outputs)
+        local settledInputs = settle(inputs)
+
+        -- A shop run's Coins are what the bought items cost in the shops, so they
+        -- follow whichever items were bought.
+        for index, line in ipairs(settledInputs) do
+            if line.shop_coins then
+                local copy = {}
+
+                for key, value in pairs(line) do
+                    copy[key] = value
+                end
+
+                copy.quantity = shopSpend(settledOutputs) / (line.basis == "action" and rate or 1)
+
+                -- At a rate of 0 nothing is bought, so nothing is spent.
+                if copy.quantity ~= copy.quantity then
+                    copy.quantity = 0
+                end
+
+                settledInputs[index] = copy
+            end
+        end
+
+        return settledInputs, settledOutputs
+    end
+
+    local inputLines, outputLines = choose(model.inputs, Loot.outputs(model))
+
+    calculated.inputs, calculated.cost = calculateLines(inputLines, "high")
     calculated.outputs, calculated.revenue, calculated.tax = calculateLines(outputLines, "low")
 
     if calculated.cost == nil then
-        calculated.cost = countMissingAsZero(calculated.inputs, model.inputs,
+        calculated.cost = countMissingAsZero(calculated.inputs, inputLines,
             "Counted as 0 GP in the total, since most supplies have prices, so the profit may be a little high.")
     end
 
