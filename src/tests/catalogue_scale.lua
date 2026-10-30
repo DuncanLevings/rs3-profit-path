@@ -8,6 +8,37 @@
 return function(test, equal, client, pretty)
     local catalogue = require("src/data/method_data")
 
+    -- Every PvM method carries its researched difficulty (and nothing else does),
+    -- so each Difficulty filter level finds methods in the real catalogue.
+    test("every PvM method is rated, and each Difficulty filter level matches some", function()
+        local Browser = require("src/methods/browser")
+        local Preferences = require("src/storage/preferences")
+
+        client()
+
+        for _, method in ipairs(catalogue.methods) do
+            equal(method.difficulty ~= nil, method.category == "pvm", method.id)
+        end
+
+        local browser = Browser.new(catalogue.methods, Preferences.new(PersistentDB), function() end)
+
+        for _, level in ipairs(Browser.difficultyLevels) do
+            browser.difficulty = level
+            local rows = browser:rows()
+            assert(#rows > 0, "Nothing rated " .. level)
+
+            for _, method in ipairs(rows) do
+                equal(method.difficulty, level)
+            end
+        end
+
+        -- A few anchors from the research: PvME's easiest group, its Intermediate
+        -- stage, and the endgame.
+        equal(catalogue.find("killing-general-graardor.standard").difficulty, "Easy")
+        equal(catalogue.find("completing-ed2-dragonkin-laboratory.solo").difficulty, "Hard")
+        equal(catalogue.find("killing-solak.standard").difficulty, "Elite")
+    end)
+
     test("Telos killstreak restores its setup and cannot pass without access evidence", function()
         local Requirements = require("src/game/requirements")
         local method = catalogue.find("killing-telos-the-warden.200-killstreak")

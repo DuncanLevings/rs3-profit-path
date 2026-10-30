@@ -1,0 +1,1299 @@
+{
+  "schema": 1,
+  "scale": [
+    "Easy",
+    "Medium",
+    "Hard",
+    "Elite"
+  ],
+  "about": "Researched PvM difficulty, one rating per Wiki guide version. Easy matches \"New to bossing\", Medium GWD2-level, Hard Elite-dungeon-level and Elite \"Experienced\". Judgement calls were checked in a gameplay review on 30 October 2026; their evidence says so. A new judgement call carries a \"review\" note until it's checked.",
+  "sources": {
+    "pvme": {
+      "repository": "https://github.com/pvme/pvme-guides",
+      "commit": "aa2f5ccf0ed92f926b45420ae352d9ff0ffc5876",
+      "licence": "CC BY-NC-SA 4.0",
+      "files": [
+        "new-to-bossing/bossing-path.txt",
+        "slayer/*.txt",
+        "afk/ (file names)",
+        "basic-guides/ (file names)"
+      ]
+    }
+  },
+  "ratings": [
+    {
+      "page": "Money making guide/Completing Barrows: Rise of the Six",
+      "version": "",
+      "difficulty": "Hard",
+      "basis": "judgement",
+      "evidence": "Not on the path; a group encounter. PvME has a basic guide. Confirmed Hard in gameplay review (30 October 2026)."
+    },
+    {
+      "page": "Money making guide/Completing ED1 - Temple of Aminishi (Solo)",
+      "version": "",
+      "difficulty": "Hard",
+      "basis": "judgement",
+      "evidence": "Not on the path; the first Elite Dungeon, alongside ED2 (Intermediate). PvME has a basic guide. Confirmed Hard in gameplay review (30 October 2026)."
+    },
+    {
+      "page": "Money making guide/Completing ED2 - Dragonkin Laboratory",
+      "version": "Duo",
+      "difficulty": "Hard",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Intermediate stage."
+    },
+    {
+      "page": "Money making guide/Completing ED2 - Dragonkin Laboratory",
+      "version": "Solo",
+      "difficulty": "Hard",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Intermediate stage."
+    },
+    {
+      "page": "Money making guide/Completing ED2 - Dragonkin Laboratory",
+      "version": "Trio",
+      "difficulty": "Hard",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Intermediate stage."
+    },
+    {
+      "page": "Money making guide/Completing ED3 - Shadow Reef",
+      "version": "Duo",
+      "difficulty": "Hard",
+      "basis": "judgement",
+      "evidence": "Not on the path; an Elite Dungeon like ED2 (Intermediate). PvME has a basic guide. Confirmed Hard in gameplay review (30 October 2026)."
+    },
+    {
+      "page": "Money making guide/Completing ED3 - Shadow Reef",
+      "version": "Solo",
+      "difficulty": "Hard",
+      "basis": "judgement",
+      "evidence": "Not on the path; an Elite Dungeon like ED2 (Intermediate). PvME has a basic guide. Confirmed Hard in gameplay review (30 October 2026)."
+    },
+    {
+      "page": "Money making guide/Completing ED3 - Shadow Reef",
+      "version": "Trio",
+      "difficulty": "Hard",
+      "basis": "judgement",
+      "evidence": "Not on the path; an Elite Dungeon like ED2 (Intermediate). PvME has a basic guide. Confirmed Hard in gameplay review (30 October 2026)."
+    },
+    {
+      "page": "Money making guide/Completing Sanctum of Rebirth",
+      "version": "Hard Mode",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage."
+    },
+    {
+      "page": "Money making guide/Completing Sanctum of Rebirth",
+      "version": "Normal Mode",
+      "difficulty": "Hard",
+      "basis": "judgement",
+      "evidence": "Not on the path; a three-boss dungeon. Confirmed Hard in gameplay review (30 October 2026)."
+    },
+    {
+      "page": "Money making guide/Completing the Fight Kiln",
+      "version": "",
+      "difficulty": "Medium",
+      "basis": "gameplay-review",
+      "evidence": "Not on the path; wave challenge after the Fight Caves. The Wiki lists it as high-level combat. Gameplay review (30 October 2026): Medium, not the drafted Hard."
+    },
+    {
+      "page": "Money making guide/K'ril Tsutsaroth Alt Guide",
+      "version": "High-level",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/K'ril Tsutsaroth Alt Guide",
+      "version": "Low-level",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/K'ril Tsutsaroth Alt Guide",
+      "version": "Mid-level",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing Amascut, the Devourer",
+      "version": "100 Enrage",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME's full guides cover 1000% and 2000%."
+    },
+    {
+      "page": "Money making guide/Killing Amascut, the Devourer",
+      "version": "1000 Enrage",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME's full guides cover 1000% and 2000%."
+    },
+    {
+      "page": "Money making guide/Killing Amascut, the Devourer",
+      "version": "2000 Enrage",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME's full guides cover 1000% and 2000%."
+    },
+    {
+      "page": "Money making guide/Killing Amascut, the Devourer",
+      "version": "500 Enrage",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME's full guides cover 1000% and 2000%."
+    },
+    {
+      "page": "Money making guide/Killing Amascut, the Devourer",
+      "version": "750 Enrage",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME's full guides cover 1000% and 2000%."
+    },
+    {
+      "page": "Money making guide/Killing Amascut, the Devourer",
+      "version": "Normal Mode",
+      "difficulty": "Elite",
+      "basis": "gameplay-review",
+      "evidence": "Not on the path; PvME has a normal mode mechanics guide. Gameplay review (30 October 2026): Elite, not the drafted Hard."
+    },
+    {
+      "page": "Money making guide/Killing Araxxi",
+      "version": "",
+      "difficulty": "Hard",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Intermediate stage. (Araxxor)."
+    },
+    {
+      "page": "Money making guide/Killing Beastmaster Durzag",
+      "version": "",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. Group boss; PvME has a duo guide."
+    },
+    {
+      "page": "Money making guide/Killing Crystal Shapeshifters (Classic Combat Mode)",
+      "version": "with Inquisitor staff",
+      "difficulty": "Medium",
+      "basis": "gameplay-review",
+      "evidence": "PvME Slayer guide; active methods only. Gameplay review (30 October 2026): Medium, not the drafted Easy."
+    },
+    {
+      "page": "Money making guide/Killing Crystal Shapeshifters (Classic Combat Mode)",
+      "version": "without Inquisitor staff",
+      "difficulty": "Medium",
+      "basis": "gameplay-review",
+      "evidence": "PvME Slayer guide; active methods only. Gameplay review (30 October 2026): Medium, not the drafted Easy."
+    },
+    {
+      "page": "Money making guide/Killing Dagannoth Kings",
+      "version": "High Level",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing Dagannoth Kings",
+      "version": "Mid Level",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing General Graardor",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing Gregorovic",
+      "version": "High Level",
+      "difficulty": "Medium",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Introductory stage. (GWD2; PvME calls Gregorovic slightly harder than the others)."
+    },
+    {
+      "page": "Money making guide/Killing Gregorovic",
+      "version": "Mid Level",
+      "difficulty": "Medium",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Introductory stage. (GWD2; PvME calls Gregorovic slightly harder than the others)."
+    },
+    {
+      "page": "Money making guide/Killing Helwyr",
+      "version": "High Level",
+      "difficulty": "Medium",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Introductory stage. (GWD2)."
+    },
+    {
+      "page": "Money making guide/Killing Helwyr",
+      "version": "Mid Level",
+      "difficulty": "Medium",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Introductory stage. (GWD2)."
+    },
+    {
+      "page": "Money making guide/Killing Iorwerth scouts",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing K'ril Tsutsaroth",
+      "version": "AFK Necromancy",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing K'ril Tsutsaroth",
+      "version": "High-Level",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing K'ril Tsutsaroth",
+      "version": "Low-Level",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing Kerapac, the bound",
+      "version": "Duo hard mode",
+      "difficulty": "Hard",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Advanced stage. (hard mode)."
+    },
+    {
+      "page": "Money making guide/Killing Kerapac, the bound",
+      "version": "Normal mode",
+      "difficulty": "Medium",
+      "basis": "pvme-guide",
+      "evidence": "PvME has an AFK guide for normal mode; only hard mode is on the path (Advanced)."
+    },
+    {
+      "page": "Money making guide/Killing Kerapac, the bound",
+      "version": "Solo hard mode",
+      "difficulty": "Hard",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Advanced stage. (hard mode)."
+    },
+    {
+      "page": "Money making guide/Killing Kerapac, the bound",
+      "version": "Trio hard mode",
+      "difficulty": "Hard",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Advanced stage. (hard mode)."
+    },
+    {
+      "page": "Money making guide/Killing Kerapac, the bound (Solo normal mode using Necromancy)",
+      "version": "",
+      "difficulty": "Medium",
+      "basis": "pvme-guide",
+      "evidence": "PvME has an AFK guide for normal mode Kerapac; only hard mode is on the path (Advanced)."
+    },
+    {
+      "page": "Money making guide/Killing Kree'arra",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing Nex",
+      "version": "",
+      "difficulty": "Medium",
+      "basis": "judgement",
+      "evidence": "Not on the path; the God Wars Dungeon's own boss with more mechanics than the four generals. PvME has a basic guide. Confirmed Medium in gameplay review (30 October 2026)."
+    },
+    {
+      "page": "Money making guide/Killing Nex, Angel of Death",
+      "version": "4-player",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME has full team guides."
+    },
+    {
+      "page": "Money making guide/Killing Nex, Angel of Death",
+      "version": "7-player",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME has full team guides."
+    },
+    {
+      "page": "Money making guide/Killing Nex, Angel of Death",
+      "version": "Duo",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME has full team guides."
+    },
+    {
+      "page": "Money making guide/Killing Nex, Angel of Death",
+      "version": "Solo",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME has full team guides."
+    },
+    {
+      "page": "Money making guide/Killing Osseous",
+      "version": "",
+      "difficulty": "Medium",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Introductory stage."
+    },
+    {
+      "page": "Money making guide/Killing Raksha",
+      "version": "",
+      "difficulty": "Hard",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Advanced stage."
+    },
+    {
+      "page": "Money making guide/Killing Rasial, the First Necromancer",
+      "version": "",
+      "difficulty": "Medium",
+      "basis": "gameplay-review",
+      "evidence": "Not on the path. PvME has a \"Low effort\" guide, which puts it below the endgame. Gameplay review (30 October 2026): Medium, not the drafted Hard."
+    },
+    {
+      "page": "Money making guide/Killing Rex Matriarchs",
+      "version": "Orikalka",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group). PvME also has AFK guides for each matriarch."
+    },
+    {
+      "page": "Money making guide/Killing Rex Matriarchs",
+      "version": "Pthentraken",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group). PvME also has AFK guides for each matriarch."
+    },
+    {
+      "page": "Money making guide/Killing Rex Matriarchs",
+      "version": "Rathis",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group). PvME also has AFK guides for each matriarch."
+    },
+    {
+      "page": "Money making guide/Killing Solak",
+      "version": "",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. The Wiki calls it one of the most challenging group bosses."
+    },
+    {
+      "page": "Money making guide/Killing Telos, the Warden",
+      "version": "100 Enrage Claims",
+      "difficulty": "Elite",
+      "basis": "gameplay-review",
+      "evidence": "Not on the path; 100% is Telos's lowest claimable enrage. Gameplay review (30 October 2026): Elite, not the drafted Hard."
+    },
+    {
+      "page": "Money making guide/Killing Telos, the Warden",
+      "version": "200 Killstreak",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME has full guides."
+    },
+    {
+      "page": "Money making guide/Killing Telos, the Warden",
+      "version": "2449 Enrage Claims",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME has full guides."
+    },
+    {
+      "page": "Money making guide/Killing Telos, the Warden",
+      "version": "999 Enrage Claims",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME has full guides."
+    },
+    {
+      "page": "Money making guide/Killing The Barrows Brothers (High-Level)",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing TzKal-Zuk",
+      "version": "Hard mode",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Only normal mode is on the path (Intermediate); hard mode is beyond it."
+    },
+    {
+      "page": "Money making guide/Killing TzKal-Zuk",
+      "version": "Normal mode",
+      "difficulty": "Hard",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Intermediate stage. (normal mode)."
+    },
+    {
+      "page": "Money making guide/Killing TzekHaar-Jad",
+      "version": "",
+      "difficulty": "Medium",
+      "basis": "judgement",
+      "evidence": "Not on the path; the Fight Caves' final wave. The Wiki lists it as high-level combat. Confirmed Medium in gameplay review (30 October 2026)."
+    },
+    {
+      "page": "Money making guide/Killing Vindicta",
+      "version": "High Level",
+      "difficulty": "Medium",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Introductory stage. (GWD2)."
+    },
+    {
+      "page": "Money making guide/Killing Vindicta",
+      "version": "Low Level",
+      "difficulty": "Medium",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Introductory stage. (GWD2)."
+    },
+    {
+      "page": "Money making guide/Killing Vindicta",
+      "version": "Mid Level",
+      "difficulty": "Medium",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Introductory stage. (GWD2)."
+    },
+    {
+      "page": "Money making guide/Killing Vorago",
+      "version": "Duo",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME has full guides per rotation."
+    },
+    {
+      "page": "Money making guide/Killing Vorago",
+      "version": "Solo",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME has full guides per rotation."
+    },
+    {
+      "page": "Money making guide/Killing Vorago",
+      "version": "Trio",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage. PvME has full guides per rotation."
+    },
+    {
+      "page": "Money making guide/Killing Zamorak, Lord of Chaos",
+      "version": "100 enrage",
+      "difficulty": "Elite",
+      "basis": "gameplay-review",
+      "evidence": "Not on the path; a low enrage. Gameplay review (30 October 2026): Elite, not the drafted Hard."
+    },
+    {
+      "page": "Money making guide/Killing Zamorak, Lord of Chaos",
+      "version": "1000 enrage",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage."
+    },
+    {
+      "page": "Money making guide/Killing Zamorak, Lord of Chaos",
+      "version": "2000 enrage",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage."
+    },
+    {
+      "page": "Money making guide/Killing Zamorak, Lord of Chaos",
+      "version": "300 enrage",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage."
+    },
+    {
+      "page": "Money making guide/Killing Zamorak, Lord of Chaos",
+      "version": "50 enrage",
+      "difficulty": "Elite",
+      "basis": "gameplay-review",
+      "evidence": "Not on the path; the lowest enrage listed. Gameplay review (30 October 2026): Elite, not the drafted Hard."
+    },
+    {
+      "page": "Money making guide/Killing Zamorak, Lord of Chaos",
+      "version": "500 enrage",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Not on PvME's Bossing Path, which leaves it to \"Next steps\" after the Advanced stage."
+    },
+    {
+      "page": "Money making guide/Killing Zemouregal & Vorkath",
+      "version": "Hard Mode w/ Flight Skip",
+      "difficulty": "Hard",
+      "basis": "pvme-guide",
+      "evidence": "Not on the path. PvME has a \"Low effort\" guide for hard mode."
+    },
+    {
+      "page": "Money making guide/Killing Zemouregal & Vorkath",
+      "version": "Hard Mode, Magic",
+      "difficulty": "Hard",
+      "basis": "pvme-guide",
+      "evidence": "Not on the path. PvME has a \"Low effort\" guide for hard mode."
+    },
+    {
+      "page": "Money making guide/Killing Zemouregal & Vorkath",
+      "version": "Hard Mode, Necromancy",
+      "difficulty": "Hard",
+      "basis": "pvme-guide",
+      "evidence": "Not on the path. PvME has a \"Low effort\" guide for hard mode."
+    },
+    {
+      "page": "Money making guide/Killing Zemouregal & Vorkath",
+      "version": "Normal Mode",
+      "difficulty": "Hard",
+      "basis": "gameplay-review",
+      "evidence": "Not on the path; PvME's low-effort guide is for hard mode, so normal mode sits below it. Gameplay review (30 October 2026): Hard, not the drafted Medium."
+    },
+    {
+      "page": "Money making guide/Killing aberrant spectres",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing abyssal beasts",
+      "version": "Low requirements",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing abyssal beasts",
+      "version": "Magic",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing abyssal beasts",
+      "version": "Melee",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing abyssal beasts",
+      "version": "Necromancy",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing abyssal demons",
+      "version": "Magic",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method. PvME: \"a great option for lower level players\"."
+    },
+    {
+      "page": "Money making guide/Killing abyssal demons",
+      "version": "Melee",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method. PvME: \"a great option for lower level players\"."
+    },
+    {
+      "page": "Money making guide/Killing abyssal demons",
+      "version": "Melee with Death Note Relic",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method. PvME: \"a great option for lower level players\"."
+    },
+    {
+      "page": "Money making guide/Killing abyssal demons",
+      "version": "Necromancy",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method. PvME: \"a great option for lower level players\"."
+    },
+    {
+      "page": "Money making guide/Killing abyssal lords",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing abyssal savages",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing acheron mammoths",
+      "version": "",
+      "difficulty": "Medium",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide: a raptor creature with mechanics \"more dangerous than normal mobs\". PvME: \"no completely safe method to AFK\"."
+    },
+    {
+      "page": "Money making guide/Killing adamant dragons",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME's metal dragons guide offers AFK methods."
+    },
+    {
+      "page": "Money making guide/Killing adolescent white wolves",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing airut",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing arhats",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing automaton guardians",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing aviansie",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing basilisks",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing black dragons",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing black unicorns",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing blood reavers",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "pvme-guide",
+      "evidence": "PvME has an AFK Blood Reavers guide."
+    },
+    {
+      "page": "Money making guide/Killing blue dragons",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing capsarii",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide; a regular creature with no special mechanics listed."
+    },
+    {
+      "page": "Money making guide/Killing cave horrors",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing cave slime",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing celestial dragons",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing chickens",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing corpse spiders",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing corrupted scarabs",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing corrupted scorpions",
+      "version": "Off Slayer task",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing corrupted scorpions",
+      "version": "On Slayer task",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing cows",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing crystal shapeshifters",
+      "version": "",
+      "difficulty": "Medium",
+      "basis": "gameplay-review",
+      "evidence": "PvME Slayer guide; active methods only. Gameplay review (30 October 2026): Medium, not the drafted Easy."
+    },
+    {
+      "page": "Money making guide/Killing dark beasts",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing edimmu",
+      "version": "Ranged",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing elite profane scabarites (AFK)",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing exiled kalphite paragons",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing frost dragons",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing fungal magi",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing ganodermic beasts",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing gelatinous abominations",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing glacytes",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME's glacors guide; glacytes are the Arch-Glacor's minions."
+    },
+    {
+      "page": "Money making guide/Killing gladii",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing green dragons",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing grifolapines",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing guards",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing hellhounds",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing kal'gerion demons",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing lava strykewyrms",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide: \"substantially safer\" since the Wilderness update."
+    },
+    {
+      "page": "Money making guide/Killing legiones to make ascension crossbows",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing liverworts",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME's Lost Grove creatures guide offers AFK methods."
+    },
+    {
+      "page": "Money making guide/Killing luminous snagglers",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing mature grotworms",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing mithril dragons",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME's metal dragons guide offers AFK methods."
+    },
+    {
+      "page": "Money making guide/Killing moss golems",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME's Lost Grove creatures guide offers AFK methods."
+    },
+    {
+      "page": "Money making guide/Killing moss golems (On Task)",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME's Lost Grove creatures guide offers AFK methods."
+    },
+    {
+      "page": "Money making guide/Killing muspah",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing nechryael",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing nightmares",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing pyrefiends",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing rabbits",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing ravenous ghouls",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing red dragons",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing revenants",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers a low-effort method. In the Wilderness, so other players are a risk the rating doesn't cover."
+    },
+    {
+      "page": "Money making guide/Killing ripper demons",
+      "version": "",
+      "difficulty": "Medium",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide: a raptor creature with mechanics \"more dangerous than normal mobs\"."
+    },
+    {
+      "page": "Money making guide/Killing rorarii",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing rune dragons",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME's metal dragons guide offers AFK methods."
+    },
+    {
+      "page": "Money making guide/Killing salawa akhs",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing seekers",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing skeletal wyverns",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing spellwisps",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing spiritual mages",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing spiritual warriors",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide; a regular creature with no special mechanics listed."
+    },
+    {
+      "page": "Money making guide/Killing steel dragons",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME's metal dragons guide offers AFK methods."
+    },
+    {
+      "page": "Money making guide/Killing the Arch-Glacor",
+      "version": "Hard Mode 0 percent enrage claims",
+      "difficulty": "Medium",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Introductory stage. A hard mode kill is one of its milestones."
+    },
+    {
+      "page": "Money making guide/Killing the Arch-Glacor",
+      "version": "Hard Mode 1000 percent enrage claims",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Far past PvME's advanced milestone (25 killstreak or 250% enrage)."
+    },
+    {
+      "page": "Money making guide/Killing the Arch-Glacor",
+      "version": "Hard Mode 200 killstreak",
+      "difficulty": "Elite",
+      "basis": "bossing-path",
+      "evidence": "Far past PvME's advanced milestone (25 killstreak or 250% enrage)."
+    },
+    {
+      "page": "Money making guide/Killing the Arch-Glacor",
+      "version": "Hard Mode streaking",
+      "difficulty": "Hard",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: a 25 killstreak or 250% enrage is an \"Advanced milestone\"."
+    },
+    {
+      "page": "Money making guide/Killing the Arch-Glacor",
+      "version": "Normal Mode, AFK with 1 mechanic",
+      "difficulty": "Easy",
+      "basis": "pvme-guide",
+      "evidence": "PvME has an AFK Arch-Glacor guide; normal mode with mechanics off is where the path starts."
+    },
+    {
+      "page": "Money making guide/Killing the Corporeal Beast",
+      "version": "AFK Necromancy",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing the Corporeal Beast",
+      "version": "Melee",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing the Giant Mimic",
+      "version": "Beginner",
+      "difficulty": "Easy",
+      "basis": "encounter-setting",
+      "evidence": "The Giant Mimic's own difficulty setting."
+    },
+    {
+      "page": "Money making guide/Killing the Giant Mimic",
+      "version": "Elite",
+      "difficulty": "Elite",
+      "basis": "encounter-setting",
+      "evidence": "The Giant Mimic's own difficulty setting."
+    },
+    {
+      "page": "Money making guide/Killing the Giant Mimic",
+      "version": "Hard",
+      "difficulty": "Hard",
+      "basis": "encounter-setting",
+      "evidence": "The Giant Mimic's own difficulty setting."
+    },
+    {
+      "page": "Money making guide/Killing the Giant Mimic",
+      "version": "Medium",
+      "difficulty": "Medium",
+      "basis": "encounter-setting",
+      "evidence": "The Giant Mimic's own difficulty setting."
+    },
+    {
+      "page": "Money making guide/Killing the Giant Mole (Free-to-play, Hard Mode)",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing the Kalphite King",
+      "version": "Duo",
+      "difficulty": "Hard",
+      "basis": "judgement",
+      "evidence": "Not on the path; PvME's AFK King guide is archived. Solo and duo both need sustained damage. Confirmed Hard in gameplay review (30 October 2026)."
+    },
+    {
+      "page": "Money making guide/Killing the Kalphite King",
+      "version": "Solo",
+      "difficulty": "Hard",
+      "basis": "judgement",
+      "evidence": "Not on the path; PvME's AFK King guide is archived. Solo and duo both need sustained damage. Confirmed Hard in gameplay review (30 October 2026)."
+    },
+    {
+      "page": "Money making guide/Killing the King Black Dragon",
+      "version": "free-to-play",
+      "difficulty": "Easy",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: \"Bosses with Limited Learning Opportunities\" (its easiest group)."
+    },
+    {
+      "page": "Money making guide/Killing the Magister",
+      "version": "",
+      "difficulty": "Medium",
+      "basis": "gameplay-review",
+      "evidence": "PvME Bossing Path lists it among \"Bosses with Limited Learning Opportunities\", which says it teaches little, not that it's easy. PvME's guide for it is \"Low effort\" rather than AFK (the label it gives Raksha, Rasial and Vorkath hard mode), it needs 115 Slayer, and it hits hard. Gameplay review (30 October 2026): Medium, not the drafted Easy."
+    },
+    {
+      "page": "Money making guide/Killing the Queen Black Dragon",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "judgement",
+      "evidence": "Not on the path or in PvME; an older boss the Wiki lists as mid-level combat. Confirmed Easy in gameplay review (30 October 2026)."
+    },
+    {
+      "page": "Money making guide/Killing the Twin Furies",
+      "version": "High Level",
+      "difficulty": "Medium",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Introductory stage. (GWD2)."
+    },
+    {
+      "page": "Money making guide/Killing the Twin Furies",
+      "version": "Mid Level",
+      "difficulty": "Medium",
+      "basis": "bossing-path",
+      "evidence": "PvME Bossing Path: Introductory stage. (GWD2)."
+    },
+    {
+      "page": "Money making guide/Killing tormented demons",
+      "version": "",
+      "difficulty": "Medium",
+      "basis": "gameplay-review",
+      "evidence": "PvME Slayer guide; active methods only. Gameplay review (30 October 2026): Medium, not the drafted Easy."
+    },
+    {
+      "page": "Money making guide/Killing tortoises",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing unicows",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing unspeakable horrors",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing vinecrawlers",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME's Lost Grove creatures guide offers AFK methods."
+    },
+    {
+      "page": "Money making guide/Killing vyrelords and vyreladies",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide offers an AFK method."
+    },
+    {
+      "page": "Money making guide/Killing warped bats",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing warped tortoises",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Killing wyverns",
+      "version": "",
+      "difficulty": "Medium",
+      "basis": "slayer-guide",
+      "evidence": "PvME Slayer guide: a raptor creature with mechanics \"more dangerous than normal mobs\". PvME: \"highly damaging attacks\"."
+    },
+    {
+      "page": "Money making guide/Making sacred oil",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    },
+    {
+      "page": "Money making guide/Scavenging",
+      "version": "",
+      "difficulty": "Easy",
+      "basis": "regular-creature",
+      "evidence": "Regular creature: no boss mechanics. PvME has no guide for it."
+    }
+  ]
+}

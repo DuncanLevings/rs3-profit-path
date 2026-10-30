@@ -101,3 +101,15 @@ reasons are retained in catalogue-source/research/access-requirements.json.
 Tier 1-59 weapon, shield and body-armour records were added from the Wiki
 infobox_bonuses and infobox_item buckets using the identified, paced API client.
 Unresolved Mindspike/Tower mindspike IDs do not establish negative ownership.
+
+PvM difficulty ratings (2026-10-30):
+PvM Encyclopedia (PvME) guide contributors, https://pvme.io/
+https://github.com/pvme/pvme-guides at commit aa2f5ccf0ed92f926b45420ae352d9ff0ffc5876
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+Profit Path's Easy/Medium/Hard/Elite rating for each PvM method draws on PvME's
+Bossing Path stages, its Slayer guides (whether they offer AFK methods or warn of
+dangerous mechanics) and which bosses have AFK or low-effort guides. No PvME guide
+text is bundled; each rating's short evidence note is in
+catalogue-source/research/difficulty.json. Ratings marked for review are
+Profit Path's own judgement calls.

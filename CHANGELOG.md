@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.15-dev - 2026-10-30
+
+- Groundwork for "Don't recommend", which will be on Recommend for me's suggestions: a per-profile list of methods to skip. A listed method stays in Browse and Favourites, where its row reads "Not recommended" with an eye to recommend it again.
+- New My account sidebar section, without the search and filters: the character and profile your settings belong to, and every method that isn't recommended, with Recommend again.
+- Every PvM method now has a difficulty (Easy, Medium, Hard or Elite), researched from PvME's Bossing Path and Slayer guides, so the Difficulty filter works and Browse rows show it. The 22 judgement calls were checked in a gameplay review.
+
 ## 0.8.14-dev - 2026-10-30
 
 - Hovering an either-or or all-of requirement line that isn't met says what each part reads as, e.g. "Either one will do. Mobile: can't be checked in game. Shadow's Grace: not unlocked yet." A line like "Mobile or Shadow's Grace" stays neutral rather than red when the relic isn't unlocked, because the Mobile perk can't be checked; the hover now says so. The label is made again only when that text changes, at most four lines in any method.

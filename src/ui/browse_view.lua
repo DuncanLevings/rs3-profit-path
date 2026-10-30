@@ -130,10 +130,15 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
     local heading
     local sectionButtons, categoryButtons = {}, {}
     local renderResults
+    local buildHeader, dropHeader
 
     -- release() functions for pending callbacks (the dropdowns' and the search
     -- box's), so nothing fires after the screen is gone.
     local dropdownReleases = {}
+
+    -- The same for the header's dropdowns alone, so My account can drop the
+    -- header without closing the whole screen.
+    local headerReleases = {}
 
     -- Ticks since the last keystroke while a search is waiting; nil when not.
     local searchQuietTicks
@@ -181,6 +186,10 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
             release()
         end
 
+        for _, release in ipairs(headerReleases) do
+            release()
+        end
+
         -- Keep the list's scroll position, so a rebuild (e.g. after the window is
         -- resized) lands where the player was.
         if results then
@@ -198,12 +207,85 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         end
     end
 
+    -- My account: who the settings belong to, and the methods kept out of
+    -- Recommend for me, each with Recommend again. `rowAction` guards the buttons the same
+    -- way as the method rows. My account has no search or filters.
+    local function drawAccount(rowAction)
+        local fitter = Style.panelFitter(results, 10)
+
+        results:AddTitle({ text = "My account", colour = Style.gold, height = 32 })
+        results:AddTitle({ text = "Profile", height = 30, marginTop = 8 })
+
+        -- Settings follow the character's name; no tracking ID is read.
+        local profile = browser:profileInfo()
+        local who = profile.character
+            and ("Signed in as " .. profile.character .. ". ")
+            or "No character is signed in yet. "
+
+        results:AddText({
+            text = who .. "Rates, favourites and hidden methods are saved under the profile \""
+                .. (profile.profile or "Default") .. "\".",
+            colour = Style.muted,
+        })
+
+        if browser.message then
+            results:AddText({ text = browser.message, colour = Style.bad })
+        end
+
+        local hidden = browser:hiddenMethods()
+
+        results:AddTitle({ text = "Not recommended", height = 30, marginTop = 12 })
+        results:AddText({
+            text = #hidden == 0
+                and "Nothing here. \"Don't recommend\" on a recommendation keeps that method out of Recommend for me."
+                or "Recommend for me skips these. They still show in Browse and Favourites.",
+            colour = Style.muted,
+        })
+
+        -- The button fits its measured label, so the client's font never clips it.
+        local restoreWidth = math.ceil(Style.textWidth("Recommend again")) + 40
+
+        for _, entry in ipairs(hidden) do
+            local method = entry.method
+            local row = fitter:add(results:AddPanel({ height = 44, scrollable = false, marginBottom = 4 }), 44)
+
+            Style.rectangle(row, {
+                x = 0, y = 0, width = 0, height = 0, widthAnchor = 1, heightAnchor = 1,
+                colour = ROW_FILL,
+            })
+
+            -- A saved ID this version of the plugin doesn't have still gets a row,
+            -- so it can always be restored.
+            local text = method
+                and (method.title .. (method.variant and " - " .. method.variant or ""))
+                or (entry.id .. " (not in this version)")
+
+            row:AddText({
+                text = text, x = ROW_INSET, y = 8, width = -(ROW_INSET + restoreWidth + 20), widthAnchor = 1, height = 28,
+                maxLines = 1, colour = method and (Style.categories[method.category] or Style.text) or Style.muted,
+            })
+
+            row:AddSimpleButton("Recommend again", rowAction(function()
+                browser.scroll = results.scrollY
+                browser:setHidden(entry.id, false)
+                renderResults()
+            end), { x = -(restoreWidth + 10), xAnchor = 1, y = 8, width = restoreWidth, height = 28 })
+        end
+
+        fitter:fit()
+        results:SetScrollPosition(browser.scroll)
+    end
+
     -- These are interface units, not physical pixels. The right column stretches
     -- with the window; the narrow sidebar and header stay separate from list scroll.
     local function drawResults()
         local generation = rowGeneration
+
+        -- My account has no header, so it takes the whole column.
+        local top = browser.section == "account" and 0 or resultsY
+
         results = library.SimpleView.new(view.content, {
-            x = 190, y = resultsY, width = -190, height = -resultsY,
+            x = 190, y = top, width = -190, height = -top,
             widthAnchor = 1, heightAnchor = 1, scrollable = true,
             layout = { startY = 8, padding = 10, rowGap = 8 },
         })
@@ -232,7 +314,9 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         local fitter = Style.panelFitter(results, 10)
         local headings = {}
 
-        heading.content = browser.section == "favourites" and "Favourites" or "Browse methods"
+        if heading then
+            heading.content = browser.section == "favourites" and "Favourites" or "Browse methods"
+        end
 
         -- Only the active entry gets the gold native toggle treatment. Keep the
         -- section and category groups independent: both are filters at once.
@@ -242,6 +326,12 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
 
         for category, button in pairs(categoryButtons) do
             button:SetActive(browser.category == category)
+        end
+
+        -- My account isn't a list of methods, so it draws its own page.
+        if browser.section == "account" then
+            drawAccount(rowAction)
+            return
         end
 
         results:AddText({
@@ -353,6 +443,12 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
                 activity = activity .. "  /  Difficulty: " .. method.difficulty
             end
 
+            local isHidden = browser.hidden[method.id] == true
+
+            if isHidden then
+                activity = activity .. "  /  Not recommended"
+            end
+
             row:AddText({
                 text = activity,
                 x = ROW_INSET, y = 62, width = -108, widthAnchor = 1, height = 24, colour = Style.muted,
@@ -362,6 +458,20 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
                 browser.scroll = results.scrollY
                 openMethod(method)
             end), { x = -38, xAnchor = 1, y = 62, size = 24, tooltip = "View method" })
+
+            -- A method kept out of Recommend for me gets a dimmed eye, which puts
+            -- it back. Other rows get nothing: an eye on every row would read as
+            -- "hide this row", and "Don't recommend" belongs on recommendations.
+            if isHidden then
+                row:AddSpriteButton("EYE", rowAction(function()
+                    browser.scroll = results.scrollY
+                    browser:setHidden(method.id, false)
+                    renderResults()
+                end), {
+                    x = -68, xAnchor = 1, y = 62, size = 24, toggleable = true, disabled = true,
+                    tooltip = "Not recommended - click to recommend again",
+                })
+            end
 
             -- The star toggle: lit when it's a favourite. "disabled" here is
             -- PrettyUI's unlit toggle state; the button can still be clicked.
@@ -484,15 +594,32 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
             layout = { startY = 10, padding = 8, rowGap = 8 },
         })
 
+        -- Switches the sidebar section. Only a move into or out of My account
+        -- touches the header; Browse <-> Favourites keeps it (and the search text).
+        local function showSection(section)
+            local wasAccount = browser.section == "account"
+            browser.section = section
+
+            if section == "account" and not wasAccount then
+                dropHeader()
+            elseif section ~= "account" and wasAccount then
+                buildHeader()
+            end
+
+            filterChanged()
+        end
+
         sidebar:AddText({ text = "FIND A METHOD", colour = Style.muted, height = 26 })
         sectionButtons.browse = sidebar:AddSimpleButton("Browse", guarded(function()
-            browser.section = "browse"
-            filterChanged()
+            showSection("browse")
         end), { width = 158, height = 32 })
 
         sectionButtons.favourites = sidebar:AddSimpleButton("Favourites", guarded(function()
-            browser.section = "favourites"
-            filterChanged()
+            showSection("favourites")
+        end), { width = 158, height = 32 })
+
+        sectionButtons.account = sidebar:AddSimpleButton("My account", guarded(function()
+            showSection("account")
         end), { width = 158, height = 32 })
 
         sidebar:AddText({ text = "ACTIVITIES", colour = Style.muted, marginTop = 18, height = 26 })
@@ -500,121 +627,150 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         for _, category in ipairs(categories) do
             categoryButtons[category.id] = sidebar:AddSimpleButton(category.label, guarded(function()
                 browser.category = category.id
-                filterChanged()
+
+                -- An activity is a list filter, so from My account it opens Browse.
+                if browser.section == "account" then
+                    showSection("browse")
+                else
+                    filterChanged()
+                end
             end), { width = 158, height = 32, colour = Style.categories[category.id] or Style.text })
         end
 
-        header = library.SimpleView.new(view.content, {
-            x = 190, y = 0, width = -190, height = headerHeight, widthAnchor = 1, scrollable = false,
-        })
-
-        heading = header:AddTitle({ text = "Browse methods", x = 10, y = 4, height = 32, colour = Style.gold })
-        header:AddTextField({
-            text = browser.search, placeholder = "Search methods", maxLength = 100,
-            x = 10, y = 44, width = -20, widthAnchor = 1, height = 30,
-            onChange = guarded(function(_, _, text)
-                browser.search = text
-                searchTyped()
-            end),
-
-            -- Enter doesn't wait for the pause.
-            onSubmit = guarded(function(_, text)
-                browser.search = text
-                stopSearchWait()
-                filterChanged()
-            end),
-        })
-
-        -- Small captions over the dropdowns, in the same muted capitals as the
-        -- sidebar headings: one "Sort by" over the sort pair, one per filter.
-        header:AddText({ text = "SORT BY", x = slotX(0), y = captionY(0), width = DROPDOWN_STEP * 2, height = 22, colour = Style.muted })
-        header:AddText({ text = "DIFFICULTY", x = slotX(2), y = captionY(2), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
-        header:AddText({ text = "INTENSITY", x = slotX(3), y = captionY(3), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
-
-        header:AddText({ text = "REQUIREMENTS", x = slotX(4), y = captionY(4), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
-
-        -- A divider separates sorting from filtering when they share a row.
-        if not wrapFilters then
-            local dividerX = slotX(1) + DROPDOWN_WIDTH + math.floor((slotX(2) - slotX(1) - DROPDOWN_WIDTH) / 2) - 1
-            Style.rectangle(header, { x = dividerX, y = captionY(0), width = 2, height = 54, colour = 0x655638FF })
-        end
-
-        -- One dropdown in the row. `slot` is its place in the row (0 = leftmost);
-        -- dropdown.lua handles the client's selection quirks.
-        local function dropdown(entries, selectedID, slot, changed)
-            local control, release = Dropdown.new(header.content, {
-                x = slotX(slot),
-                y = dropdownY(slot),
-                width = DROPDOWN_WIDTH,
-                entries = entries,
-                selected = selectedID,
-                owner = "profit-path-dropdown-" .. slot,
-                guarded = guarded,
-                onChange = changed,
-                isClosed = function()
-                    return closed
-                end,
+        -- The header: heading, search box, sort and filter dropdowns. My account
+        -- has no use for any of it, so it's built only for the method lists, and
+        -- dropped (with the dropdowns' pending callbacks) on the way into My account.
+        buildHeader = function()
+            header = library.SimpleView.new(view.content, {
+                x = 190, y = 0, width = -190, height = headerHeight, widthAnchor = 1, scrollable = false,
             })
 
-            dropdownReleases[#dropdownReleases + 1] = release
+            heading = header:AddTitle({ text = "Browse methods", x = 10, y = 4, height = 32, colour = Style.gold })
+            header:AddTextField({
+                text = browser.search, placeholder = "Search methods", maxLength = 100,
+                x = 10, y = 44, width = -20, widthAnchor = 1, height = 30,
+                onChange = guarded(function(_, _, text)
+                    browser.search = text
+                    searchTyped()
+                end),
 
-            return control
+                -- Enter doesn't wait for the pause.
+                onSubmit = guarded(function(_, text)
+                    browser.search = text
+                    stopSearchWait()
+                    filterChanged()
+                end),
+            })
+
+            -- Small captions over the dropdowns, in the same muted capitals as the
+            -- sidebar headings: one "Sort by" over the sort pair, one per filter.
+            header:AddText({ text = "SORT BY", x = slotX(0), y = captionY(0), width = DROPDOWN_STEP * 2, height = 22, colour = Style.muted })
+            header:AddText({ text = "DIFFICULTY", x = slotX(2), y = captionY(2), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
+            header:AddText({ text = "INTENSITY", x = slotX(3), y = captionY(3), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
+
+            header:AddText({ text = "REQUIREMENTS", x = slotX(4), y = captionY(4), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
+
+            -- A divider separates sorting from filtering when they share a row.
+            if not wrapFilters then
+                local dividerX = slotX(1) + DROPDOWN_WIDTH + math.floor((slotX(2) - slotX(1) - DROPDOWN_WIDTH) / 2) - 1
+                Style.rectangle(header, { x = dividerX, y = captionY(0), width = 2, height = 54, colour = 0x655638FF })
+            end
+
+            -- One dropdown in the row. `slot` is its place in the row (0 = leftmost);
+            -- dropdown.lua handles the client's selection quirks.
+            local function dropdown(entries, selectedID, slot, changed)
+                local control, release = Dropdown.new(header.content, {
+                    x = slotX(slot),
+                    y = dropdownY(slot),
+                    width = DROPDOWN_WIDTH,
+                    entries = entries,
+                    selected = selectedID,
+                    owner = "profit-path-dropdown-" .. slot,
+                    guarded = guarded,
+                    onChange = changed,
+                    isClosed = function()
+                        return closed
+                    end,
+                })
+
+                headerReleases[#headerReleases + 1] = release
+
+                return control
+            end
+
+            -- Restoring a failed save can emit another native event. Compare against
+            -- the selected model first so that notification cannot save in a loop.
+            sortControl = dropdown(sortEntries, sortIDs[browser.sort], 0, function(selectedID)
+                if selectedID == sortIDs[browser.sort] or not sortNames[selectedID] then
+                    return
+                end
+
+                if not browser:setSort(sortNames[selectedID], browser.descending) then
+                    sortControl:SetEntrySelected(sortIDs[browser.sort], true)
+                end
+
+                renderResults()
+            end)
+
+            directionControl = dropdown(directionEntries, directionID(browser.descending), 1, function(selectedID)
+                if selectedID == directionID(browser.descending) then
+                    return
+                end
+
+                if not browser:setSort(browser.sort, selectedID == directionID(true)) then
+                    directionControl:SetEntrySelected(directionID(browser.descending), true)
+                end
+
+                renderResults()
+            end)
+
+            -- Filters aren't saved, so there's no failed write to undo here: just
+            -- remember the choice and redraw from the top.
+            dropdown(difficultyEntries, entryFor(difficultyValues, browser.difficulty), 2, function(selectedID)
+                local value = difficultyValues[selectedID]
+
+                if value and value ~= browser.difficulty then
+                    browser.difficulty = value
+                    filterChanged()
+                end
+            end)
+
+            dropdown(intensityEntries, entryFor(intensityValues, browser.intensity), 3, function(selectedID)
+                local value = intensityValues[selectedID]
+
+                if value and value ~= browser.intensity then
+                    browser.intensity = value
+                    filterChanged()
+                end
+            end)
+
+            dropdown(readinessEntries, entryFor(readinessValues, browser.availability), 4, function(selectedID)
+                local value = readinessValues[selectedID]
+
+                if value and value ~= browser.availability then
+                    browser.availability = value
+                    filterChanged()
+                end
+            end)
         end
 
-        -- Restoring a failed save can emit another native event. Compare against
-        -- the selected model first so that notification cannot save in a loop.
-        sortControl = dropdown(sortEntries, sortIDs[browser.sort], 0, function(selectedID)
-            if selectedID == sortIDs[browser.sort] or not sortNames[selectedID] then
-                return
+        dropHeader = function()
+            for _, release in ipairs(headerReleases) do
+                release()
             end
 
-            if not browser:setSort(sortNames[selectedID], browser.descending) then
-                sortControl:SetEntrySelected(sortIDs[browser.sort], true)
+            headerReleases = {}
+            stopSearchWait()
+
+            if header then
+                header:Destroy()
+                header, heading = nil, nil
             end
+        end
 
-            renderResults()
-        end)
-
-        directionControl = dropdown(directionEntries, directionID(browser.descending), 1, function(selectedID)
-            if selectedID == directionID(browser.descending) then
-                return
-            end
-
-            if not browser:setSort(browser.sort, selectedID == directionID(true)) then
-                directionControl:SetEntrySelected(directionID(browser.descending), true)
-            end
-
-            renderResults()
-        end)
-
-        -- Filters aren't saved, so there's no failed write to undo here: just
-        -- remember the choice and redraw from the top.
-        dropdown(difficultyEntries, entryFor(difficultyValues, browser.difficulty), 2, function(selectedID)
-            local value = difficultyValues[selectedID]
-
-            if value and value ~= browser.difficulty then
-                browser.difficulty = value
-                filterChanged()
-            end
-        end)
-
-        dropdown(intensityEntries, entryFor(intensityValues, browser.intensity), 3, function(selectedID)
-            local value = intensityValues[selectedID]
-
-            if value and value ~= browser.intensity then
-                browser.intensity = value
-                filterChanged()
-            end
-        end)
-
-        dropdown(readinessEntries, entryFor(readinessValues, browser.availability), 4, function(selectedID)
-            local value = readinessValues[selectedID]
-
-            if value and value ~= browser.availability then
-                browser.availability = value
-                filterChanged()
-            end
-        end)
+        if browser.section ~= "account" then
+            buildHeader()
+        end
 
         renderResults()
     end)
@@ -624,7 +780,17 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         error(failure, 0)
     end
 
-    return destroy, renderResults
+    -- The workbench's refresh, after account reads: redraw in place, keeping the
+    -- player's scroll position (unlike a filter change, which starts at the top).
+    local function refresh()
+        if results then
+            browser.scroll = results.scrollY
+        end
+
+        renderResults()
+    end
+
+    return destroy, refresh
 end
 
 return BrowseView

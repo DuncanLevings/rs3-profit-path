@@ -495,8 +495,14 @@ local function pretty()
                 self.active = active
             end
 
-            -- SetText updates the surface's lookup, not a field on the button.
+            -- A destroyed button leaves the surface's lookup.
             local owner = self
+            function button:Destroy()
+                self.destroyed = true
+                owner.buttons[text] = nil
+            end
+
+            -- SetText updates the surface's lookup, not a field on the button.
             button.SetText = function(_, replacement)
                 owner.buttons[text] = nil
                 owner.buttons[replacement] = callback
@@ -514,6 +520,9 @@ local function pretty()
         function view:AddSpriteButton(sprite, callback, options)
             local button = self:AddSimpleButton(options.tooltip, callback, options)
             button.sprite = sprite
+
+            -- A toggle's starting state ("disabled" is PrettyUI's unlit look).
+            button.disabled = options.disabled == true
 
             function button:SetDisabled(disabled)
                 self.disabled = disabled
@@ -1465,7 +1474,9 @@ test("failed UI construction destroys the partial view and reports failure", fun
     local library = pretty()
     library.failTitle = true
 
-    local screen = UI.new(library, account)
+    -- Browse checks which section it's on before it draws anything, so it gets
+    -- just enough of a browser to reach the failing title.
+    local screen = UI.new(library, account, nil, { section = "browse" })
 
     local ok, failure = pcall(function()
         screen:mount({ width = 700, height = 500 })

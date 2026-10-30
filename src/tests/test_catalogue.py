@@ -544,6 +544,10 @@ class MethodTests(unittest.TestCase):
         # a bad method (an ID with spaces). It must fail without touching either output.
         page = short_page()
         page["versions"][0]["id"] = "Not a valid ID"
+
+        # Skilling, so the PvM difficulty research (none for this fixture) isn't
+        # what stops the build first.
+        page["category"], page["source_category"] = "skilling", "Gathering"
         short = {"schema": 2, "items": {"42": {"name": "Fixture item"}}, "pages": [page]}
 
         # Use a known writable workspace parent; Windows sandbox temp can be read-only.

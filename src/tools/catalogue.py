@@ -982,6 +982,11 @@ def validate_methods(source, monsters, recipes=None):
         if "variant" in method:
             require_text(method["variant"], "Method variant")
 
+        # Only PvM methods are rated (see catalogue-source/research/difficulty.json).
+        if "difficulty" in method:
+            if method["difficulty"] not in {"Easy", "Medium", "Hard", "Elite"} or method.get("category") != "pvm":
+                raise ValueError(f"{method_id}: difficulty is one of Easy/Medium/Hard/Elite, on PvM methods only")
+
         require_text_list(method.get("instructions"), "Method instructions")
 
         location = require_record(method.get("location"), "Method location")

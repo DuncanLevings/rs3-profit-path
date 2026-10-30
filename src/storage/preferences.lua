@@ -1,5 +1,5 @@
--- Everything Profit Path saves: personal rates, favourites, which character uses
--- which profile, and the browser's sort choice.
+-- Everything Profit Path saves: personal rates, favourites, methods hidden from
+-- recommendations, which character uses which profile, and the browser's sort choice.
 --
 -- How profiles work: PersistentDB is shared by every character on this computer,
 -- so saved rates and favourites live under a "profile". When a window opens we
@@ -16,6 +16,7 @@ local PROFILE_KEY = "profit-path.profile.v1"
 local BROWSER_KEY = "profit-path.browser.v1"
 local CHARACTERS_KEY = "profit-path.characters.v1"
 local FAVOURITES_KEY = "profit-path.favourites.v1"
+local HIDDEN_KEY = "profit-path.hidden.v1"
 
 -- Difficulty and intensity used to be sorts too; they're filters now, so an old
 -- saved "difficulty"/"intensity" sort just falls back to the profit default.
@@ -84,9 +85,76 @@ function Preferences.new(db)
             .. "/" .. method.id .. "/" .. method.income.rate.key
     end
 
-    -- The current profile's favourites list, e.g. "profit-path.favourites.v1/7:Default".
-    local function favouritesKey()
-        return FAVOURITES_KEY .. "/" .. #self.profile .. ":" .. self.profile
+    -- A per-profile key, e.g. "profit-path.favourites.v1/7:Default".
+    local function profileKey(base)
+        return base .. "/" .. #self.profile .. ":" .. self.profile
+    end
+
+    -- Favourites and hidden methods are both just a set of method IDs, saved as
+    -- { schema = 1, ids = { [id] = true } }. These two helpers load and save one.
+    -- `what` names the list in messages ("Favourites", "Hidden methods").
+    --
+    -- Loading keeps valid IDs even if they aren't in this bundle, so an update
+    -- won't erase choices. It returns ids, warning, writable. `writable` is false
+    -- when what's stored couldn't be read or understood; saving then refuses to
+    -- write, so a glitch can never replace a real list with an empty one.
+    local function loadIds(base, what)
+        local key = profileKey(base)
+
+        local success, stored, exists = pcall(function()
+            return db:GetStructuredData(key), db:CheckExists(key)
+        end)
+
+        if not success then
+            return {}, what .. " could not be loaded: " .. tostring(stored), false
+        end
+
+        if stored == nil and not exists then
+            return {}, nil, true
+        end
+
+        if type(stored) ~= "table" or stored.schema ~= 1 or type(stored.ids) ~= "table" then
+            return {}, "Saved " .. what:lower() .. " have an unsupported format; no changes were made.", false
+        end
+
+        local ids = {}
+        local invalid = false
+
+        for id, selected in pairs(stored.ids) do
+            if type(id) == "string" and id:match("^[a-z0-9][a-z0-9._-]*$") and selected == true then
+                ids[id] = true
+            else
+                invalid = true
+            end
+        end
+
+        if invalid then
+            return ids, "Some saved " .. what:lower() .. " were invalid; valid choices were kept.", true
+        end
+
+        return ids, nil, true
+    end
+
+    -- Re-reads before writing so a failed load can't accidentally replace the
+    -- player's saved list with an empty one. This touches no rates or sort keys.
+    local function saveId(base, what, id, selected)
+        local ids, warning, writable = loadIds(base, what)
+
+        if not writable then
+            return false, warning
+        end
+
+        ids[id] = selected or nil
+
+        local success, written = pcall(function()
+            return db:SetStructuredData(profileKey(base), { schema = 1, ids = ids })
+        end)
+
+        if not success or written ~= true then
+            return false, what .. " could not be saved: " .. tostring(written)
+        end
+
+        return true
     end
 
     -- Returns rate, isSaved, message. With nothing saved we quietly use the source
@@ -299,69 +367,26 @@ function Preferences.new(db)
         return true
     end
 
-    -- Read a profile's favourite IDs without needing a catalogue scan. Keep valid
-    -- IDs even if they aren't in this bundle, so an update won't erase choices.
-    --
-    -- Returns ids, warning, writable. `writable` is false when what's stored couldn't
-    -- be read or understood; saveFavourite then refuses to write, so a glitch can
-    -- never replace a real list with an empty one.
+    -- The current profile's favourite IDs, read without a catalogue scan.
+    -- Returns ids, warning, writable (see loadIds).
     function self:loadFavourites()
-        local key = favouritesKey()
-
-        local success, stored, exists = pcall(function()
-            return db:GetStructuredData(key), db:CheckExists(key)
-        end)
-
-        if not success then
-            return {}, "Favourites could not be loaded: " .. tostring(stored), false
-        end
-
-        if stored == nil and not exists then
-            return {}, nil, true
-        end
-
-        if type(stored) ~= "table" or stored.schema ~= 1 or type(stored.ids) ~= "table" then
-            return {}, "Saved favourites have an unsupported format; no changes were made.", false
-        end
-
-        local ids = {}
-        local invalid = false
-
-        for id, selected in pairs(stored.ids) do
-            if type(id) == "string" and id:match("^[a-z0-9][a-z0-9._-]*$") and selected == true then
-                ids[id] = true
-            else
-                invalid = true
-            end
-        end
-
-        if invalid then
-            return ids, "Some saved favourites were invalid; valid choices were kept.", true
-        end
-
-        return ids, nil, true
+        return loadIds(FAVOURITES_KEY, "Favourites")
     end
 
-    -- Re-read before writing so a failed load can't accidentally replace the
-    -- player's saved list with an empty one. This touches no rates or sort keys.
+    -- Adds (selected = true) or removes one favourite.
     function self:saveFavourite(id, selected)
-        local ids, warning, writable = self:loadFavourites()
+        return saveId(FAVOURITES_KEY, "Favourites", id, selected)
+    end
 
-        if not writable then
-            return false, warning
-        end
+    -- Methods this profile has hidden from recommendations. Hiding is for that
+    -- one method ID only: another version of the same method stays shown.
+    function self:loadHidden()
+        return loadIds(HIDDEN_KEY, "Hidden methods")
+    end
 
-        ids[id] = selected or nil
-
-        local success, written = pcall(function()
-            return db:SetStructuredData(favouritesKey(), { schema = 1, ids = ids })
-        end)
-
-        if not success or written ~= true then
-            return false, "Favourite could not be saved: " .. tostring(written)
-        end
-
-        return true
+    -- Hides (hidden = true) or restores one method.
+    function self:saveHidden(id, hidden)
+        return saveId(HIDDEN_KEY, "Hidden methods", id, hidden)
     end
 
     return self

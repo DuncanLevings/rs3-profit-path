@@ -285,6 +285,137 @@ return function(test, equal, client, pretty)
         end
     end)
 
+    -- Hidden methods are per profile, separate from favourites, and stay in every
+    -- list. My account lists them in title order, plus IDs this bundle lacks.
+    test("hidden methods are saved per profile and stay browsable", function()
+        local state = client()
+        local prefs = Preferences.new(PersistentDB)
+        local browser = Browser.new(methods(), prefs, function() end)
+
+        assert(browser:setHidden("z", true))
+        assert(browser:setHidden("a", true))
+        assert(prefs:saveHidden("future-method", true))
+        browser:loadFavourites()
+
+        -- Still in Browse, and favouriting is untouched.
+        equal(ids(browser:rows()), "b,a,z,unknown")
+        equal(next(browser.favourites), nil)
+
+        -- Title order ("Same" twice, so ID breaks the tie), unknown IDs last.
+        local listed = {}
+
+        for _, entry in ipairs(browser:hiddenMethods()) do
+            listed[#listed + 1] = entry.id .. (entry.method and "" or "?")
+        end
+
+        equal(table.concat(listed, ","), "a,z,future-method?")
+
+        -- Another character has its own (empty) list.
+        assert(prefs:bindCharacter("First"))
+        assert(prefs:bindCharacter("Other"))
+        browser:loadFavourites()
+        equal(next(browser.hidden), nil)
+
+        -- A failed write leaves the list as it was.
+        state.failWrite = true
+        equal(browser:setHidden("b", true), false)
+        equal(browser.hidden.b, nil)
+        assert(browser.message:find("could not be saved", 1, true), browser.message)
+
+        -- An unreadable list is never overwritten with an empty one.
+        state.failWrite = false
+        state.db["profit-path.hidden.v1/5:Other"] = { schema = 2 }
+        equal(prefs:saveHidden("b", true), false)
+        equal(state.db["profit-path.hidden.v1/5:Other"].schema, 2)
+    end)
+
+    -- "Don't recommend" will live on Recommend for me's cards, so for now the
+    -- test saves one directly. A Browse row that isn't recommended says so and its
+    -- eye puts it back; other rows have no eye. My account has no search or
+    -- filters, and lists what to recommend again.
+    test("a method that isn't recommended is marked in Browse and listed in My account", function()
+        client()
+        prettyui = pretty()
+        gepl = nil
+
+        assert(Preferences.new(PersistentDB):saveHidden("smelting-steel-bars.basic", true))
+        dofile("main.lua")
+
+        Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
+        prettyui:findButton("Open Profit Path")()
+
+        local returned = prettyui.views[2]
+        returned.children[2].fields[1]:SetText("steel", true)
+        settleSearch()
+
+        -- The method page has no such button: that's for recommendations.
+        prettyui:findMethod("Smelting steel bars")()
+        equal(prettyui.views[3].buttons["Don't recommend"], nil)
+        prettyui.views[3].buttons["Back to methods"]()
+        returned = prettyui.views[4]
+
+        local function row(title)
+            for index = #prettyui.allViews, 1, -1 do
+                local candidate = prettyui.allViews[index]
+
+                if not candidate.destroyed and candidate.buttons["View method"] then
+                    for _, label in ipairs(candidate.texts) do
+                        if label.content == title then
+                            return candidate
+                        end
+                    end
+                end
+            end
+        end
+
+        local function says(view, text)
+            for _, label in ipairs(view:allTexts()) do
+                if label.content:find(text, 1, true) then
+                    return true
+                end
+            end
+
+            return false
+        end
+
+        local steel = row("Smelting steel bars")
+        assert(says(steel, "Not recommended"), "A row that isn't recommended says so")
+        equal(steel.buttonControls["Not recommended - click to recommend again"].disabled, true)
+
+        -- My account: the header (search, filters) is gone while it's open.
+        local header = returned.children[2]
+        prettyui:findButton("My account")()
+        assert(header.destroyed, "No search or filters on My account")
+
+        local account = list(returned)
+        assert(says(account, "My account"))
+        account.children[1].buttons["Recommend again"]()
+        assert(says(list(returned), "Nothing here"), "Recommended again, so the list is empty")
+
+        -- An activity from My account opens Browse, with a new header.
+        local function liveHeader()
+            for index = #returned.children, 1, -1 do
+                local child = returned.children[index]
+
+                if not child.destroyed and child.fields[1] then
+                    return child
+                end
+            end
+        end
+
+        prettyui:findButton("Skilling")()
+        assert(liveHeader(), "The search box is back")
+        equal(liveHeader().texts[1].content, "Browse methods")
+
+        -- Back in Browse, the steel row has no eye again.
+        prettyui:findButton("All activities")()
+        liveHeader().fields[1]:SetText("steel", true)
+        settleSearch()
+        equal(row("Smelting steel bars").buttons["Not recommended - click to recommend again"], nil)
+
+        PluginShutdown()
+    end)
+
     -- Supplies cost far more than outputs sell for, so every priced method loses
     -- money: its profit and its negative ROI must both be red in Browse.
     test("losses show red profit and red ROI in Browse", function()

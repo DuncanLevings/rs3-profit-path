@@ -528,6 +528,52 @@ def load_access_research():
     return records
 
 
+# The PvM difficulty scale, easiest first. The plugin's Difficulty filter uses
+# the same four labels (Browser.difficultyLevels in src/methods/browser.lua).
+DIFFICULTY_SCALE = ["Easy", "Medium", "Hard", "Elite"]
+
+
+def load_difficulty():
+    """{(page, version folded): rating} from catalogue-source/research/difficulty.json:
+    one researched rating per PvM guide version, with its evidence (PvME's Bossing
+    Path and Slayer guides, the Wiki, or a flagged judgement call)."""
+    path = catalogue.ROOT / "catalogue-source" / "research" / "difficulty.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+
+    if document.get("schema") != 1 or document.get("scale") != DIFFICULTY_SCALE:
+        raise ValueError("Unsupported difficulty research")
+
+    ratings = {}
+
+    for entry in document["ratings"]:
+        key = (entry["page"], entry["version"].casefold())
+
+        if entry["difficulty"] not in DIFFICULTY_SCALE or key in ratings:
+            raise ValueError(f"Bad or repeated difficulty rating: {entry['page']} {entry['version']}")
+
+        if not entry.get("evidence"):
+            raise ValueError(f"A difficulty rating needs its evidence: {entry['page']} {entry['version']}")
+
+        ratings[key] = entry["difficulty"]
+
+    return ratings
+
+
+def apply_difficulty(method, page, version, ratings, used):
+    """Gives a PvM method its researched rating. Every PvM method must have one,
+    and nothing else may: the design never rates non-PvM methods."""
+    key = (page, (version or "").casefold())
+
+    if method["category"] != "pvm":
+        return
+
+    if key not in ratings:
+        raise ValueError(f"No difficulty research for PvM method {method['id']}; add it to difficulty.json")
+
+    method["difficulty"] = ratings[key]
+    used.add(key)
+
+
 def load_income_choices():
     """{(page, version): research} for guides whose rows depend on prices (see
     src/tools/wiki_choices.py). An empty dict before any research."""
@@ -1533,6 +1579,8 @@ def merge(recipe_source=None, monsters=None):
     ctx.guide_content = load_guide_content()
     ctx.access_research = load_access_research()
     ctx.income_choices = load_income_choices()
+    difficulty = load_difficulty()
+    rated = set()
 
     # Tool tiers, so "Crystal pickaxe or better" knows what "better" is.
     pickaxes = load_pickaxes()
@@ -1576,6 +1624,7 @@ def merge(recipe_source=None, monsters=None):
             apply_guide_content(method, ctx.guide_content)
 
         method["research"] = research_status(method, True)
+        apply_difficulty(method, method["source"]["title"], method.get("variant"), difficulty, rated)
         methods.append(method)
         details["research"][method["id"]] = method["research"]
 
@@ -1592,6 +1641,7 @@ def merge(recipe_source=None, monsters=None):
             details["recurring"].append(guide)
 
         method = convert_guide(guide, ctx, page_categories[guide["page"]].most_common(1)[0][0])
+        apply_difficulty(method, guide["page"], guide.get("version"), difficulty, rated)
         drops = check_drops(guide, tables) if method["category"] == "pvm" else None
         method["research"] = research_status(method, False, drops)
 
@@ -1608,6 +1658,12 @@ def merge(recipe_source=None, monsters=None):
         if len(versions) > 1 or any(m["source"]["title"] == page for m in curated["methods"]):
             for method in versions:
                 method.setdefault("variant", "Standard")
+
+    # A rating for a guide that's gone (or isn't PvM any more) is stale research.
+    stale = [key for key in difficulty if key not in rated]
+
+    if stale:
+        raise ValueError(f"Difficulty research for guides that aren't PvM methods: {stale[:3]}")
 
     ids = collections.Counter(method["id"] for method in methods)
     duplicates = [method_id for method_id, count in ids.items() if count > 1]

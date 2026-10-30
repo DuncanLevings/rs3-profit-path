@@ -67,6 +67,8 @@ function Browser.new(methods, preferences, estimateMethod)
 
     -- Favourites belong to the character's profile, just like saved rates. Reload
     -- them when the window opens or after a method, in case the character changed.
+    -- The methods hidden from recommendations are per profile too, so they come
+    -- along in the same reload.
     function self:loadFavourites()
         -- A profile switch also changes every personal rate. Old list estimates
         -- must go even when this reload came from the detail's favourite button.
@@ -74,7 +76,10 @@ function Browser.new(methods, preferences, estimateMethod)
             self.estimates = {}
         end
 
+        local hiddenWarning
         self.favourites, self.message = preferences:loadFavourites()
+        self.hidden, hiddenWarning = preferences:loadHidden()
+        self.message = self.message or hiddenWarning
         self.profile = preferences.profile
     end
 
@@ -106,6 +111,63 @@ function Browser.new(methods, preferences, estimateMethod)
         end
 
         return ok
+    end
+
+    -- Hides one method from recommendations, or restores it. Like favourites, the
+    -- in-memory list only changes once storage has accepted the write. Hidden
+    -- methods still show in Browse and Favourites; only recommendations skip them.
+    function self:setHidden(id, hidden)
+        local ok, problem = preferences:saveHidden(id, hidden)
+        self.message = problem
+
+        if ok then
+            self.hidden[id] = hidden or nil
+        end
+
+        return ok
+    end
+
+    -- Who My account says the settings belong to: the signed-in character's
+    -- name (nil before one is read) and the profile its settings are saved under.
+    function self:profileInfo()
+        return { character = preferences.characterName, profile = preferences.profile }
+    end
+
+    -- The hidden methods, for My account: catalogue methods in title order, then
+    -- any saved ID this bundle doesn't have (still listed, so it can be restored).
+    function self:hiddenMethods()
+        local known, list = {}, {}
+
+        for _, method in ipairs(methods) do
+            if self.hidden[method.id] then
+                known[method.id] = true
+                list[#list + 1] = { id = method.id, method = method }
+            end
+        end
+
+        table.sort(list, function(left, right)
+            if left.method.title ~= right.method.title then
+                return left.method.title < right.method.title
+            end
+
+            return left.id < right.id
+        end)
+
+        local unknown = {}
+
+        for id in pairs(self.hidden) do
+            if not known[id] then
+                unknown[#unknown + 1] = id
+            end
+        end
+
+        table.sort(unknown)
+
+        for _, id in ipairs(unknown) do
+            list[#list + 1] = { id = id }
+        end
+
+        return list
     end
 
     -- Opening/reopening refreshes the catalogue once. Search, sorting and skill
@@ -141,6 +203,8 @@ function Browser.new(methods, preferences, estimateMethod)
 
         for _, method in ipairs(methods) do
             local matchesCategory = self.category == "all" or method.category == self.category
+            -- Hidden methods aren't filtered out here on purpose: they stay
+            -- browsable (and favouritable). Only recommendations skip them.
             local matchesSection = self.section ~= "favourites" or self.favourites[method.id]
 
             local matchesFilters = matchesLevel(self.difficulty, method.difficulty)

@@ -756,3 +756,31 @@ class ChoiceTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "no option of 'Bones to use'"):
             merge_methods.convert_guide(bananas, ctx, "production")
+
+
+class DifficultyTests(unittest.TestCase):
+    """PvM methods take their researched difficulty; nothing else is rated."""
+
+    def test_a_pvm_method_takes_its_rating_and_others_are_left_alone(self):
+        ratings = {("Money making guide/Fixture", "solo"): "Hard"}
+        used = set()
+
+        boss = {"id": "fixture.solo", "category": "pvm"}
+        merge_methods.apply_difficulty(boss, "Money making guide/Fixture", "Solo", ratings, used)
+        self.assertEqual(boss["difficulty"], "Hard")
+        self.assertEqual(used, {("Money making guide/Fixture", "solo")})
+
+        # Skilling is never rated, even when a rating exists for its page.
+        skilling = {"id": "fixture.solo", "category": "skilling"}
+        merge_methods.apply_difficulty(skilling, "Money making guide/Fixture", "Solo", ratings, set())
+        self.assertNotIn("difficulty", skilling)
+
+    def test_a_pvm_method_without_research_stops_the_build(self):
+        with self.assertRaisesRegex(ValueError, "No difficulty research"):
+            merge_methods.apply_difficulty({"id": "fixture.duo", "category": "pvm"},
+                                           "Money making guide/Fixture", "Duo", {}, set())
+
+    def test_the_research_file_uses_the_scale_and_explains_every_rating(self):
+        ratings = merge_methods.load_difficulty()
+        self.assertTrue(ratings)
+        self.assertLessEqual(set(ratings.values()), set(merge_methods.DIFFICULTY_SCALE))
