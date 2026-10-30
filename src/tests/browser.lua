@@ -1415,6 +1415,136 @@ return function(test, equal, client, pretty)
     -- Coins: one coin per table, by the heading total only (not on every row). It's
     -- the real Coins item at its biggest-pile graphic, and it slides left as the
     -- total gets longer so it always sits right next to the number.
+    -- Hovering "Unavailable" says why. The value label is only made again when the
+    -- reason changes (prices fetched again), never while typing a rate.
+    test("an unavailable income value explains itself on hover", function()
+        client()
+        prettyui = pretty()
+
+        -- Steel bars sell, but there are no recent instant-sell trades.
+        local sells = false
+        gepl = {
+            isReady = function() return true end,
+            getLatest = function(itemId)
+                if itemId == 2353 and not sells then
+                    return { high = 1200, highTime = 50 }
+                end
+
+                return { high = 1000, highTime = 50, low = 1000, lowTime = 50 }
+            end,
+        }
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
+        prettyui:findButton("Open Profit Path")()
+        prettyui:findMethod("Smelting steel bars")()
+
+        local income = prettyui.views[#prettyui.views].tabs[1].pages[1]
+        local outputs = income.children[4]
+
+        -- The steel bar's value: the Value column, below the heading row and the
+        -- column headings (the total and "Value" sit in the same column).
+        local function valueLabel()
+            for _, label in ipairs(outputs.texts) do
+                if type(label.options) == "table" and label.options.x == -150 and label.options.y > 40 then
+                    return label
+                end
+            end
+        end
+
+        local value = valueLabel()
+        equal(value.content, "Unavailable")
+        assert(value.options.tooltip:find("instant-sell", 1, true), tostring(value.options.tooltip))
+
+        -- The status line names what's missing.
+        local named = false
+
+        for _, label in ipairs(income:allTexts()) do
+            named = named or label.content:find("No price for Steel bar", 1, true) ~= nil
+        end
+
+        assert(named, "Status line names the missing item")
+
+        -- Typing a rate keeps the same label: the reason hasn't changed.
+        income:allFields()[1]:SetText("1500", true)
+        equal(valueLabel(), value)
+
+        -- Prices come back after a close and reopen: the reason goes, and so
+        -- does the tooltip.
+        sells = true
+        prettyui.windows[#prettyui.windows]:Close()
+        prettyui:findButton("Open Profit Path")()
+
+        local priced = valueLabel()
+        assert(value.destroyed, "The old label is gone")
+        assert(priced.content ~= "Unavailable", priced.content)
+        equal(priced.options.tooltip, nil)
+
+        PluginShutdown()
+    end)
+
+    -- One unpriced drop among many counts as 0 rather than hiding the profit, and
+    -- both the method's status line and the Browse tooltip say so.
+    test("one unpriced drop counts as 0 and says so in Browse and on the method", function()
+        client()
+        prettyui = pretty()
+
+        -- Abyssal wands (30825) have no GE prices; everything else does.
+        gepl = {
+            isReady = function() return true end,
+            getLatest = function(itemId)
+                if itemId == 30825 then
+                    error("Price not found for itemId: " .. itemId)
+                end
+
+                return { high = 1000, highTime = 50, low = 1000, lowTime = 50 }
+            end,
+        }
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
+        prettyui:findButton("Open Profit Path")()
+
+        -- Browse: the row has a profit, and its tooltip names the wand.
+        local tooltip
+
+        for index = #prettyui.allViews, 1, -1 do
+            local row = prettyui.allViews[index]
+
+            if not row.destroyed and row.buttons["View method"] then
+                local isDemons = false
+
+                for _, label in ipairs(row.texts) do
+                    isDemons = isDemons or label.content:find("Killing abyssal demons", 1, true) ~= nil
+                end
+
+                for _, label in ipairs(row.texts) do
+                    if isDemons and type(label.options) == "table" and type(label.options.tooltip) == "string"
+                        and label.options.tooltip:find("Counted as 0", 1, true) then
+                        tooltip = label.options.tooltip
+                    end
+                end
+            end
+        end
+
+        assert(tooltip and tooltip:find("Abyssal wand", 1, true), tostring(tooltip))
+
+        -- The method: a real profit, with the note on the status line.
+        prettyui:findMethod("Killing abyssal demons")()
+        settleMethod()
+
+        local income = prettyui.views[#prettyui.views].tabs[1].pages[1]
+        local noted, notEstimated = false, false
+
+        for _, label in ipairs(income:allTexts()) do
+            noted = noted or label.content:find("Counted as 0 (no price): Abyssal wand.", 1, true) ~= nil
+            notEstimated = notEstimated or label.content == "Not estimated"
+        end
+
+        assert(noted, "Status line says what was counted as 0")
+        assert(not notEstimated, "The profit is shown")
+
+        PluginShutdown()
+    end)
+
     test("income tables show the coin pile only beside each total and keep it next to the number", function()
         client()
         prettyui = pretty()

@@ -545,6 +545,10 @@ end
 -- which draws up to `limit` more item rows and says how many it drew (0 once
 -- they're all there). The panel's height is set for every row up front, so rows
 -- drawn later don't move anything else on the page.
+--
+-- An "Unavailable" value says why when hovered. PrettyUI can't change a label's
+-- tooltip after it's made, so the value label is made again when its reason
+-- changes. That only happens when prices are fetched again, never while typing.
 local function itemTable(panel, definitions, moneyColour, period)
     -- Recurring (daily/weekly) methods count per run instead of per hour.
     local perRun = period == "run"
@@ -565,12 +569,33 @@ local function itemTable(panel, definitions, moneyColour, period)
     -- The last numbers we were given, so a row drawn later shows them straight away.
     local latest = {}
 
+    -- The value label, with its tooltip: the reason a value is missing, or else
+    -- the row's usual pricing note (if it has one).
+    local function addValue(row, tooltip)
+        if row.total then
+            row.total:Destroy()
+        end
+
+        row.total = panel:AddText({
+            text = "", x = valueRight - 130, xAnchor = 1, y = row.y + 10, width = 130, height = 24,
+            colour = moneyColour, alignHorizontal = ui.AlignMode.BOTTOMRIGHT, tooltip = tooltip,
+        })
+        row.tooltip = tooltip
+    end
+
     local function fill(index)
         local value = latest[index]
+        local row = rows[index]
 
         if value then
-            rows[index].quantity.content = Style.quantity(value.quantity)
-            rows[index].total.content = Style.number(value.value)
+            local tooltip = value.message or row.note
+
+            if not row.total or tooltip ~= row.tooltip then
+                addValue(row, tooltip)
+            end
+
+            row.quantity.content = Style.quantity(value.quantity)
+            row.total.content = Style.number(value.value)
         end
     end
 
@@ -582,18 +607,22 @@ local function itemTable(panel, definitions, moneyColour, period)
         ItemIcon.add(panel, definition.display_item_id or definition.item_id, { x = 12, y = y + 2 }, definition.name)
 
         local quantity = panel:AddText({ text = "", x = 66, y = y + 10, width = 90, height = 24 })
+
         -- Untradeable supplies are priced by what they cost to make; the tooltip
         -- says so when the player hovers over the value.
-        local creationTip = definition.pricing == "recipe"
+        local note = definition.pricing == "recipe"
             and "Creation cost: made from its ingredients at GE buy prices." or definition.valuation_note
 
-        local total = panel:AddText({
-            text = "", x = valueRight - 130, xAnchor = 1, y = y + 10, width = 130, height = 24,
-            colour = moneyColour, alignHorizontal = ui.AlignMode.BOTTOMRIGHT, tooltip = creationTip,
-        })
+        local row = { quantity = quantity, y = y, note = note }
+        rows[index] = row
 
-        rows[index] = { quantity = quantity, total = total }
-        fill(index)
+        -- With numbers already in, fill() makes the value label with the right
+        -- tooltip; without them, make it now with the usual note.
+        if latest[index] then
+            fill(index)
+        else
+            addValue(row, note)
+        end
     end
 
     local function addRows(limit)
@@ -813,12 +842,16 @@ function MethodView.mount(view, method, calculator, guarded, options)
     }), TOP_ROW_HEIGHT, { rest = RATE_WIDTH })
 
     local perRun = method.income.period == "run"
-    summary:AddText({ text = perRun and "Profit per run (after tax)" or "Profit per hour (after tax)", x = TOP_INSET, y = FIRST_LINE_Y, width = 200, colour = Style.muted })
+    local profitLabel = perRun and "Profit per run (after tax)" or "Profit per hour (after tax)"
+    summary:AddText({ text = profitLabel, x = TOP_INSET, y = FIRST_LINE_Y, width = 200, colour = Style.muted })
 
     -- Unsaved changes and errors show at the top right of the profit panel, right
-    -- beside the rate box, so they're hard to miss.
+    -- beside the rate box, so they're hard to miss. They start a clear gap after
+    -- the label's measured width, so a long message never runs into it.
+    local stateX = TOP_INSET + math.ceil(Style.textWidth(profitLabel)) + 16
+
     local state = summary:AddText({
-        text = "", x = 224, y = FIRST_LINE_Y, width = -(224 + TOP_INSET), widthAnchor = 1, height = 24,
+        text = "", x = stateX, y = FIRST_LINE_Y, width = -(stateX + TOP_INSET), widthAnchor = 1, height = 24,
         colour = Style.muted, alignHorizontal = ui.AlignMode.BOTTOMRIGHT,
     })
 
@@ -964,6 +997,9 @@ function MethodView.mount(view, method, calculator, guarded, options)
             messages[#messages + 1] = calculator.message
         elseif result.status ~= "available" then
             messages[#messages + 1] = result.message or "Income estimate unavailable: some prices or costs are missing."
+        elseif result.note then
+            -- An output with no price that was counted as 0 (see Income.calculate).
+            messages[#messages + 1] = result.note
         end
 
         state.content = table.concat(messages, " / ")

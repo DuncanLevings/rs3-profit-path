@@ -174,12 +174,33 @@ def lookup_items(forms):
     A page whose infobox describes one item gives that item. A page whose items are
     all doses of one thing ("Aggroverload (1)" ... "(6)") is a dose family: its ID
     is the biggest dose, and the family lists every dose so owning any of them
-    counts. Any other page with several items is too ambiguous to guess from."""
+    counts. Any other page with several items is too ambiguous to guess from.
+
+    Several versions of an item can share one name. Masuta's warspear has a "new"
+    version (43053), which is the one on the Grand Exchange, and a "used" one
+    (43055), which can't be traded. Only the GE version has an exchange page, so
+    that one wins: it's the one GE prices exist for. The other versions on the
+    same page (the used warspear) go in its family, so owning a worn copy still
+    counts. Same-named items on other pages (Dungeoneering's novite ore) don't."""
     found, families, real_names = {}, {}, {}
+
+    # Item IDs we picked from a row with an exchange page.
+    on_exchange = set()
+
+    def pick(table, key, item_id, listed):
+        """Keeps the first ID for `key`, unless a GE-listed version turns up later."""
+        if key not in table or (listed and table[key] not in on_exchange):
+            table[key] = item_id
+
+        if listed:
+            on_exchange.add(item_id)
+
+    # {item name: {page: [every ID with that exact name on that page]}}
+    same_name = {}
 
     for field in ("item_name", "page_name"):
         for group in batches(forms - set(found), BATCH):
-            rows = bucket("bucket('infobox_item').select('page_name','item_name','item_id')"
+            rows = bucket("bucket('infobox_item').select('page_name','item_name','item_id','exchange_page')"
                           f".where({any_of(field, group)}).limit({PAGE_SIZE}).run()")
             per_page = {}
 
@@ -189,15 +210,18 @@ def lookup_items(forms):
                 if not ids or not isinstance(ids[0], int) or ids[0] <= 0:
                     continue
 
+                listed = bool(row.get("exchange_page"))
+
                 # The game checks an item's name before showing its icon, so keep
                 # the Wiki's exact item name ("Aggroverload (6)", not "Aggroverload").
                 if row.get("item_name"):
                     real_names.setdefault(ids[0], row["item_name"])
 
                 if field == "item_name" and row.get("item_name") in group:
-                    found.setdefault(row["item_name"], ids[0])
+                    pick(found, row["item_name"], ids[0], listed)
+                    same_name.setdefault(row["item_name"], {}).setdefault(row.get("page_name"), []).append(ids[0])
 
-                per_page.setdefault(row.get("page_name"), {})[row.get("item_name") or ""] = ids[0]
+                pick(per_page.setdefault(row.get("page_name"), {}), row.get("item_name") or "", ids[0], listed)
 
             if field != "page_name":
                 continue
@@ -224,6 +248,12 @@ def lookup_items(forms):
                 if doses:
                     found[page] = doses[max(doses)]
                     families[page] = [doses[dose] for dose in sorted(doses)]
+
+    # A name with several versions on its chosen page: owning any of them counts.
+    for name, pages in same_name.items():
+        for ids in pages.values():
+            if found.get(name) in ids and len(set(ids)) > 1:
+                families[name] = sorted(set(ids))
 
     return found, families, real_names
 
@@ -605,13 +635,6 @@ def build(rows, revisions, item_ids, retrieved, families=None, item_names=None):
     for guide in guides:
         validate_guide(guide)
 
-    names = sorted({row[0] for guide in guides for row in guide["inputs"] + guide["outputs"]})
-    unresolved = [name for name in names if name not in item_ids]
-
-    # Requirement "items" are often not items at all (outfits, perks, abilities),
-    # so not resolving one is normal; the merge treats those as capabilities.
-    required = sorted(requirement_names(guides))
-
     meta = {
         "schema": 1,
         "retrieved": retrieved,
@@ -623,11 +646,34 @@ def build(rows, revisions, item_ids, retrieved, families=None, item_names=None):
             "obsolete_skipped": len(obsolete),
             "recurring": sum(1 for guide in guides if "recurring" in guide),
             "per_kill": sum(1 for guide in guides if "kph" in guide),
-            "income_names": len(names),
-            "unresolved_names": len(unresolved),
-            "requirement_item_names": len(required),
-            "unresolved_requirement_items": sum(1 for name in required if name not in item_ids),
         },
+        "unlabelled_versions": sorted(unlabelled),
+    }
+
+    set_item_tables(meta, guides, item_ids, families, item_names)
+
+    text = "".join(json.dumps(guide, ensure_ascii=False, separators=(",", ":")) + "\n" for guide in guides)
+
+    return text, meta
+
+
+def set_item_tables(meta, guides, item_ids, families=None, item_names=None):
+    """Fills in meta.json's item tables (and their counts) for these guides."""
+    names = sorted({row[0] for guide in guides for row in guide["inputs"] + guide["outputs"]})
+    unresolved = [name for name in names if name not in item_ids]
+
+    # Requirement "items" are often not items at all (outfits, perks, abilities),
+    # so not resolving one is normal; the merge treats those as capabilities.
+    required = sorted(requirement_names(guides))
+
+    meta["counts"].update({
+        "income_names": len(names),
+        "unresolved_names": len(unresolved),
+        "requirement_item_names": len(required),
+        "unresolved_requirement_items": sum(1 for name in required if name not in item_ids),
+    })
+
+    meta.update({
         "items": {name: item_ids[name] for name in sorted(set(names) | set(required)) if name in item_ids},
         "unresolved": unresolved,
         "unresolved_requirement_items": [name for name in required if name not in item_ids],
@@ -635,12 +681,27 @@ def build(rows, revisions, item_ids, retrieved, families=None, item_names=None):
                           if name in names or name in required},
         # Each item's own name, for the plugin's in-game name check.
         "item_names": {str(item_id): name for item_id, name in sorted((item_names or {}).items())},
-        "unlabelled_versions": sorted(unlabelled),
-    }
+    })
 
-    text = "".join(json.dumps(guide, ensure_ascii=False, separators=(",", ":")) + "\n" for guide in guides)
 
-    return text, meta
+def refresh_items():
+    """Looks up item IDs again for the guides already on disk, and rewrites only
+    meta.json's item tables. The guides themselves (and their revisions) stay as
+    they are, so an ID fix doesn't drag in newer guide wording at the same time.
+    Returns (old items, new items)."""
+    meta = json.loads(META.read_text(encoding="utf-8"))
+    guides = [json.loads(line) for line in GUIDES.read_text(encoding="utf-8").splitlines()]
+    names = {row[0] for guide in guides for row in guide["inputs"] + guide["outputs"]}
+
+    old = dict(meta["items"])
+    item_ids, families, item_names = fetch_item_ids((names | requirement_names(guides)) - {""})
+
+    set_item_tables(meta, guides, item_ids, families, item_names)
+    meta["items_retrieved"] = datetime.date.today().isoformat()
+
+    META.write_text(json.dumps(meta, indent=1, ensure_ascii=False, sort_keys=False) + "\n", encoding="utf-8", newline="\n")
+
+    return old, meta["items"]
 
 
 # ---- Outfits: which items make up each one -----------------------------------
@@ -1023,7 +1084,20 @@ def main():
                         help="instead of the guides, import the pieces of every outfit in research/capabilities.json")
     parser.add_argument("--pickaxes", action="store_true",
                         help="instead of the guides, import every pickaxe and its Mining level")
+    parser.add_argument("--items", action="store_true",
+                        help="look up item IDs again for the saved guides, leaving the guides unchanged")
     args = parser.parse_args()
+
+    if args.items:
+        old, new = refresh_items()
+        changed = sorted(name for name in set(old) | set(new) if old.get(name) != new.get(name))
+
+        print(f"{len(new)} item names resolved; {len(changed)} changed:")
+
+        for name in changed:
+            print(f"  {name}: {old.get(name)} -> {new.get(name)}")
+
+        return
 
     if args.pickaxes:
         pieces, missing = import_pickaxes()

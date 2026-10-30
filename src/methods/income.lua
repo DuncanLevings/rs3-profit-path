@@ -64,9 +64,14 @@ end
 -- status: "available", "partial" (only one side usable), "loading", "unavailable",
 -- "invalid" or "error". Nothing here ever invents a price.
 --
--- Each usable side has a price, a timestamp and a source ("hour" for the hourly
--- average, "latest" for a single trade). A side we refused says why in its
--- message (highMessage / lowMessage).
+-- Each usable side has a price and a source ("hour" for the hourly average,
+-- "latest" for a single trade). A latest side always has its trade's timestamp;
+-- an hour side has one only when the item has a latest trade too, because GEPL's
+-- hourly data carries no times of its own. A side we refused or couldn't find
+-- says why in its message (highMessage / lowMessage).
+--
+-- GEPL keeps its latest and hourly data apart, and an item can be in one but not
+-- the other. So we ask for both, and either one is enough for a price.
 function Income.inspectQuote(library, itemId)
     -- GEPL is a required dependency, but guard anyway: a missing or disabled
     -- library must show "unavailable", never crash or invent a price.
@@ -78,35 +83,52 @@ function Income.inspectQuote(library, itemId)
         return { status = "invalid", message = "A positive integer item ID is required." }
     end
 
-    -- GEPL throws for item IDs it doesn't know, and getLatest may kick off its own
-    -- cache refresh. Wrap it so a library error becomes a readable message.
+    -- isReady can throw on a broken library; wrap everything so any library error
+    -- becomes a readable message instead of stopping the screen.
     local ok, result = pcall(function()
-        if not library.isReady("latest") then
-            return { status = "loading", message = "GE Price Library has no ready latest dataset." }
+        local latestReady = library.isReady("latest")
+        local quote, latestProblem
+
+        -- GEPL throws "Price not found" for an item it has no latest entry for,
+        -- and returns nil for one that only has hourly data. getLatest may also
+        -- kick off GEPL's own cache refresh.
+        if latestReady then
+            local fetched, value = pcall(library.getLatest, itemId)
+
+            if fetched and type(value) == "table" then
+                quote = value
+            elseif not fetched and not tostring(value):find("Price not found", 1, true) then
+                latestProblem = "GE Price Library: " .. tostring(value)
+            end
         end
 
-        local quote = library.getLatest(itemId)
+        local average = hourlyAverage(library, itemId)
 
-        if not quote then
-            return { status = "unavailable", message = "No quote returned for this item." }
+        -- Nothing to go on: say whether that's GEPL still loading, a library
+        -- error, or simply no GE prices for this item.
+        if not quote and not average then
+            if not latestReady then
+                return { status = "loading", message = "GE Price Library is still loading prices." }
+            end
+
+            if latestProblem then
+                return { status = "error", message = latestProblem }
+            end
+
+            return { status = "unavailable", message = "GE Price Library has no prices for this item. "
+                .. "It may not be tradeable on the Grand Exchange." }
         end
 
         -- A latest trade only counts if both its price and its timestamp look sane.
-        local highValid = nonNegativeFinite(quote.high) and nonNegativeFinite(quote.highTime)
-        local lowValid = nonNegativeFinite(quote.low) and nonNegativeFinite(quote.lowTime)
-
-        if not highValid and not lowValid then
-            return { status = "unavailable", message = "No valid timestamped trade sides are available." }
-        end
+        local highValid = quote ~= nil and nonNegativeFinite(quote.high) and nonNegativeFinite(quote.highTime)
+        local lowValid = quote ~= nil and nonNegativeFinite(quote.low) and nonNegativeFinite(quote.lowTime)
 
         -- Copy the values into our own table rather than keeping GEPL's object.
         local result = { itemId = itemId }
-        local average = hourlyAverage(library, itemId)
 
-        -- Averages have no timestamp of their own, so an average side borrows the
-        -- latest trade's time (its own side's if it has one). That time only says
-        -- "this item is trading", which is what the calculator checks for.
-        local anyTime = highValid and quote.highTime or quote.lowTime
+        -- An hour side borrows a latest trade's time when there is one (its own
+        -- side's first). That time only says "this item is trading".
+        local anyTime = highValid and quote.highTime or lowValid and quote.lowTime or nil
 
         for _, side in ipairs({
             { key = "high", valid = highValid, average = averageSide(average, "avgHighPrice", "highPriceVolume") },
@@ -122,6 +144,11 @@ function Income.inspectQuote(library, itemId)
                 result[side.key] = quote[side.key]
                 result[time] = quote[time]
                 result[side.key .. "Source"] = "latest"
+            else
+                -- Neither an hourly average nor a usable latest trade on this side.
+                result[side.key .. "Message"] = side.key == "high"
+                    and "No recent instant-buy trades for this item."
+                    or "No recent instant-sell trades for this item."
             end
         end
 
@@ -140,7 +167,8 @@ function Income.inspectQuote(library, itemId)
         end
 
         if result.high == nil and result.low == nil then
-            return { status = "unavailable", message = "No usable trade prices are available." }
+            return { status = "unavailable", message = result.highMessage or result.lowMessage
+                or "No usable trade prices for this item." }
         end
 
         result.status = result.high ~= nil and result.low ~= nil and "available" or "partial"
@@ -218,8 +246,13 @@ end
 -- `model` is the method's income data, already checked when the catalogue was built,
 -- so we don't re-validate it here. `quotes` is the snapshot from captureQuotes.
 --
--- If any price is missing, or the source recipe itself is incomplete, there's no
--- total profit. A partial subtotal would look like a real answer and mislead people.
+-- If the source recipe itself is incomplete, there's no total profit. A missing
+-- price is different: one thinly traded potion or rare drop shouldn't hide a
+-- whole method. When most of a side's priced rows (supplies, or outputs) have
+-- prices, the missing ones count as 0 GP and the result names them. When most
+-- don't (or the only one doesn't), that side has no total, so neither does the
+-- profit. A missing output counted as 0 can only make the profit look worse; a
+-- missing supply can make it look a little better, and its row says so.
 function Income.calculate(model, rate, quotes)
     if not nonNegativeFinite(rate) then
         return { status = "invalid", message = "Rate must be finite and zero or greater." }
@@ -248,7 +281,7 @@ function Income.calculate(model, rate, quotes)
                 overflow = true
             end
 
-            local quote, price, timestamp, recipeProblem
+            local quote, price, timestamp, recipeProblem, hourly
 
             if line.pricing == "fixed" then
                 -- Coin drops and alchemy proceeds have a fixed GP value, no GE
@@ -267,6 +300,10 @@ function Income.calculate(model, rate, quotes)
                 local usable = quote and (quote.status == "available" or quote.status == "partial")
                 price = usable and quote[side] or nil
                 timestamp = usable and quote[side .. "Time"] or nil
+
+                -- An hourly average proves the item traded without a timestamp
+                -- (see inspectQuote), so it counts as current on its own.
+                hourly = usable and quote[side .. "Source"] == "hour"
             end
 
             local row = {
@@ -280,7 +317,10 @@ function Income.calculate(model, rate, quotes)
                 row.gross = 0
                 row.tax = 0
                 row.value = 0
-            elseif nonNegativeFinite(price) and (line.pricing == "fixed" or nonNegativeFinite(timestamp)) then
+            -- Fixed values need no timestamp, and a recipe cost that came back at
+            -- all already checked every ingredient's price.
+            elseif nonNegativeFinite(price) and (line.pricing == "fixed" or line.pricing == "recipe"
+                or hourly or nonNegativeFinite(timestamp)) then
                 -- GE tax works per item and is rounded down: floor(price / 50) for a
                 -- 2% tax. Round per item first, then multiply, or the totals drift
                 -- from the Wiki's numbers.
@@ -316,8 +356,63 @@ function Income.calculate(model, rate, quotes)
         return rows, complete and total or nil, complete and taxTotal or nil
     end
 
+    -- Rows counted as 0 because they have no price: { names }, if any.
+    local uncounted = {}
+
+    -- Sums one side's rows that have prices, if they're most of them. Fixed
+    -- values (coins) don't count towards "most": a pile of coins says nothing
+    -- about what the missing items are worth. Returns nil when there are too few.
+    -- `effect` finishes each missing row's message, saying what the 0 means.
+    local function countMissingAsZero(rows, lines, effect)
+        local priced, missing, total, tax, names = 0, 0, 0, 0, {}
+
+        for index, row in ipairs(rows) do
+            if row.value then
+                total = total + row.value
+                tax = tax + row.tax
+
+                if lines[index].pricing ~= "fixed" and row.quantity > 0 then
+                    priced = priced + 1
+                end
+            else
+                missing = missing + 1
+                names[#names + 1] = row.name
+            end
+        end
+
+        if priced <= missing then
+            return nil
+        end
+
+        -- Each row still says why it has no price, and now what that means.
+        for _, row in ipairs(rows) do
+            if not row.value then
+                row.countedAsZero = true
+                row.message = row.message .. " " .. effect
+            end
+        end
+
+        for _, name in ipairs(names) do
+            uncounted[#uncounted + 1] = name
+        end
+
+        return total, tax
+    end
+
+    local outputLines = Loot.outputs(model)
+
     calculated.inputs, calculated.cost = calculateLines(model.inputs, "high")
-    calculated.outputs, calculated.revenue, calculated.tax = calculateLines(Loot.outputs(model), "low")
+    calculated.outputs, calculated.revenue, calculated.tax = calculateLines(outputLines, "low")
+
+    if calculated.cost == nil then
+        calculated.cost = countMissingAsZero(calculated.inputs, model.inputs,
+            "Counted as 0 GP in the total, since most supplies have prices, so the profit may be a little high.")
+    end
+
+    if calculated.revenue == nil then
+        calculated.revenue, calculated.tax = countMissingAsZero(calculated.outputs, outputLines,
+            "Counted as 0 GP in the total, since most outputs have prices.")
+    end
 
     if overflow then
         return { status = "invalid", message = "This rate produces values too large to calculate." }
@@ -345,13 +440,42 @@ function Income.calculate(model, rate, quotes)
                 calculated.roi = roi
             end
         end
+
+        -- Say what was left out, so nobody takes the profit as exact.
+        if #uncounted > 0 then
+            local named = uncounted[1] .. (#uncounted > 1 and (" and " .. (#uncounted - 1) .. " more") or "")
+
+            calculated.uncounted = uncounted
+            calculated.note = "Counted as 0 (no price): " .. named .. "."
+        end
     else
         calculated.status = "partial"
 
         if model.coverage ~= "complete" then
             calculated.message = "Source model is incomplete; total profit is unavailable."
         else
-            calculated.message = "Required prices are unavailable; total profit is unavailable."
+            -- Name what's missing, so nobody has to hunt through both tables.
+            local missing = {}
+
+            for _, row in ipairs(calculated.inputs) do
+                if row.message then
+                    missing[#missing + 1] = row.name
+                end
+            end
+
+            for _, row in ipairs(calculated.outputs) do
+                if row.message then
+                    missing[#missing + 1] = row.name
+                end
+            end
+
+            local named = missing[1] or "some items"
+
+            if #missing > 1 then
+                named = named .. " and " .. (#missing - 1) .. " more"
+            end
+
+            calculated.message = "No price for " .. named .. " - hover it for why."
         end
     end
 

@@ -207,16 +207,23 @@ def collect_recipes():
 
 
 def resolve_item_ids(recipes):
-    """Step 3: item IDs for outputs and GE-priced ingredients, via infobox_item."""
+    """Step 3: item IDs for outputs and GE-priced ingredients, via infobox_item.
+
+    Several versions of an item can share one name, and only one of them is on
+    the Grand Exchange (the one with an exchange page). For a GE-priced
+    ingredient that's the version we need, so it wins over the others."""
     pages = {recipe["output"]["page"] for recipe in recipes}
     pages |= {m["page"] for recipe in recipes for m in recipe["materials"] if m["wiki_cost"] == "gemw"}
 
     # item name -> ID, and page -> its only ID (for pages without dose variants).
     by_name, single = {}, {}
 
+    # Item IDs we picked from a row with an exchange page.
+    on_exchange = set()
+
     for group in batches(pages):
         rows = ask(
-            "bucket('infobox_item').select('page_name','item_name','item_id')"
+            "bucket('infobox_item').select('page_name','item_name','item_id','exchange_page')"
             f".where({any_of('page_name', group)}).limit({PAGE_SIZE}).run()"
         )
         per_page = {}
@@ -227,7 +234,16 @@ def resolve_item_ids(recipes):
             if not ids or not isinstance(ids[0], int):
                 continue
 
-            by_name.setdefault(row.get("item_name"), ids[0])
+            name = row.get("item_name")
+            listed = bool(row.get("exchange_page"))
+
+            # Keep the first ID for a name, unless a GE-listed version turns up later.
+            if name not in by_name or (listed and by_name[name] not in on_exchange):
+                by_name[name] = ids[0]
+
+            if listed:
+                on_exchange.add(ids[0])
+
             per_page.setdefault(row["page_name"], set()).add(ids[0])
 
         for page, ids in per_page.items():
@@ -272,9 +288,54 @@ def classify(recipes):
                 material["pricing"] = "free"
 
 
+def refresh_items():
+    """Looks up item IDs again for the recipes already on disk, keeping the
+    recipes themselves as they are. Returns the updated document and a list of
+    (recipe page, ingredient or output name, old ID, new ID) changes."""
+    document = json.loads(OUTPUT.read_text(encoding="utf-8"))
+    recipes = document["recipes"]
+
+    def entries():
+        for recipe in recipes:
+            yield recipe, recipe["output"]
+
+            for material in recipe["materials"]:
+                yield recipe, material
+
+    old = [entry.get("item_id") for _, entry in entries()]
+
+    # Start clean, so an ID the Wiki no longer gives doesn't linger.
+    for _, entry in entries():
+        entry.pop("item_id", None)
+        entry.pop("pricing", None)
+
+    resolve_item_ids(recipes)
+    classify(recipes)
+
+    changes = [(recipe["page"], entry["name"], before, entry.get("item_id"))
+               for (recipe, entry), before in zip(entries(), old) if before != entry.get("item_id")]
+
+    document["items_retrieved"] = datetime.date.today().isoformat()
+
+    return document, changes
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.parse_args()
+    parser.add_argument("--items", action="store_true",
+                        help="look up item IDs again for the saved recipes, leaving the recipes unchanged")
+    args = parser.parse_args()
+
+    if args.items:
+        document, changes = refresh_items()
+        OUTPUT.write_text(json.dumps(document, indent=2, ensure_ascii=True) + "\n", encoding="utf-8", newline="\n")
+
+        print(f"{len(changes)} item IDs changed:")
+
+        for page, name, before, after in changes:
+            print(f"  {page} / {name}: {before} -> {after}")
+
+        return
 
     recipes = collect_recipes()
     resolve_item_ids(recipes)

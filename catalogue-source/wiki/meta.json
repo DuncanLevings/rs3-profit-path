@@ -18,7 +18,7 @@
   "'Friendship bracelet'": 56988,
   "Abyssal flesh": 52937,
   "Abyssal orb": 30828,
-  "Abyssal scourge": 52933,
+  "Abyssal scourge": 52931,
   "Abyssal titan pouch": 12796,
   "Abyssal wand": 30825,
   "Abyssal whip": 4151,
@@ -74,12 +74,12 @@
   "Agility cape": 9771,
   "Agility potion (1)": 3038,
   "Agility potion (4)": 3032,
-  "Ahrim's book of magic": 36807,
+  "Ahrim's book of magic": 25672,
   "Ahrim's hood": 4708,
   "Ahrim's robe skirt": 4714,
   "Ahrim's robe top": 4712,
-  "Ahrim's staff": 35552,
-  "Ahrim's wand": 36810,
+  "Ahrim's staff": 4710,
+  "Ahrim's wand": 25652,
   "Air battlestaff": 1397,
   "Air orb": 573,
   "Air rune": 556,
@@ -88,7 +88,7 @@
   "Akrisae's hood": 21736,
   "Akrisae's robe skirt": 21760,
   "Akrisae's robe top": 21752,
-  "Akrisae's war mace": 35577,
+  "Akrisae's war mace": 21744,
   "Alchemist's key": 52498,
   "Algarum thread": 29864,
   "Altar of War": 62675,
@@ -100,9 +100,9 @@
   "Amulet of glory": 1704,
   "Amulet of glory (4)": 1712,
   "Amulet of nature": 6040,
-  "Amulet of souls": 31877,
+  "Amulet of souls": 31875,
   "Amulet of souls (or)": 41964,
-  "Amulet of the forsaken": 39063,
+  "Amulet of the forsaken": 39061,
   "Amulet of zealots": 19892,
   "Ancient ceremonial robes set": 40930,
   "Ancient elven ritual shard": 43358,
@@ -137,7 +137,7 @@
   "Ardougne cloak 1": 15345,
   "Ardougne cloak 4": 19748,
   "Ardougne teleport (item)": 8011,
-  "Argonite ore": 17642,
+  "Argonite ore": 57187,
   "Armadyl boots": 25010,
   "Armadyl buckler": 25013,
   "Armadyl chainskirt": 11722,
@@ -153,8 +153,8 @@
   "Ascendri bolts (e)": 31881,
   "Ascension Keystone": 28445,
   "Ascension bolts": 28465,
-  "Ascension crossbow": 28439,
-  "Ascension grips": 31205,
+  "Ascension crossbow": 28437,
+  "Ascension grips": 31203,
   "Ascension shard": 28436,
   "Asciatops (unchecked)": 48497,
   "Ashes": 592,
@@ -206,7 +206,7 @@
   "Basic ghostly ink": 55594,
   "Basic ritual candle": 55634,
   "Basilisk boots": 32368,
-  "Bathus ore": 17632,
+  "Bathus ore": 57177,
   "Battlestaff": 1391,
   "Batwing": 25549,
   "Beans": 43968,
@@ -228,7 +228,7 @@
   "Bird's nest (seeds)": 5073,
   "Black battleaxe": 1367,
   "Black dragon (player-owned farm)": 43726,
-  "Black dragon egg (unchecked)": 43723,
+  "Black dragon egg (unchecked)": 43724,
   "Black dragon leather": 2509,
   "Black dragonhide": 1747,
   "Black kiteshield": 1195,
@@ -239,13 +239,13 @@
   "Black sq shield": 1179,
   "Black stone arrow tips": 47496,
   "Black stone heart": 47506,
-  "Blade of Avaryss": 37098,
-  "Blade of Nymora": 37093,
-  "Blast diffusion boots": 48087,
+  "Blade of Avaryss": 37095,
+  "Blade of Nymora": 37090,
+  "Blast diffusion boots": 48085,
   "Blessed flask": 48680,
   "Blessed sand": 48675,
   "Blight bolts": 42748,
-  "Blightbound crossbow": 42772,
+  "Blightbound crossbow": 42770,
   "Blissful shadow core": 32607,
   "Blood Reaver scroll (Blood Siphon)": 49407,
   "Blood amulet of fury": 32704,
@@ -276,7 +276,7 @@
   "Boots of subjugation": 25004,
   "Botanist's amulet (new)": 39373,
   "Bottled dinosaur roar": 48926,
-  "Bow of the Last Guardian": 53340,
+  "Bow of the Last Guardian": 53338,
   "Bowstring": 1777,
   "Box trap": 10008,
   "Bracelet of clay": 11074,
@@ -295,7 +295,7 @@
   "Bronze pickaxe": 1265,
   "Bronze square shield": 1173,
   "Bronze throwing axe": 800,
-  "Brooch of the Gods": 50464,
+  "Brooch of the Gods": 50462,
   "Bruise blue snelm (pointed)": 3343,
   "Bruise blue snelm (round)": 3333,
   "Brutish dinosaur (unchecked)": 48487,
@@ -350,7 +350,7 @@
   "Chocolate bar": 1973,
   "Chronotes": 49430,
   "Ciku seed": 48769,
-  "Cinderbane gloves": 41108,
+  "Cinderbane gloves": 41106,
   "Clay": 434,
   "Clean arbuck": 48211,
   "Clean avantoe": 261,
@@ -456,35 +456,35 @@
   "Cryptbloom top (incomplete)": 52256,
   "Crystal armour seed": 32623,
   "Crystal binding rod": 58899,
-  "Crystal body": 35406,
-  "Crystal boots": 35414,
-  "Crystal bow": 32230,
-  "Crystal chakram": 32233,
+  "Crystal body": 35404,
+  "Crystal boots": 35412,
+  "Crystal bow": 32228,
+  "Crystal chakram": 32231,
   "Crystal chime": 11749,
   "Crystal chinchompa": 43618,
   "Crystal chinchompa (unchecked)": 43610,
-  "Crystal dagger": 32224,
-  "Crystal deflector": 32245,
+  "Crystal dagger": 32222,
+  "Crystal deflector": 32243,
   "Crystal flask": 32843,
-  "Crystal gloves": 35418,
-  "Crystal halberd": 32221,
+  "Crystal gloves": 35416,
+  "Crystal halberd": 32219,
   "Crystal hatchet": 32645,
-  "Crystal helm": 35402,
+  "Crystal helm": 35400,
   "Crystal key": 989,
   "Crystal knife": 32636,
-  "Crystal orb": 32218,
+  "Crystal orb": 32216,
   "Crystal pickaxe": 32646,
-  "Crystal shield": 32242,
+  "Crystal shield": 32240,
   "Crystal skillchompa": 40995,
-  "Crystal staff": 32212,
+  "Crystal staff": 32210,
   "Crystal teleport seed": 6103,
   "Crystal tool seed": 32208,
   "Crystal triskelion": 28550,
   "Crystal triskelion fragment 1": 28547,
   "Crystal triskelion fragment 2": 28548,
   "Crystal triskelion fragment 3": 28549,
-  "Crystal wand": 32215,
-  "Crystal ward": 32239,
+  "Crystal wand": 32213,
+  "Crystal ward": 32237,
   "Crystal weapon seed": 32206,
   "Crystalline essence": 58461,
   "Curry leaf": 5970,
@@ -526,7 +526,7 @@
   "Desert goat horn": 9735,
   "Desert robes": 6386,
   "Devourer's Guard": 59354,
-  "Dharok's greataxe": 35556,
+  "Dharok's greataxe": 4718,
   "Dharok's helm": 4716,
   "Dharok's platebody": 35585,
   "Dharok's platelegs": 4722,
@@ -588,7 +588,7 @@
   "Dragonbane arrow": 21640,
   "Dragonbane bolts": 21660,
   "Dragonbone upgrade kit": 24352,
-  "Dragonfire shield": 11283,
+  "Dragonfire shield": 11284,
   "Dragonkin bones": 51858,
   "Dragonstone": 1615,
   "Dragonstone amulet (unstrung)": 1683,
@@ -600,9 +600,9 @@
   "Drakolith": 44824,
   "Drakolith stone spirit": 44810,
   "Dreadnip": 22370,
-  "Drygore longsword": 26589,
-  "Drygore mace": 26597,
-  "Drygore rapier": 26581,
+  "Drygore longsword": 26587,
+  "Drygore mace": 26595,
+  "Drygore rapier": 26579,
   "Dungeoneering cape": 18508,
   "Dungeoneering master cape": 19709,
   "Dungeoneering token": 30824,
@@ -622,9 +622,9 @@
   "Eclectic impling jar": 11248,
   "Eclipsed Soul prayer codex": 57544,
   "Ectophial": 4251,
-  "Ectoplasm": 25355,
+  "Ectoplasm": 55336,
   "Egg": 1944,
-  "Ek-ZekKil": 52513,
+  "Ek-ZekKil": 52511,
   "Elder Trove (Bik, T3)": 51797,
   "Elder Trove (Ful, T3)": 51803,
   "Elder Trove (Wen, T3)": 51800,
@@ -642,11 +642,11 @@
   "Elder rune mattock": 49564,
   "Elder rune ore box": 44797,
   "Elder rune pickaxe + 5": 45652,
-  "Elder rune round shield": 45750,
+  "Elder rune round shield": 45748,
   "Elder seed": 31437,
   "Elder wood box": 54913,
   "Elder wood spirit": 54924,
-  "Eldritch crossbow": 47472,
+  "Eldritch crossbow": 47470,
   "Elemental anima stone": 54018,
   "Elemental battlestaff": 41885,
   "Elysian sigil": 13750,
@@ -658,7 +658,7 @@
   "Emerald necklace": 1658,
   "Empty sack": 5418,
   "Enchanted water tiara": 11969,
-  "Energy-gathering scrimshaw": 38830,
+  "Energy-gathering scrimshaw": 38828,
   "Enhanced Excalibur": 14632,
   "Enhanced fishing rod-o-matic": 50153,
   "Enhanced hammer-tron": 50159,
@@ -666,7 +666,7 @@
   "Enriched pontifex shadow ring": 53032,
   "Erethdor's grimoire": 42787,
   "Essence impling jar": 11246,
-  "Essence of Finality amulet": 50467,
+  "Essence of Finality amulet": 50465,
   "Eternal magic logs": 58250,
   "Eternal magic orb (saturated)": 58524,
   "Eternal magic staff (saturated)": 58502,
@@ -729,7 +729,7 @@
   "Flamtaer bracelet": 39369,
   "Flamtaer hammer": 3678,
   "Flax": 1779,
-  "Fleeting boots": 51084,
+  "Fleeting boots": 51082,
   "Flesh rune": 55339,
   "Fletching cape": 9783,
   "Flies": 49281,
@@ -737,8 +737,8 @@
   "Foot wraps of the First Necromancer": 55496,
   "Forinthry bracelet": 11095,
   "Fossilised bone": 49448,
-  "Fractite ore": 17638,
-  "Fractured Staff of Armadyl": 51774,
+  "Fractite ore": 57183,
+  "Fractured Staff of Armadyl": 51772,
   "Fragile memento": 55625,
   "Fragile woodcutting urn": 20305,
   "Fragments of Pernix's quiver": 52497,
@@ -781,7 +781,7 @@
   "Gloomshroom zygomite (unchecked)": 43678,
   "Glorious bar": 45991,
   "Gloves of Tumeken's resplendence": 59342,
-  "Gloves of passage": 40322,
+  "Gloves of passage": 40320,
   "Gloves of silence": 10075,
   "Gloves of subjugation": 25007,
   "Goat horn dust": 9736,
@@ -801,15 +801,15 @@
   "Golden roses": 52811,
   "Goldrune": 49450,
   "Gorajian mushroom": 22446,
-  "Gorgonite ore": 17646,
+  "Gorgonite ore": 57191,
   "Gown of subjugation": 24998,
-  "Grace of the elves": 44550,
+  "Grace of the elves": 44548,
   "Granite (2kg)": 6981,
   "Granite (500g)": 6979,
   "Granite (5kg)": 6983,
   "Granite legs": 6809,
   "Grapes": 1987,
-  "Grasping rune pouch": 52217,
+  "Grasping rune pouch": 52215,
   "Greater Barge ability codex": 43393,
   "Greater Chain ability codex": 51096,
   "Greater Concentrated blast ability codex": 51843,
@@ -850,7 +850,7 @@
   "Guthan's chainskirt": 4730,
   "Guthan's helm": 4724,
   "Guthan's platebody": 4728,
-  "Guthan's warspear": 35560,
+  "Guthan's warspear": 4726,
   "Guthix mjolnir": 6760,
   "Guthix rest flask (6)": 29448,
   "Hammer-tron": 39653,
@@ -913,7 +913,7 @@
   "Imcando mattock": 49574,
   "Immaculate alloy bar": 45988,
   "Imperial steel": 49510,
-  "Imperium core": 39582,
+  "Imperium core": 39579,
   "Impious ashes": 20264,
   "Impious willow incense sticks": 47694,
   "Impling jar": 11260,
@@ -927,7 +927,7 @@
   "Infernal urn (no rune)": 20422,
   "Infernal yew incense sticks": 47697,
   "Infernus pyroclasts": 53390,
-  "Inquisitor staff": 49984,
+  "Inquisitor staff": 49982,
   "Inquisitor's staff censer": 49963,
   "Inquisitor's staff ornament": 49959,
   "Inquisitor's staff rod": 49961,
@@ -963,7 +963,7 @@
   "Jangerberries": 247,
   "Jar generator": 11258,
   "Jas dragonbane arrow": 53043,
-  "Jaws of the Abyss": 52928,
+  "Jaws of the Abyss": 52926,
   "Jug of water": 1937,
   "Juju farming potion (4)": 20011,
   "Juju teleport spiritbag": 19967,
@@ -971,28 +971,28 @@
   "Karamja gloves 3": 11140,
   "Karamja gloves 4": 19754,
   "Karil's coif": 4732,
-  "Karil's crossbow": 35564,
-  "Karil's off-hand pistol crossbow": 36804,
-  "Karil's pistol crossbow": 36801,
+  "Karil's crossbow": 4734,
+  "Karil's off-hand pistol crossbow": 25895,
+  "Karil's pistol crossbow": 25918,
   "Karil's skirt": 4738,
   "Karil's top": 4736,
-  "Katagon ore": 17644,
+  "Katagon ore": 57189,
   "Keramos": 49490,
-  "Kerapac's wrist wraps": 51770,
+  "Kerapac's wrist wraps": 51767,
   "Keris": 10581,
   "Key to the Crossing": 40310,
-  "Khopesh of Tumeken": 40657,
-  "Khopesh of the Kharidian": 40314,
+  "Khopesh of Tumeken": 40655,
+  "Khopesh of the Kharidian": 40312,
   "King worm": 2162,
   "Kingly impling jar": 15517,
-  "Kratonium ore": 17636,
+  "Kratonium ore": 57181,
   "Kwuarm incense sticks": 47709,
   "Kwuarm potion (unfinished)": 105,
   "Kwuarm seed": 5299,
   "Laboratory relic (common)": 43383,
   "Laboratory relic (rare)": 43379,
   "Laboratory relic (uncommon)": 43381,
-  "Laniakea's spear": 51472,
+  "Laniakea's spear": 48103,
   "Lantadyme incense sticks": 47713,
   "Lantadyme potion (unfinished)": 2483,
   "Lantadyme seed": 5302,
@@ -1020,7 +1020,7 @@
   "Leather": 1741,
   "Leather cowl": 1167,
   "Leather gloves": 1059,
-  "Leather scraps": 31339,
+  "Leather scraps": 49452,
   "Legatus's Emberstaff": 59917,
   "Leng artefact": 52021,
   "Lesser necroplasm": 55599,
@@ -1052,8 +1052,8 @@
   "Magic longbow (unstrung)": 70,
   "Magic notepaper": 30372,
   "Magic plank": 54868,
-  "Magic potion (2)": 14273,
-  "Magic potion (4)": 14269,
+  "Magic potion (2)": 27516,
+  "Magic potion (4)": 27512,
   "Magic secateurs": 7409,
   "Magic seed": 5316,
   "Magic shortbow": 861,
@@ -1072,7 +1072,7 @@
   "Mahogany wood spirit": 54921,
   "Malachite green": 49476,
   "Malevolent energy": 30027,
-  "Malevolent kiteshield": 30016,
+  "Malevolent kiteshield": 30014,
   "Malletops (unchecked)": 48503,
   "Mammoth tusk": 36023,
   "Manifest shadow core": 32608,
@@ -1097,7 +1097,7 @@
   "Marigold seed": 5096,
   "Marigolds": 6010,
   "Mark of the Kyzaj": 49478,
-  "Marmaros ore": 17634,
+  "Marmaros ore": 57179,
   "Marrentill seed": 5292,
   "Mask of Reflection": 27620,
   "Mask of Stench": 31091,
@@ -1109,12 +1109,12 @@
   "Massive pouch": 24205,
   "Master archaeologist's hat": 49941,
   "Masterwork 2h sword": 57464,
-  "Masterwork melee boots": 45967,
-  "Masterwork melee gloves": 45962,
-  "Masterwork melee helm": 45957,
-  "Masterwork melee platebody": 45972,
-  "Masterwork melee platelegs": 45977,
-  "Masuta's warspear": 43055,
+  "Masterwork melee boots": 45965,
+  "Masterwork melee gloves": 45960,
+  "Masterwork melee helm": 45955,
+  "Masterwork melee platebody": 45970,
+  "Masterwork melee platelegs": 45975,
+  "Masuta's warspear": 43053,
   "Material manual": 49946,
   "Mattock of Time and Space": 49581,
   "Mazcab ability codex": 35148,
@@ -1137,7 +1137,7 @@
   "Memory-storage bot (Cres)": 42906,
   "Menaphite gift offering (medium)": 40306,
   "Menaphite gift offering (small)": 40304,
-  "Merciless kiteshield": 30024,
+  "Merciless kiteshield": 30022,
   "Merethiel's stave": 42767,
   "Metamorphic geode": 44818,
   "Miasma rune": 55340,
@@ -1180,10 +1180,10 @@
   "Moonstone dust": 57546,
   "Morchella mushroom": 21622,
   "Morchella mushroom spore": 21620,
-  "Morrigan's coif": 13878,
+  "Morrigan's coif": 13876,
   "Morrigan's javelin": 13879,
-  "Morrigan's leather body": 13872,
-  "Morrigan's leather chaps": 13875,
+  "Morrigan's leather body": 13870,
+  "Morrigan's leather chaps": 13873,
   "Morrigan's throwing axe": 13883,
   "Mort myre fungus": 2970,
   "Morytania legs 1": 24134,
@@ -1216,17 +1216,17 @@
   "Necronium pickaxe": 46372,
   "Necronium pickaxe + 4": 46380,
   "Necrotic anima stone": 59361,
-  "Nightmare gauntlets": 39250,
+  "Nightmare gauntlets": 39248,
   "Nightmare muspah pouch": 31328,
   "Ninja impling jar": 11254,
   "Nodon spike harness": 59925,
   "Noose wand": 10150,
   "North-western anachronia teleport (item)": 58445,
   "Nose peg": 4168,
-  "Novite ore": 17630,
-  "Noxious longbow": 31735,
-  "Noxious scythe": 31727,
-  "Noxious staff": 31731,
+  "Novite ore": 57175,
+  "Noxious longbow": 31733,
+  "Noxious scythe": 31725,
+  "Noxious staff": 31729,
   "Numbing root": 30778,
   "Nuts": 12130,
   "Oak frame": 54454,
@@ -1243,7 +1243,7 @@
   "Ochre snelm (round)": 3331,
   "Oculi apoterrasaur (unchecked)": 48501,
   "Ode to Deceit": 57158,
-  "Off-hand Blightbound crossbow": 42776,
+  "Off-hand Blightbound crossbow": 42774,
   "Off-hand adamant crossbow": 25889,
   "Off-hand adamant knife": 25900,
   "Off-hand adamant throwing axe": 25907,
@@ -1252,25 +1252,25 @@
   "Off-hand black mace": 25680,
   "Off-hand bronze crossbow": 25881,
   "Off-hand bronze throwing axe": 25903,
-  "Off-hand crystal chakram": 32236,
-  "Off-hand crystal dagger": 32227,
+  "Off-hand crystal chakram": 32234,
+  "Off-hand crystal dagger": 32225,
   "Off-hand demon slayer crossbow": 27170,
   "Off-hand dragon battleaxe": 25776,
   "Off-hand dragon claw": 25555,
   "Off-hand dragon longsword": 25740,
   "Off-hand dragon mace": 25689,
-  "Off-hand drygore longsword": 26593,
-  "Off-hand drygore mace": 26601,
-  "Off-hand drygore rapier": 26585,
+  "Off-hand drygore longsword": 26591,
+  "Off-hand drygore mace": 26599,
+  "Off-hand drygore rapier": 26583,
   "Off-hand iron crossbow": 25883,
   "Off-hand iron throwing axe": 25904,
-  "Off-hand khopesh of the Kharidian": 40318,
+  "Off-hand khopesh of the Kharidian": 40316,
   "Off-hand mithril crossbow": 25887,
   "Off-hand mithril knife": 25899,
   "Off-hand mithril throwing axe": 25906,
-  "Off-hand ripper claw": 36010,
+  "Off-hand ripper claw": 36008,
   "Off-hand rune knife": 25901,
-  "Off-hand shadow glaive": 37083,
+  "Off-hand shadow glaive": 37080,
   "Off-hand steel crossbow": 25885,
   "Off-hand steel knife": 25898,
   "Off-hand steel throwing axe": 25905,
@@ -1290,7 +1290,7 @@
   "Opal bolt tips": 45,
   "Orb of corrupted anima": 37619,
   "Orb of pure anima": 37621,
-  "Orb of the Cywir elders": 40603,
+  "Orb of the Cywir elders": 40600,
   "Orb of volcanic anima": 37620,
   "Orgone": 50694,
   "Orichalcite ore": 44822,
@@ -1324,11 +1324,11 @@
   "Perfect juju smithing potion (4)": 32783,
   "Perfect juju woodcutting potion (1)": 32753,
   "Perfect plus potion": 33234,
-  "Pernix body": 20153,
-  "Pernix boots": 24990,
-  "Pernix chaps": 20157,
-  "Pernix cowl": 20149,
-  "Pernix gloves": 24975,
+  "Pernix body": 20151,
+  "Pernix boots": 25068,
+  "Pernix chaps": 20155,
+  "Pernix cowl": 20147,
+  "Pernix gloves": 25058,
   "Phasmatite": 44828,
   "Phasmatite stone spirit": 44812,
   "Phoenix Lair Teleport": 19478,
@@ -1394,7 +1394,7 @@
   "Primal pickaxe + 5": 57401,
   "Primal stone spirit": 57174,
   "Prime colossus": 39919,
-  "Promethium ore": 17648,
+  "Promethium ore": 57193,
   "Pumpkin mask": 55972,
   "Pure essence": 7936,
   "Purple mushroom": 42782,
@@ -1438,7 +1438,7 @@
   "Raw swordfish": 371,
   "Raw tuna": 359,
   "Raw wolf meat": 23058,
-  "Razorback gauntlets": 30215,
+  "Razorback gauntlets": 30213,
   "Reaver's ring": 51470,
   "Red chinchompa": 10034,
   "Red dragon leather": 2507,
@@ -1481,7 +1481,7 @@
   "Ring of slaying": 13281,
   "Ring of vigour": 19669,
   "Ripper Demon scroll (Death From Above)": 49419,
-  "Ripper claw": 36006,
+  "Ripper claw": 36004,
   "Ripper dinosaur (unchecked)": 48483,
   "Roar of Awakening": 57162,
   "Robe bottom of Tumeken's resplendence": 59346,
@@ -1569,11 +1569,11 @@
   "Scrimshaw of sacrifice (inactive)": 35769,
   "Scrimshaw of the elements": 26301,
   "Scrimshaw of vampyrism": 26295,
-  "Scripture of Amascut": 57126,
-  "Scripture of Bik": 52347,
-  "Scripture of Elidinis": 57526,
-  "Scripture of Ful": 52494,
-  "Scripture of Jas": 51814,
+  "Scripture of Amascut": 57124,
+  "Scripture of Bik": 52345,
+  "Scripture of Elidinis": 57524,
+  "Scripture of Ful": 52492,
+  "Scripture of Jas": 51812,
   "Scripture of Wen": 52117,
   "Scroll of cleansing": 19890,
   "Scroll of dexterity": 31452,
@@ -1589,15 +1589,15 @@
   "Seaweed": 401,
   "Seed bag": 52212,
   "Seedicide": 31188,
-  "Seeker's charm": 17289,
+  "Seeker's charm": 41580,
   "Seer's headband 1": 14631,
   "Seercull": 6724,
   "Seers' ring": 6731,
   "Seiryu's claw": 37822,
-  "Seismic singularity": 28623,
-  "Seismic wand": 28619,
+  "Seismic singularity": 28621,
+  "Seismic wand": 28617,
   "Serenic essence": 37033,
-  "Shadow glaive": 37078,
+  "Shadow glaive": 37075,
   "Shadow spike": 51086,
   "Shaft": 52,
   "Shard of Genesis Essence": 57128,
@@ -1733,8 +1733,8 @@
   "Starved ancient effigy": 18778,
   "Static gloves": 27481,
   "Statius's full helm": 13896,
-  "Statius's platebody": 13886,
-  "Statius's platelegs": 13892,
+  "Statius's platebody": 13884,
+  "Statius's platelegs": 13890,
   "Statius's warhammer": 13902,
   "Steadfast scale": 34972,
   "Steam battlestaff": 11736,
@@ -1841,7 +1841,7 @@
   "Tectonic energy": 28627,
   "Teleport to house": 8013,
   "Tempered fungal shaft": 53083,
-  "Terrasaur maul": 48009,
+  "Terrasaur maul": 48007,
   "Tetracompass (unpowered)": 49956,
   "Tetsu sword upgrade kit": 43071,
   "The Devourer's Nexus (unattuned)": 59358,
@@ -1873,7 +1873,7 @@
   "Tomato seed": 5322,
   "Tome of frost": 18346,
   "Tooth half of a key": 985,
-  "Torag's hammer": 35568,
+  "Torag's hammer": 4747,
   "Torag's helm": 4745,
   "Torag's platebody": 4749,
   "Torag's platelegs": 4751,
@@ -1882,11 +1882,11 @@
   "Torstol seed": 5304,
   "Tortoise shell": 7939,
   "Tortured ashes": 33260,
-  "Torva boots": 24984,
-  "Torva full helm": 20137,
-  "Torva gloves": 24978,
-  "Torva platebody": 20141,
-  "Torva platelegs": 20145,
+  "Torva boots": 25064,
+  "Torva full helm": 20135,
+  "Torva gloves": 25060,
+  "Torva platebody": 20139,
+  "Torva platelegs": 20143,
   "Totem of Crystal": 48113,
   "Totem of Intimidation": 48121,
   "Totem of Summoning": 48125,
@@ -1932,16 +1932,16 @@
   "Vellum": 49462,
   "Venator dagger": 49922,
   "Venator light crossbow": 49924,
-  "Vengeful kiteshield": 30020,
+  "Vengeful kiteshield": 30018,
   "Venomous dinosaur (unchecked)": 48479,
   "Verac's brassard": 4757,
-  "Verac's flail": 35572,
+  "Verac's flail": 4755,
   "Verac's helm": 4753,
   "Verac's plateskirt": 4759,
-  "Vesta's chainbody": 13889,
-  "Vesta's longsword": 13901,
-  "Vesta's plateskirt": 13895,
-  "Vesta's spear": 13907,
+  "Vesta's chainbody": 13887,
+  "Vesta's longsword": 13899,
+  "Vesta's plateskirt": 13893,
+  "Vesta's spear": 13905,
   "Vestments of havoc boots": 53384,
   "Vestments of havoc hood": 53375,
   "Vestments of havoc robe bottom": 53381,
@@ -1951,13 +1951,13 @@
   "Vibrant energy": 29319,
   "Viridian chinchompa (unchecked)": 43604,
   "Viridian skillchompa": 31596,
-  "Virtus book": 30495,
-  "Virtus boots": 24987,
-  "Virtus gloves": 24981,
-  "Virtus mask": 20161,
-  "Virtus robe legs": 20169,
-  "Virtus robe top": 20165,
-  "Virtus wand": 30493,
+  "Virtus book": 25664,
+  "Virtus boots": 25066,
+  "Virtus gloves": 25062,
+  "Virtus mask": 20159,
+  "Virtus robe legs": 20167,
+  "Virtus robe top": 20163,
+  "Virtus wand": 25654,
   "Vital spark": 40324,
   "Vital spark drop enhancer": 43376,
   "Volcanic ash": 50696,
@@ -1967,8 +1967,8 @@
   "Vulcanised rubber": 49480,
   "Vulnerability bomb": 48951,
   "Wand": 11012,
-  "Wand of the Cywir elders": 37088,
-  "Wand of the praesul": 39577,
+  "Wand of the Cywir elders": 37085,
+  "Wand of the praesul": 39574,
   "War tortoise pouch": 12031,
   "War's Blessing 1": 58412,
   "War's Blessing 2": 58413,
@@ -2040,7 +2040,7 @@
   "Wyrm spike": 34151,
   "Wyrmfire potion (6)": 33054,
   "Wyvern bones": 6812,
-  "Wyvern crossbow": 35987,
+  "Wyvern crossbow": 35985,
   "Wyvern spines": 35989,
   "XP Capacitor 5000 (charged)": 49979,
   "XP Capacitor 5000 (inactive)": 49977,
@@ -2063,16 +2063,16 @@
   "Zanarian zygomite (unchecked)": 43681,
   "Zarosian essence": 37030,
   "Zarosian insignia": 49514,
-  "Zaryte bow": 20173,
+  "Zaryte bow": 20171,
   "Zemouregal's nexus": 56143,
-  "Zephyrium ore": 17640,
+  "Zephyrium ore": 57185,
   "Zombie impling jar": 15515,
-  "Zuriel's hood": 13866,
-  "Zuriel's robe bottom": 13863,
-  "Zuriel's robe top": 13860,
-  "Zuriel's staff": 13869,
+  "Zuriel's hood": 13864,
+  "Zuriel's robe bottom": 13861,
+  "Zuriel's robe top": 13858,
+  "Zuriel's staff": 13867,
   "Zygomite fruit": 43983,
-  "amulet of souls": 31877,
+  "amulet of souls": 31875,
   "attuned crystal body": 35424,
   "attuned crystal boots": 35430,
   "attuned crystal gloves": 35433,
@@ -2382,6 +2382,14 @@
   "simple generator"
  ],
  "item_families": {
+  "Abyssal scourge": [
+   52931,
+   52933
+  ],
+  "Achto Teralith helmet": [
+   35174,
+   35245
+  ],
   "Adrenaline potion": [
    15303,
    15302,
@@ -2396,11 +2404,191 @@
    48237,
    48239
   ],
+  "Ahrim's book of magic": [
+   25672,
+   36807
+  ],
+  "Ahrim's staff": [
+   4710,
+   35552
+  ],
+  "Ahrim's wand": [
+   25652,
+   36810
+  ],
+  "Akrisae's war mace": [
+   21744,
+   35577
+  ],
+  "Amulet of souls": [
+   31875,
+   31877
+  ],
+  "Amulet of souls (or)": [
+   41963,
+   41964
+  ],
+  "Amulet of the forsaken": [
+   39061,
+   39063
+  ],
   "Antipoison++": [
    5958,
    5956,
    5954,
    5952
+  ],
+  "Arcane blood necklace": [
+   32694,
+   32695
+  ],
+  "Ascension crossbow": [
+   28437,
+   28439
+  ],
+  "Ascension grips": [
+   31203,
+   31205
+  ],
+  "Black dragon egg (unchecked)": [
+   43723,
+   43724
+  ],
+  "Blade of Avaryss": [
+   37095,
+   37098
+  ],
+  "Blade of Nymora": [
+   37090,
+   37093
+  ],
+  "Blast diffusion boots": [
+   48085,
+   48087
+  ],
+  "Blightbound crossbow": [
+   42770,
+   42772
+  ],
+  "Blood amulet of fury": [
+   32703,
+   32704
+  ],
+  "Boots of lightness": [
+   88,
+   89
+  ],
+  "Bow of the Last Guardian": [
+   53338,
+   53340
+  ],
+  "Brawler's blood necklace": [
+   32700,
+   32701
+  ],
+  "Brooch of the Gods": [
+   50462,
+   50464
+  ],
+  "Chaos die reroll token": [
+   53278,
+   53442
+  ],
+  "Cinderbane gloves": [
+   41106,
+   41108
+  ],
+  "Coins": [
+   995,
+   54830
+  ],
+  "Crystal body": [
+   35404,
+   35406
+  ],
+  "Crystal boots": [
+   35412,
+   35414
+  ],
+  "Crystal bow": [
+   32228,
+   32230
+  ],
+  "Crystal chakram": [
+   32231,
+   32233
+  ],
+  "Crystal dagger": [
+   32222,
+   32224
+  ],
+  "Crystal deflector": [
+   32243,
+   32245
+  ],
+  "Crystal gloves": [
+   35416,
+   35418
+  ],
+  "Crystal halberd": [
+   32219,
+   32221
+  ],
+  "Crystal helm": [
+   35400,
+   35402
+  ],
+  "Crystal knife": [
+   32635,
+   32636
+  ],
+  "Crystal orb": [
+   32216,
+   32218
+  ],
+  "Crystal shield": [
+   32240,
+   32242
+  ],
+  "Crystal staff": [
+   32210,
+   32212
+  ],
+  "Crystal wand": [
+   32213,
+   32215
+  ],
+  "Crystal ward": [
+   32237,
+   32239
+  ],
+  "Dharok's greataxe": [
+   4718,
+   35556
+  ],
+  "Dragon Rider lance": [
+   37070,
+   37073
+  ],
+  "Dragonfire shield": [
+   11283,
+   11284
+  ],
+  "Drygore longsword": [
+   26587,
+   26589
+  ],
+  "Drygore mace": [
+   26595,
+   26597
+  ],
+  "Drygore rapier": [
+   26579,
+   26581
+  ],
+  "Ek-ZekKil": [
+   52511,
+   52513
   ],
   "Elder overload potion": [
    49029,
@@ -2418,6 +2606,26 @@
    49050,
    49052
   ],
+  "Elder rune round shield": [
+   45748,
+   45750
+  ],
+  "Eldritch crossbow": [
+   47470,
+   47472
+  ],
+  "Energy-gathering scrimshaw": [
+   38828,
+   38830
+  ],
+  "Erethdor's grimoire": [
+   42785,
+   42787
+  ],
+  "Essence of Finality amulet": [
+   50465,
+   50467
+  ],
   "Extreme divination": [
    44107,
    44105,
@@ -2430,12 +2638,51 @@
    44119,
    44117
   ],
+  "Fleeting boots": [
+   51082,
+   51084
+  ],
   "Forinthry bracelet": [
    11103,
    11101,
    11099,
    11097,
    11095
+  ],
+  "Fractured Staff of Armadyl": [
+   51772,
+   51774
+  ],
+  "Ghost hunter body": [
+   32380,
+   32381,
+   32382
+  ],
+  "Ghost hunter goggles": [
+   32386,
+   32387,
+   32388
+  ],
+  "Ghost hunter legs": [
+   32383,
+   32384,
+   32385
+  ],
+  "Gloves of passage": [
+   40320,
+   40322
+  ],
+  "Grace of the elves": [
+   44548,
+   44550
+  ],
+  "Grasping rune pouch": [
+   52215,
+   52217
+  ],
+  "Guthan's warspear": [
+   4726,
+   35560
   ],
   "Holy overload potion": [
    33236,
@@ -2445,6 +2692,164 @@
    33244,
    33246
   ],
+  "Imperium core": [
+   39579,
+   39582
+  ],
+  "Inquisitor staff": [
+   49982,
+   49984
+  ],
+  "Jaws of the Abyss": [
+   52926,
+   52928
+  ],
+  "Karil's crossbow": [
+   4734,
+   35564
+  ],
+  "Karil's off-hand pistol crossbow": [
+   25895,
+   36804
+  ],
+  "Karil's pistol crossbow": [
+   25918,
+   36801
+  ],
+  "Kerapac's wrist wraps": [
+   51767,
+   51770
+  ],
+  "Khopesh of Tumeken": [
+   40655,
+   40657
+  ],
+  "Khopesh of the Kharidian": [
+   40312,
+   40314
+  ],
+  "Laniakea's spear": [
+   48103,
+   51472
+  ],
+  "Malevolent kiteshield": [
+   30014,
+   30016
+  ],
+  "Massive pouch": [
+   24204,
+   24205
+  ],
+  "Masterwork 2h sword": [
+   57462,
+   57464
+  ],
+  "Masterwork melee boots": [
+   45965,
+   45967
+  ],
+  "Masterwork melee gloves": [
+   45960,
+   45962
+  ],
+  "Masterwork melee helm": [
+   45955,
+   45957
+  ],
+  "Masterwork melee platebody": [
+   45970,
+   45972
+  ],
+  "Masterwork melee platelegs": [
+   45975,
+   45977
+  ],
+  "Masuta's warspear": [
+   43053,
+   43055
+  ],
+  "Merciless kiteshield": [
+   30022,
+   30024
+  ],
+  "Morrigan's coif": [
+   13876,
+   13878
+  ],
+  "Morrigan's leather body": [
+   13870,
+   13872
+  ],
+  "Morrigan's leather chaps": [
+   13873,
+   13875
+  ],
+  "Nightmare gauntlets": [
+   39248,
+   39250
+  ],
+  "Noxious longbow": [
+   31733,
+   31735
+  ],
+  "Noxious scythe": [
+   31725,
+   31727
+  ],
+  "Noxious staff": [
+   31729,
+   31731
+  ],
+  "Off-hand Blightbound crossbow": [
+   42774,
+   42776
+  ],
+  "Off-hand crystal chakram": [
+   32234,
+   32236
+  ],
+  "Off-hand crystal dagger": [
+   32225,
+   32227
+  ],
+  "Off-hand drygore longsword": [
+   26591,
+   26593
+  ],
+  "Off-hand drygore mace": [
+   26599,
+   26601
+  ],
+  "Off-hand drygore rapier": [
+   26583,
+   26585
+  ],
+  "Off-hand khopesh of the Kharidian": [
+   40316,
+   40318
+  ],
+  "Off-hand ripper claw": [
+   36008,
+   36010
+  ],
+  "Off-hand shadow glaive": [
+   37080,
+   37083
+  ],
+  "Orb of the Cywir elders": [
+   40600,
+   40603
+  ],
+  "Passage of the abyss": [
+   44542,
+   44543,
+   44544,
+   44545
+  ],
+  "Penance gloves": [
+   10553,
+   10554
+  ],
   "Perfect plus potion": [
    33224,
    33226,
@@ -2453,11 +2858,35 @@
    33232,
    33234
   ],
+  "Pernix body": [
+   20151,
+   20153
+  ],
+  "Pernix boots": [
+   24990,
+   25068
+  ],
+  "Pernix chaps": [
+   20155,
+   20157
+  ],
+  "Pernix cowl": [
+   20147,
+   20149
+  ],
+  "Pernix gloves": [
+   24975,
+   25058
+  ],
   "Powerburst of sorcery": [
    49069,
    49067,
    49065,
    49063
+  ],
+  "Razorback gauntlets": [
+   30213,
+   30215
   ],
   "Ring of duelling": [
    2566,
@@ -2479,6 +2908,10 @@
    13282,
    13281
   ],
+  "Ripper claw": [
+   36004,
+   36006
+  ],
   "Runecrafting potion": [
    44059,
    44057,
@@ -2490,6 +2923,54 @@
    6689,
    6687,
    6685
+  ],
+  "Scripture of Amascut": [
+   57124,
+   57126
+  ],
+  "Scripture of Bik": [
+   52345,
+   52347
+  ],
+  "Scripture of Elidinis": [
+   57524,
+   57526
+  ],
+  "Scripture of Ful": [
+   52492,
+   52494
+  ],
+  "Scripture of Jas": [
+   51812,
+   51814
+  ],
+  "Scripture of Wen": [
+   52115,
+   52117
+  ],
+  "Seismic singularity": [
+   28621,
+   28623
+  ],
+  "Seismic wand": [
+   28617,
+   28619
+  ],
+  "Shadow glaive": [
+   37075,
+   37078
+  ],
+  "Spottier cape": [
+   10071,
+   10074
+  ],
+  "Statius's platebody": [
+   13884,
+   13886
+  ],
+  "Statius's platelegs": [
+   13890,
+   13892
   ],
   "Super prayer renewal potion": [
    33176,
@@ -2513,6 +2994,102 @@
    23401,
    23399
   ],
+  "Superior rock-crushing scrimshaw": [
+   26288,
+   33893
+  ],
+  "Superior scrimshaw of vampyrism": [
+   26297,
+   33909
+  ],
+  "Terrasaur maul": [
+   48007,
+   48009
+  ],
+  "Torag's hammer": [
+   4747,
+   35568
+  ],
+  "Torva boots": [
+   24984,
+   25064
+  ],
+  "Torva full helm": [
+   20135,
+   20137
+  ],
+  "Torva gloves": [
+   24978,
+   25060
+  ],
+  "Torva platebody": [
+   20139,
+   20141
+  ],
+  "Torva platelegs": [
+   20143,
+   20145
+  ],
+  "Vengeful kiteshield": [
+   30018,
+   30020
+  ],
+  "Verac's flail": [
+   4755,
+   35572
+  ],
+  "Vesta's chainbody": [
+   13887,
+   13889
+  ],
+  "Vesta's longsword": [
+   13899,
+   13901
+  ],
+  "Vesta's plateskirt": [
+   13893,
+   13895
+  ],
+  "Vesta's spear": [
+   13905,
+   13907
+  ],
+  "Virtus book": [
+   25664,
+   30495
+  ],
+  "Virtus boots": [
+   24987,
+   25066
+  ],
+  "Virtus gloves": [
+   24981,
+   25062
+  ],
+  "Virtus mask": [
+   20159,
+   20161
+  ],
+  "Virtus robe legs": [
+   20167,
+   20169
+  ],
+  "Virtus robe top": [
+   20163,
+   20165
+  ],
+  "Virtus wand": [
+   25654,
+   30493
+  ],
+  "Wand of the Cywir elders": [
+   37085,
+   37088
+  ],
+  "Wand of the praesul": [
+   39574,
+   39577
+  ],
   "Waterskin": [
    1831,
    1829,
@@ -2525,6 +3102,74 @@
    49119,
    49117,
    49115
+  ],
+  "Wicked cape": [
+   24210,
+   24211
+  ],
+  "Wicked legs": [
+   24208,
+   24209
+  ],
+  "Wicked robe top": [
+   24206,
+   24207
+  ],
+  "Wingsuit v1": [
+   49381,
+   50120
+  ],
+  "Wyvern crossbow": [
+   35985,
+   35987
+  ],
+  "Zaryte bow": [
+   20171,
+   20173
+  ],
+  "Zuriel's hood": [
+   13864,
+   13866
+  ],
+  "Zuriel's robe bottom": [
+   13861,
+   13863
+  ],
+  "Zuriel's robe top": [
+   13858,
+   13860
+  ],
+  "Zuriel's staff": [
+   13867,
+   13869
+  ],
+  "amulet of souls": [
+   31875,
+   31877
+  ],
+  "attuned crystal body": [
+   35423,
+   35424
+  ],
+  "attuned crystal boots": [
+   35429,
+   35430
+  ],
+  "attuned crystal gloves": [
+   35432,
+   35433
+  ],
+  "attuned crystal helm": [
+   35420,
+   35421
+  ],
+  "brawler's blood necklace": [
+   32700,
+   32701
+  ],
+  "coins": [
+   995,
+   54830
   ],
   "kethsi ring": [
    34995,
@@ -2549,6 +3194,7 @@
   "70": "Magic longbow (unstrung)",
   "72": "Magic shortbow (unstrung)",
   "88": "Boots of lightness",
+  "89": "Boots of lightness",
   "91": "Guam potion (unfinished)",
   "99": "Ranarr potion (unfinished)",
   "101": "Irit potion (unfinished)",
@@ -2929,21 +3575,27 @@
   "4698": "Mud rune",
   "4699": "Lava rune",
   "4708": "Ahrim's hood",
+  "4710": "Ahrim's staff",
   "4712": "Ahrim's robe top",
   "4714": "Ahrim's robe skirt",
   "4716": "Dharok's helm",
+  "4718": "Dharok's greataxe",
   "4722": "Dharok's platelegs",
   "4724": "Guthan's helm",
+  "4726": "Guthan's warspear",
   "4728": "Guthan's platebody",
   "4730": "Guthan's chainskirt",
   "4732": "Karil's coif",
+  "4734": "Karil's crossbow",
   "4736": "Karil's top",
   "4738": "Karil's skirt",
   "4740": "Bolt rack",
   "4745": "Torag's helm",
+  "4747": "Torag's hammer",
   "4749": "Torag's platebody",
   "4751": "Torag's platelegs",
   "4753": "Verac's helm",
+  "4755": "Verac's flail",
   "4757": "Verac's brassard",
   "4759": "Verac's plateskirt",
   "5073": "Bird's nest (seeds)",
@@ -3117,12 +3769,14 @@
   "10020": "Ruby harvest jar",
   "10034": "Red chinchompa",
   "10071": "Spottier cape",
+  "10074": "Spottier cape",
   "10075": "Gloves of silence",
   "10117": "Polar kebbit fur",
   "10148": "Black salamander",
   "10149": "Green salamander",
   "10150": "Noose wand",
   "10553": "Penance gloves",
+  "10554": "Penance gloves",
   "10581": "Keris",
   "10588": "Salve amulet (e)",
   "10818": "Yak-hide",
@@ -3154,6 +3808,7 @@
   "11259": "Magic butterfly net",
   "11260": "Impling jar",
   "11283": "Dragonfire shield",
+  "11284": "Dragonfire shield",
   "11286": "Draconic visage",
   "11335": "Dragon full helm",
   "11702": "Armadyl hilt",
@@ -3235,22 +3890,35 @@
   "13750": "Elysian sigil",
   "13752": "Spectral sigil",
   "13754": "Holy elixir",
+  "13858": "Zuriel's robe top",
   "13860": "Zuriel's robe top",
+  "13861": "Zuriel's robe bottom",
   "13863": "Zuriel's robe bottom",
+  "13864": "Zuriel's hood",
   "13866": "Zuriel's hood",
+  "13867": "Zuriel's staff",
   "13869": "Zuriel's staff",
+  "13870": "Morrigan's leather body",
   "13872": "Morrigan's leather body",
+  "13873": "Morrigan's leather chaps",
   "13875": "Morrigan's leather chaps",
+  "13876": "Morrigan's coif",
   "13878": "Morrigan's coif",
   "13879": "Morrigan's javelin",
   "13883": "Morrigan's throwing axe",
+  "13884": "Statius's platebody",
   "13886": "Statius's platebody",
+  "13887": "Vesta's chainbody",
   "13889": "Vesta's chainbody",
+  "13890": "Statius's platelegs",
   "13892": "Statius's platelegs",
+  "13893": "Vesta's plateskirt",
   "13895": "Vesta's plateskirt",
   "13896": "Statius's full helm",
+  "13899": "Vesta's longsword",
   "13901": "Vesta's longsword",
   "13902": "Statius's warhammer",
+  "13905": "Vesta's spear",
   "13907": "Vesta's spear",
   "13908": "Corrupt Statius's platebody",
   "13911": "Corrupt Vesta's chainbody",
@@ -3280,8 +3948,6 @@
   "13982": "Corrupt dragon longsword",
   "13985": "Corrupt dragon mace",
   "13988": "Corrupt dragon spear",
-  "14269": "Magic potion (4)",
-  "14273": "Magic potion (2)",
   "14472": "Ruined dragon armour lump",
   "14474": "Ruined dragon armour slice",
   "14476": "Ruined dragon armour shard",
@@ -3318,17 +3984,6 @@
   "15517": "Kingly impling jar",
   "15670": "Champion's tackle box",
   "15707": "Ring of kinship",
-  "17289": "Seeker's charm",
-  "17630": "Novite ore",
-  "17632": "Bathus ore",
-  "17634": "Marmaros ore",
-  "17636": "Kratonium ore",
-  "17638": "Fractite ore",
-  "17640": "Zephyrium ore",
-  "17642": "Argonite ore",
-  "17644": "Katagon ore",
-  "17646": "Gorgonite ore",
-  "17648": "Promethium ore",
   "18334": "Arcane blast necklace",
   "18336": "Scroll of life",
   "18337": "Bonecrusher",
@@ -3363,15 +4018,25 @@
   "20039": "Zamorak's favour (4)",
   "20042": "Zamorak's favour (1)",
   "20046": "Witchdoctor mask",
+  "20135": "Torva full helm",
   "20137": "Torva full helm",
+  "20139": "Torva platebody",
   "20141": "Torva platebody",
+  "20143": "Torva platelegs",
   "20145": "Torva platelegs",
+  "20147": "Pernix cowl",
   "20149": "Pernix cowl",
+  "20151": "Pernix body",
   "20153": "Pernix body",
+  "20155": "Pernix chaps",
   "20157": "Pernix chaps",
+  "20159": "Virtus mask",
   "20161": "Virtus mask",
+  "20163": "Virtus robe top",
   "20165": "Virtus robe top",
+  "20167": "Virtus robe legs",
   "20169": "Virtus robe legs",
+  "20171": "Zaryte bow",
   "20173": "Zaryte bow",
   "20264": "Impious ashes",
   "20266": "Accursed ashes",
@@ -3396,6 +4061,7 @@
   "21640": "Dragonbane arrow",
   "21660": "Dragonbane bolts",
   "21736": "Akrisae's hood",
+  "21744": "Akrisae's war mace",
   "21752": "Akrisae's robe top",
   "21760": "Akrisae's robe skirt",
   "21778": "Banite ore",
@@ -3442,10 +4108,14 @@
   "24134": "Morytania legs 1",
   "24135": "Morytania legs 2",
   "24137": "Morytania legs 4",
+  "24204": "Massive pouch",
   "24205": "Massive pouch",
   "24206": "Wicked robe top",
+  "24207": "Wicked robe top",
   "24208": "Wicked legs",
+  "24209": "Wicked legs",
   "24210": "Wicked cape",
+  "24211": "Wicked cape",
   "24336": "Royal bolts",
   "24338": "Royal crossbow",
   "24340": "Royal bolt stabiliser",
@@ -3475,7 +4145,12 @@
   "25019": "Bandos warshield",
   "25022": "Bandos helmet",
   "25025": "Bandos gloves",
-  "25355": "Ectoplasm",
+  "25058": "Pernix gloves",
+  "25060": "Torva gloves",
+  "25062": "Virtus gloves",
+  "25064": "Torva boots",
+  "25066": "Virtus boots",
+  "25068": "Pernix boots",
   "25481": "Dragon limbs",
   "25483": "Magic stock",
   "25497": "Weapon poison+ (2)",
@@ -3485,7 +4160,11 @@
   "25551": "Carapace",
   "25555": "Off-hand dragon claw",
   "25640": "Splitbark wand",
+  "25652": "Ahrim's wand",
+  "25654": "Virtus wand",
+  "25664": "Virtus book",
   "25670": "Splitbark orb",
+  "25672": "Ahrim's book of magic",
   "25674": "Bronze off hand mace",
   "25676": "Iron off hand mace",
   "25680": "Off-hand black mace",
@@ -3503,6 +4182,7 @@
   "25885": "Off-hand steel crossbow",
   "25887": "Off-hand mithril crossbow",
   "25889": "Off-hand adamant crossbow",
+  "25895": "Karil's off-hand pistol crossbow",
   "25898": "Off-hand steel knife",
   "25899": "Off-hand mithril knife",
   "25900": "Off-hand adamant knife",
@@ -3514,6 +4194,7 @@
   "25906": "Off-hand mithril throwing axe",
   "25907": "Off-hand adamant throwing axe",
   "25917": "Dragon crossbow",
+  "25918": "Karil's pistol crossbow",
   "25919": "Bronze 2h crossbow",
   "25921": "Iron 2h crossbow",
   "25923": "Steel 2h crossbow",
@@ -3528,11 +4209,17 @@
   "26301": "Scrimshaw of the elements",
   "26358": "Captain's Log",
   "26578": "Chitin scraps",
+  "26579": "Drygore rapier",
   "26581": "Drygore rapier",
+  "26583": "Off-hand drygore rapier",
   "26585": "Off-hand drygore rapier",
+  "26587": "Drygore longsword",
   "26589": "Drygore longsword",
+  "26591": "Off-hand drygore longsword",
   "26593": "Off-hand drygore longsword",
+  "26595": "Drygore mace",
   "26597": "Drygore mace",
+  "26599": "Off-hand drygore mace",
   "26601": "Off-hand drygore mace",
   "27094": "Desert amulet 2",
   "27095": "Desert amulet 3",
@@ -3547,6 +4234,8 @@
   "27477": "Sixth-Age circuit",
   "27481": "Static gloves",
   "27495": "Achromatic Balmung",
+  "27512": "Magic potion (4)",
+  "27516": "Magic potion (2)",
   "27618": "Mask of Stone",
   "27619": "Helm of Petrification",
   "27620": "Mask of Reflection",
@@ -3567,6 +4256,7 @@
   "28265": "Butterfly flower seed",
   "28266": "Barberry seed",
   "28436": "Ascension shard",
+  "28437": "Ascension crossbow",
   "28439": "Ascension crossbow",
   "28445": "Ascension Keystone",
   "28465": "Ascension bolts",
@@ -3574,7 +4264,9 @@
   "28548": "Crystal triskelion fragment 2",
   "28549": "Crystal triskelion fragment 3",
   "28550": "Crystal triskelion",
+  "28617": "Seismic wand",
   "28619": "Seismic wand",
+  "28621": "Seismic singularity",
   "28623": "Seismic singularity",
   "28627": "Tectonic energy",
   "28628": "Stone of binding",
@@ -3598,13 +4290,17 @@
   "29863": "Sirenic scale",
   "29864": "Algarum thread",
   "30004": "Barrows totem",
+  "30014": "Malevolent kiteshield",
   "30016": "Malevolent kiteshield",
+  "30018": "Vengeful kiteshield",
   "30020": "Vengeful kiteshield",
+  "30022": "Merciless kiteshield",
   "30024": "Merciless kiteshield",
   "30027": "Malevolent energy",
   "30028": "Reinforcing plate",
   "30030": "Barrows amulet",
   "30209": "Airut bones",
+  "30213": "Razorback gauntlets",
   "30215": "Razorback gauntlets",
   "30372": "Magic notepaper",
   "30447": "Spirit sapphire",
@@ -3627,6 +4323,7 @@
   "31091": "Mask of Stench",
   "31187": "Slayer VIP ticket",
   "31188": "Seedicide",
+  "31203": "Ascension grips",
   "31205": "Ascension grips",
   "31282": "Slayer master cape",
   "31291": "Farming master cape",
@@ -3634,7 +4331,6 @@
   "31328": "Nightmare muspah pouch",
   "31330": "Muspah spine",
   "31334": "Elder charm",
-  "31339": "Leather scraps",
   "31410": "Blood nihil pouch",
   "31414": "Smoke nihil pouch",
   "31436": "Hoardstalker ring",
@@ -3652,13 +4348,17 @@
   "31722": "Araxxi's fang",
   "31723": "Araxxi's eye",
   "31724": "Araxxi's web",
+  "31725": "Noxious scythe",
   "31727": "Noxious scythe",
+  "31729": "Noxious staff",
   "31731": "Noxious staff",
+  "31733": "Noxious longbow",
   "31735": "Noxious longbow",
   "31737": "Araxyte arrow",
   "31851": "Incomplete hydrix",
   "31867": "Hydrix bolt tips",
   "31868": "Ascendri bolts",
+  "31875": "Amulet of souls",
   "31877": "Amulet of souls",
   "31881": "Ascendri bolts (e)",
   "31924": "Collector's insignia",
@@ -3667,17 +4367,29 @@
   "32197": "Most Wanted card (tormented demons)",
   "32206": "Crystal weapon seed",
   "32208": "Crystal tool seed",
+  "32210": "Crystal staff",
   "32212": "Crystal staff",
+  "32213": "Crystal wand",
   "32215": "Crystal wand",
+  "32216": "Crystal orb",
   "32218": "Crystal orb",
+  "32219": "Crystal halberd",
   "32221": "Crystal halberd",
+  "32222": "Crystal dagger",
   "32224": "Crystal dagger",
+  "32225": "Off-hand crystal dagger",
   "32227": "Off-hand crystal dagger",
+  "32228": "Crystal bow",
   "32230": "Crystal bow",
+  "32231": "Crystal chakram",
   "32233": "Crystal chakram",
+  "32234": "Off-hand crystal chakram",
   "32236": "Off-hand crystal chakram",
+  "32237": "Crystal ward",
   "32239": "Crystal ward",
+  "32240": "Crystal shield",
   "32242": "Crystal shield",
+  "32243": "Crystal deflector",
   "32245": "Crystal deflector",
   "32262": "Corrupted ore",
   "32280": "Modified blacksmith's helmet",
@@ -3686,8 +4398,14 @@
   "32341": "Ghostly essence",
   "32368": "Basilisk boots",
   "32380": "Ghost hunter body",
+  "32381": "Ghost hunter body",
+  "32382": "Ghost hunter body",
   "32383": "Ghost hunter legs",
+  "32384": "Ghost hunter legs",
+  "32385": "Ghost hunter legs",
   "32386": "Ghost hunter goggles",
+  "32387": "Ghost hunter goggles",
+  "32388": "Ghost hunter goggles",
   "32525": "Asylum surgeon's ring",
   "32606": "Truthful shadow core",
   "32607": "Blissful shadow core",
@@ -3698,13 +4416,17 @@
   "32623": "Crystal armour seed",
   "32625": "Attuned crystal weapon seed",
   "32626": "Attuned crystal armour seed",
+  "32635": "Crystal knife",
   "32636": "Crystal knife",
   "32645": "Crystal hatchet",
   "32646": "Crystal pickaxe",
   "32665": "Harmony moss seed",
   "32692": "Blood necklace shard",
+  "32694": "Arcane blood necklace",
   "32695": "Arcane blood necklace",
+  "32700": "Brawler's blood necklace",
   "32701": "Brawler's blood necklace",
+  "32703": "Blood amulet of fury",
   "32704": "Blood amulet of fury",
   "32753": "Perfect juju woodcutting potion (1)",
   "32769": "Perfect juju mining potion (1)",
@@ -3739,8 +4461,10 @@
   "33719": "Tirannwn quiver 1",
   "33721": "Tirannwn quiver 3",
   "33870": "Araxyte pheromone",
+  "33893": "Superior rock-crushing scrimshaw",
   "33896": "Whopper-baiting scrimshaw",
   "33901": "Casket-salvaging scrimshaw",
+  "33909": "Superior scrimshaw of vampyrism",
   "34032": "Sunglasses",
   "34151": "Wyrm spike",
   "34153": "Wyrm heart",
@@ -3765,6 +4489,7 @@
   "35008": "Hardened dragon bones",
   "35010": "Reinforced dragon bones",
   "35148": "Mazcab ability codex",
+  "35174": "Achto Teralith helmet",
   "35199": "Cooked eeligator",
   "35201": "Teci",
   "35202": "Small goebie burial charm",
@@ -3777,13 +4502,21 @@
   "35277": "Mask of the Dagannoth",
   "35281": "Mask of the Ganodermic",
   "35282": "Helm of the Ganodermic",
+  "35400": "Crystal helm",
   "35402": "Crystal helm",
+  "35404": "Crystal body",
   "35406": "Crystal body",
+  "35412": "Crystal boots",
   "35414": "Crystal boots",
+  "35416": "Crystal gloves",
   "35418": "Crystal gloves",
+  "35420": "Attuned crystal helm",
   "35421": "Attuned crystal helm",
+  "35423": "Attuned crystal body",
   "35424": "Attuned crystal body",
+  "35429": "Attuned crystal boots",
   "35430": "Attuned crystal boots",
+  "35432": "Attuned crystal gloves",
   "35433": "Attuned crystal gloves",
   "35443": "Tarddian crystal",
   "35552": "Ahrim's staff",
@@ -3798,10 +4531,13 @@
   "35769": "Scrimshaw of sacrifice (inactive)",
   "35771": "Scrimshaw of corruption (inactive)",
   "35867": "Liberation of Mazcab reroll token",
+  "35985": "Wyvern crossbow",
   "35987": "Wyvern crossbow",
   "35989": "Wyvern spines",
   "36001": "Raptor key part 1",
+  "36004": "Ripper claw",
   "36006": "Ripper claw",
+  "36008": "Off-hand ripper claw",
   "36010": "Off-hand ripper claw",
   "36012": "Raptor key part 2",
   "36023": "Mammoth tusk",
@@ -3840,11 +4576,17 @@
   "37032": "Zamorakian essence",
   "37033": "Serenic essence",
   "37052": "Anima core helm of Seren",
+  "37070": "Dragon Rider lance",
   "37073": "Dragon Rider lance",
+  "37075": "Shadow glaive",
   "37078": "Shadow glaive",
+  "37080": "Off-hand shadow glaive",
   "37083": "Off-hand shadow glaive",
+  "37085": "Wand of the Cywir elders",
   "37088": "Wand of the Cywir elders",
+  "37090": "Blade of Nymora",
   "37093": "Blade of Nymora",
+  "37095": "Blade of Avaryss",
   "37098": "Blade of Avaryss",
   "37227": "Congealed blood",
   "37261": "Sunspear (magic)",
@@ -3875,6 +4617,7 @@
   "38451": "Small rune pouch",
   "38453": "Large rune pouch",
   "38758": "Grimy herb",
+  "38828": "Energy-gathering scrimshaw",
   "38830": "Energy-gathering scrimshaw",
   "38934": "Spirit gem bag",
   "38990": "Shard of chaos weapon token",
@@ -3882,9 +4625,11 @@
   "38992": "Shard of suffering weapon token",
   "38993": "Mimic plushie",
   "39047": "Ancient warriors' equipment patch",
+  "39061": "Amulet of the forsaken",
   "39063": "Amulet of the forsaken",
   "39065": "Wilderness hilt",
   "39067": "Adrenaline crystal",
+  "39248": "Nightmare gauntlets",
   "39250": "Nightmare gauntlets",
   "39369": "Flamtaer bracelet",
   "39370": "Traveller's necklace (new)",
@@ -3893,7 +4638,9 @@
   "39431": "Ring of Whispers",
   "39434": "Hunter's Catalyst fragment",
   "39437": "Combined Catalyst fragment",
+  "39574": "Wand of the praesul",
   "39577": "Wand of the praesul",
+  "39579": "Imperium core",
   "39582": "Imperium core",
   "39584": "Praesul codex",
   "39586": "Intricate blood stained chest",
@@ -3916,14 +4663,19 @@
   "40304": "Menaphite gift offering (small)",
   "40306": "Menaphite gift offering (medium)",
   "40310": "Key to the Crossing",
+  "40312": "Khopesh of the Kharidian",
   "40314": "Khopesh of the Kharidian",
+  "40316": "Off-hand khopesh of the Kharidian",
   "40318": "Off-hand khopesh of the Kharidian",
+  "40320": "Gloves of passage",
   "40322": "Gloves of passage",
   "40324": "Vital spark",
   "40334": "Corrupted gem",
   "40338": "Corrupted magic logs",
   "40409": "Slayer Codex",
+  "40600": "Orb of the Cywir elders",
   "40603": "Orb of the Cywir elders",
+  "40655": "Khopesh of Tumeken",
   "40657": "Khopesh of Tumeken",
   "40881": "Decorated hunter urn",
   "40918": "Decorated runecrafting urn (no rune)",
@@ -3937,9 +4689,11 @@
   "41078": "Spirit tree re-rooter",
   "41081": "Potion reservoir",
   "41083": "Divine-o-matic vacuum",
+  "41106": "Cinderbane gloves",
   "41108": "Cinderbane gloves",
   "41223": "Mystic cloth",
   "41375": "Advanced gold accumulator",
+  "41580": "Seeker's charm",
   "41589": "Stalker essence",
   "41623": "Opal bakriminel bolts (e)",
   "41627": "Emerald bakriminel bolts (e)",
@@ -3947,6 +4701,7 @@
   "41630": "Diamond bakriminel bolts (e)",
   "41633": "Hydrix bakriminel bolts (e)",
   "41885": "Elemental battlestaff",
+  "41963": "Amulet of souls (or)",
   "41964": "Amulet of souls (or)",
   "42007": "Sealed clue scroll (medium)",
   "42008": "Sealed clue scroll (hard)",
@@ -3961,14 +4716,18 @@
   "42304": "Scare Tactics",
   "42748": "Blight bolts",
   "42767": "Merethiel's stave",
+  "42770": "Blightbound crossbow",
   "42772": "Blightbound crossbow",
+  "42774": "Off-hand Blightbound crossbow",
   "42776": "Off-hand Blightbound crossbow",
   "42782": "Purple mushroom",
+  "42785": "Erethdor's grimoire",
   "42787": "Erethdor's grimoire",
   "42893": "Cursed Amascut sand",
   "42895": "Omni soulstone",
   "42906": "Memory-storage bot (Cres)",
   "42954": "Onyx dust",
+  "43053": "Masuta's warspear",
   "43055": "Masuta's warspear",
   "43058": "Relic of aminishi (rare)",
   "43060": "Relic of aminishi (uncommon)",
@@ -4000,6 +4759,7 @@
   "43684": "Arcspore zygomite (unchecked)",
   "43687": "Daemoncap zygomite (unchecked)",
   "43723": "Black dragon egg (unchecked)",
+  "43724": "Black dragon egg (unchecked)",
   "43726": "Black dragon",
   "43966": "Ultracompost",
   "43968": "Beans",
@@ -4023,7 +4783,11 @@
   "44121": "Extreme invention (2)",
   "44123": "Extreme invention (1)",
   "44131": "Extreme hunter (1)",
+  "44542": "Passage of the abyss",
+  "44543": "Passage of the abyss",
   "44544": "Passage of the abyss",
+  "44545": "Passage of the abyss",
+  "44548": "Grace of the elves",
   "44550": "Grace of the elves",
   "44781": "Iron ore box",
   "44783": "Steel ore box",
@@ -4090,11 +4854,17 @@
   "45521": "Adamant pickaxe",
   "45548": "Rune pickaxe",
   "45652": "Elder rune pickaxe + 5",
+  "45748": "Elder rune round shield",
   "45750": "Elder rune round shield",
+  "45955": "Masterwork melee helm",
   "45957": "Masterwork melee helm",
+  "45960": "Masterwork melee gloves",
   "45962": "Masterwork melee gloves",
+  "45965": "Masterwork melee boots",
   "45967": "Masterwork melee boots",
+  "45970": "Masterwork melee platebody",
   "45972": "Masterwork melee platebody",
+  "45975": "Masterwork melee platelegs",
   "45977": "Masterwork melee platelegs",
   "45988": "Immaculate alloy bar",
   "45991": "Glorious bar",
@@ -4143,6 +4913,7 @@
   "47310": "Medium plated rune salvage",
   "47312": "Large plated rune salvage",
   "47314": "Huge plated rune salvage",
+  "47470": "Eldritch crossbow",
   "47472": "Eldritch crossbow",
   "47496": "Black stone arrow tips",
   "47506": "Black stone heart",
@@ -4176,6 +4947,7 @@
   "47972": "Raw oculi apoterrasaur meat",
   "47976": "Raw malletops meat",
   "47980": "Raw pavosaurus rex meat",
+  "48007": "Terrasaur maul",
   "48009": "Terrasaur maul",
   "48022": "Dinosaur hide",
   "48024": "Damaged dinosaur hide",
@@ -4183,7 +4955,9 @@
   "48028": "Dinosaur scale",
   "48056": "Herb bag",
   "48075": "Dinosaur bones",
+  "48085": "Blast diffusion boots",
   "48087": "Blast diffusion boots",
+  "48103": "Laniakea's spear",
   "48113": "Totem of Crystal",
   "48117": "Totem of the Abyss",
   "48121": "Totem of Intimidation",
@@ -4261,6 +5035,7 @@
   "49119": "Weapon poison+++ (2)",
   "49121": "Weapon poison+++ (1)",
   "49281": "Flies",
+  "49381": "Wingsuit v1",
   "49405": "Binding contract (blood reaver)",
   "49407": "Blood Reaver scroll (Blood Siphon)",
   "49408": "Binding contract (gargoyle)",
@@ -4278,6 +5053,7 @@
   "49446": "Animal furs",
   "49448": "Fossilised bone",
   "49450": "Goldrune",
+  "49452": "Leather scraps",
   "49454": "Orthenglass",
   "49456": "Samite silk",
   "49458": "Soapstone",
@@ -4337,6 +5113,7 @@
   "49963": "Inquisitor's staff censer",
   "49977": "XP Capacitor 5000 (inactive)",
   "49979": "XP Capacitor 5000 (charged)",
+  "49982": "Inquisitor staff",
   "49984": "Inquisitor staff",
   "50120": "Wingsuit v1",
   "50153": "Enhanced fishing rod-o-matic",
@@ -4345,7 +5122,9 @@
   "50163": "Large crate (historic components)",
   "50164": "Small crate (classic components)",
   "50252": "Medium bladed orikalkum salvage",
+  "50462": "Brooch of the Gods",
   "50464": "Brooch of the Gods",
+  "50465": "Essence of Finality amulet",
   "50467": "Essence of Finality amulet",
   "50559": "Fishing guild teleport",
   "50562": "Trollheim farm teleport",
@@ -4360,6 +5139,7 @@
   "50831": "Spirit attraction flask (6)",
   "50849": "Summoning renewal (1)",
   "50877": "Holy aggroverload (6)",
+  "51082": "Fleeting boots",
   "51084": "Fleeting boots",
   "51086": "Shadow spike",
   "51094": "Greater Ricochet ability codex",
@@ -4380,7 +5160,9 @@
   "51472": "Laniakea's spear",
   "51490": "Sign of the porter VII",
   "51678": "Pontifex shadow ring",
+  "51767": "Kerapac's wrist wraps",
   "51770": "Kerapac's wrist wraps",
+  "51772": "Fractured Staff of Armadyl",
   "51774": "Fractured Staff of Armadyl",
   "51791": "Dwarven siege engine",
   "51797": "Elder Trove (Bik, T3)",
@@ -4388,6 +5170,7 @@
   "51803": "Elder Trove (Ful, T3)",
   "51806": "Resonant anima of Bik (tradeable)",
   "51810": "Resonant anima of Ful (tradeable)",
+  "51812": "Scripture of Jas",
   "51814": "Scripture of Jas",
   "51815": "Manuscript of Jas",
   "51816": "Manuscript of Bik",
@@ -4402,12 +5185,14 @@
   "52019": "Dark nilas",
   "52020": "Frozen core of Leng",
   "52021": "Leng artefact",
+  "52115": "Scripture of Wen",
   "52117": "Scripture of Wen",
   "52121": "Medium blunt orikalkum salvage",
   "52169": "Dwarf multicannon",
   "52172": "Royale dwarf multicannon",
   "52212": "Seed bag",
   "52213": "Croesus spore sack",
+  "52215": "Grasping rune pouch",
   "52217": "Grasping rune pouch",
   "52242": "Tagga's corehammer",
   "52244": "Croesus sporehammer",
@@ -4425,14 +5210,17 @@
   "52333": "Calcified fungus soup",
   "52337": "Fungal spore soup",
   "52341": "Fungal algae soup",
+  "52345": "Scripture of Bik",
   "52347": "Scripture of Bik",
   "52442": "Super woodcutting potion (4)",
+  "52492": "Scripture of Ful",
   "52494": "Scripture of Ful",
   "52497": "Fragments of Pernix's quiver",
   "52498": "Alchemist's key",
   "52500": "Igneous stone",
   "52503": "Igneous Kal-Mej",
   "52504": "Igneous Kal-Zuk",
+  "52511": "Ek-ZekKil",
   "52513": "Ek-ZekKil",
   "52530": "Magma Tempest ability codex",
   "52550": "Tiny blunt orikalkum salvage",
@@ -4448,7 +5236,9 @@
   "52810": "Hollyhocks",
   "52811": "Golden roses",
   "52825": "Holy scarab pouch",
+  "52926": "Jaws of the Abyss",
   "52928": "Jaws of the Abyss",
+  "52931": "Abyssal scourge",
   "52933": "Abyssal scourge",
   "52937": "Abyssal flesh",
   "52945": "Small bladed orikalkum salvage",
@@ -4460,6 +5250,8 @@
   "53073": "Dinosaur 'propellant'",
   "53083": "Tempered fungal shaft",
   "53093": "Sharp shell shard",
+  "53278": "Chaos die reroll token",
+  "53338": "Bow of the Last Guardian",
   "53340": "Bow of the Last Guardian",
   "53375": "Vestments of havoc hood",
   "53378": "Vestments of havoc robe top",
@@ -4486,6 +5278,7 @@
   "54456": "Teak frame",
   "54458": "Mahogany frame",
   "54460": "Stone wall segment",
+  "54830": "Coins",
   "54844": "Refined Magic planks",
   "54846": "Refined Elder planks",
   "54848": "Willow frame",
@@ -4520,6 +5313,7 @@
   "55318": "Super necromancy (3)",
   "55324": "Extreme necromancy (4)",
   "55330": "Extreme necromancy (1)",
+  "55336": "Ectoplasm",
   "55337": "Spirit rune",
   "55338": "Bone rune",
   "55339": "Flesh rune",
@@ -4578,6 +5372,7 @@
   "57113": "Sanctum of rebirth relic (rare)",
   "57115": "Sanctum of rebirth relic (uncommon)",
   "57117": "Sanctum of rebirth relic (common)",
+  "57124": "Scripture of Amascut",
   "57126": "Scripture of Amascut",
   "57127": "Manuscript of Amascut",
   "57128": "Shard of Genesis Essence",
@@ -4586,14 +5381,26 @@
   "57162": "Roar of Awakening",
   "57172": "Primal ore box",
   "57174": "Primal stone spirit",
+  "57175": "Novite ore",
+  "57177": "Bathus ore",
+  "57179": "Marmaros ore",
+  "57181": "Kratonium ore",
+  "57183": "Fractite ore",
+  "57185": "Zephyrium ore",
+  "57187": "Argonite ore",
+  "57189": "Katagon ore",
+  "57191": "Gorgonite ore",
+  "57193": "Promethium ore",
   "57195": "Pickaxe of life and death",
   "57196": "Augmented pickaxe of life and death",
   "57401": "Primal pickaxe + 5",
   "57435": "Primal bar",
+  "57462": "Masterwork 2h sword",
   "57464": "Masterwork 2h sword",
   "57519": "Runic attuner",
   "57521": "Memory dowser",
   "57523": "Manuscript of Elidinis",
+  "57524": "Scripture of Elidinis",
   "57526": "Scripture of Elidinis",
   "57528": "Latent Offering",
   "57544": "Eclipsed Soul prayer codex",
@@ -4664,5 +5471,6 @@
  },
  "unlabelled_versions": [
   "Money making guide/Cutting acadia logs"
- ]
+ ],
+ "items_retrieved": "2026-10-30"
 }

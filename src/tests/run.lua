@@ -452,6 +452,18 @@ local function pretty()
                 self.size = { width = width, height = height }
             end
 
+            -- A destroyed label leaves the page's list of texts.
+            function label:Destroy()
+                self.destroyed = true
+
+                for index, candidate in ipairs(view.texts) do
+                    if candidate == self then
+                        table.remove(view.texts, index)
+                        break
+                    end
+                end
+            end
+
             return label
         end
 
@@ -1349,17 +1361,97 @@ test("missing or broken hourly averages leave the latest trades in use", functio
     equal(Income.inspectQuote(notReady, 7).high, 120)
 end)
 
+-- GEPL throws "Price not found" for an item it doesn't list: that's no prices,
+-- said plainly. Any other error is a library fault and keeps its own message.
 test("GE item errors preserve a useful diagnostic", function()
+    local problem = "Price not found for itemId: 49430"
     local library = { isReady = function()
         return true
     end, getLatest = function()
-        error("Price not found")
+        error(problem)
     end }
 
     local result = Income.inspectQuote(library, 49430)
 
+    equal(result.status, "unavailable")
+    assert(result.message:find("may not be tradeable", 1, true), result.message)
+
+    problem = "attempt to index a nil value"
+    result = Income.inspectQuote(library, 49430)
+
     equal(result.status, "error")
-    assert(result.message:find("Price not found", 1, true))
+    assert(result.message:find("attempt to index a nil value", 1, true))
+end)
+
+-- GEPL keeps its latest and hourly data apart. An item with hourly trades but
+-- no latest entry (GEPL returns nil or throws) is still priced, without needing
+-- a timestamp, and so is everything while only the hourly data has loaded.
+test("hourly averages price an item with no latest entry", function()
+    local hour = { [2353] = { avgHighPrice = 1139, highPriceVolume = 50, avgLowPrice = 1051, lowPriceVolume = 40 } }
+    local steel = require("src/data/method_data").find("smelting-steel-bars.basic")
+
+    for _, latest in ipairs({ {}, false }) do
+        local library = averagingLibrary(latest or {}, hour)
+
+        if not latest then
+            library.getLatest = function(itemId)
+                error("Price not found for itemId: " .. itemId)
+            end
+        end
+
+        local quote = Income.inspectQuote(library, 2353)
+
+        equal(quote.status, "available")
+        equal(quote.low, 1051)
+        equal(quote.lowSource, "hour")
+        equal(quote.lowTime, nil)
+
+        local calculated = Income.calculate(steel.income, 2000, { [2353] = quote })
+        equal(calculated.outputs[1].unitPrice, 1051)
+        assert(calculated.outputs[1].value, "An hourly average needs no trade timestamp")
+    end
+
+    -- Latest data still loading, hourly data ready: use the hour.
+    local library = averagingLibrary({}, hour)
+    library.isReady = function(endpoint)
+        return endpoint == "1h"
+    end
+    library.getLatest = function()
+        error("Not ready: getter must not be called")
+    end
+
+    equal(Income.inspectQuote(library, 2353).high, 1139)
+
+    -- Neither loaded yet: loading, not "no prices".
+    library.isReady = function()
+        return false
+    end
+
+    equal(Income.inspectQuote(library, 2353).status, "loading")
+end)
+
+-- A missing side says which kind of trade is missing, and the status line names
+-- the item, so "Unavailable" is never a dead end.
+test("a missing price says why on its row and names the item on the status line", function()
+    local library = averagingLibrary({ [2353] = { high = 1139, highTime = 100 } }, {})
+    local quote = Income.inspectQuote(library, 2353)
+
+    equal(quote.status, "partial")
+    assert(quote.lowMessage:find("instant-sell", 1, true), quote.lowMessage)
+
+    -- The ores are fully priced, so the steel bar is the only thing missing.
+    local steel = require("src/data/method_data").find("smelting-steel-bars.basic")
+    local ores = { isReady = function() return true end, getLatest = function()
+        return { high = 100, highTime = 100, low = 90, lowTime = 100 }
+    end }
+    local quotes = Income.captureQuotes(ores, steel.income)
+    quotes[2353] = quote
+
+    local calculated = Income.calculate(steel.income, 2000, quotes)
+
+    equal(calculated.revenue, nil)
+    equal(calculated.outputs[1].message, quote.lowMessage)
+    assert(calculated.message:find("No price for Steel bar", 1, true), calculated.message)
 end)
 
 -- UI lifetime (ui.lua) ----------------------------------------------------------

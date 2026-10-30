@@ -397,13 +397,82 @@ return function(test, equal, client, pretty)
         local half = Income.calculate(method.income, 450, quotes)
         assert(math.abs(half.revenue - result.revenue / 2) < 1e-7)
 
-        -- Missing a single sell price makes total revenue/profit unavailable,
-        -- but fixed coin/alchemy rows remain visible and usable.
+        -- One drop without a sell price, among many with prices, counts as 0:
+        -- that can only understate the profit. The result says it left it out,
+        -- and the row says why and what that means.
+        local one
+        for index, row in ipairs(result.outputs) do
+            if row.itemId == 30825 then
+                one = index
+            end
+        end
+
         quotes[30825] = nil
         local missing = Income.calculate(method.income, 900, quotes)
-        equal(missing.revenue, nil)
-        equal(missing.profit, nil)
+        equal(missing.status, "available")
+        assert(math.abs(missing.revenue - (result.revenue - result.outputs[one].value)) < 1e-7)
+        equal(missing.outputs[one].value, nil)
+        assert(missing.outputs[one].countedAsZero)
+        assert(missing.outputs[one].message:find("Counted as 0 GP", 1, true), missing.outputs[one].message)
+        equal(#missing.uncounted, 1)
+        equal(missing.uncounted[1], missing.outputs[one].name)
+        assert(missing.note:find(missing.outputs[one].name, 1, true), missing.note)
         equal(missing.outputs[13].value, 599062.5)
+
+        -- When most drops have no price, there's no total: the coins alone say
+        -- nothing about what the rest are worth.
+        local few = {}
+        for itemId, quote in pairs(quotes) do
+            few[itemId] = quote
+        end
+
+        for _, row in ipairs(result.outputs) do
+            if row.itemId and row.itemId ~= 995 and row.itemId ~= 1631 then
+                few[row.itemId] = nil
+            end
+        end
+
+        local mostMissing = Income.calculate(method.income, 900, few)
+        equal(mostMissing.revenue, nil)
+        equal(mostMissing.profit, nil)
+        equal(mostMissing.note, nil)
+
+        -- Supplies follow the same rule. One potion with no price, among
+        -- supplies that have prices, counts as 0 and its row warns that the
+        -- profit may be a little high (Antipoison++ at Araxxi, say).
+        local renewal
+        for index, row in ipairs(result.inputs) do
+            if row.name == "Super prayer renewal potion (6)" then
+                renewal = index
+            end
+        end
+
+        local oneSupply = {}
+        for itemId, quote in pairs(quotes) do
+            oneSupply[itemId] = quote
+        end
+        oneSupply[result.inputs[renewal].itemId] = nil
+
+        local thin = Income.calculate(method.income, 900, oneSupply)
+        equal(thin.status, "available")
+        assert(math.abs(thin.cost - (result.cost - result.inputs[renewal].value)) < 1e-7)
+        assert(thin.inputs[renewal].countedAsZero)
+        assert(thin.inputs[renewal].message:find("may be a little high", 1, true), thin.inputs[renewal].message)
+        equal(thin.uncounted[1], "Super prayer renewal potion (6)")
+        assert(thin.note:find("Super prayer renewal potion (6)", 1, true), thin.note)
+
+        -- When most supplies have no price, there's no total. Keep only the
+        -- drops' prices, so the potions' ingredients have none.
+        local noSupply = {}
+        for _, row in ipairs(result.outputs) do
+            if row.itemId then
+                noSupply[row.itemId] = quotes[row.itemId]
+            end
+        end
+
+        local unpriced = Income.calculate(method.income, 900, noSupply)
+        equal(unpriced.cost, nil)
+        equal(unpriced.profit, nil)
     end)
 
     test("rate parser rejects empty negative nonfinite input and arithmetic overflow", function()

@@ -209,6 +209,31 @@ class ItemLookupTests(unittest.TestCase):
             self.assertEqual(wiki_methods.fetch_item_ids({"Adamant Pickaxe"}),
                              ({"Adamant Pickaxe": 1271}, {}, {1271: "Adamant pickaxe"}))
 
+    def test_the_grand_exchange_version_wins_and_other_versions_count_as_owned(self):
+        # Masuta's warspear: the used version comes first and can't be traded; the
+        # new one (with an exchange page) is the one GE prices exist for. Novite
+        # ore has a Dungeoneering namesake on another page, which isn't the same.
+        def bucket(query):
+            if "{'item_name'," in query:
+                return [
+                    {"page_name": "Masuta's warspear", "item_name": "Masuta's warspear", "item_id": [43055]},
+                    {"page_name": "Masuta's warspear", "item_name": "Masuta's warspear", "item_id": [43053],
+                     "exchange_page": "Exchange:Masuta's warspear"},
+                    {"page_name": "Novite ore (Dungeoneering)", "item_name": "Novite ore", "item_id": [17630]},
+                    {"page_name": "Novite ore", "item_name": "Novite ore", "item_id": [57175],
+                     "exchange_page": "Exchange:Novite ore"},
+                ]
+
+            return []
+
+        with patch.object(wiki_methods, "bucket", bucket):
+            found, families, _ = wiki_methods.fetch_item_ids({"Masuta's warspear", "Novite ore"})
+
+        self.assertEqual(found, {"Masuta's warspear": 43053, "Novite ore": 57175})
+
+        # Owning a used warspear still counts; the Dungeoneering ore doesn't.
+        self.assertEqual(families, {"Masuta's warspear": [43053, 43055]})
+
 
 class OutfitTests(unittest.TestCase):
     def test_set_pieces_reads_one_piece_per_slot_from_the_set_template(self):

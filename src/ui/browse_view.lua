@@ -109,8 +109,15 @@ local function estimateText(method, estimate)
     end
 
     -- The row already shows the profit and ROI, so the tooltip only adds the rate
-    -- the estimate assumes, e.g. "580 logs/hour" or "2,000 smelts/hour".
-    return Style.number(estimate.rate) .. " " .. method.income.rate.unit
+    -- the estimate assumes, e.g. "580 logs/hour" or "2,000 smelts/hour", and any
+    -- output with no price that was counted as 0.
+    local text = Style.number(estimate.rate) .. " " .. method.income.rate.unit
+
+    if estimate.note then
+        text = text .. ". " .. estimate.note
+    end
+
+    return text
 end
 
 -- `guarded` checks the screen's lifetime. Row callbacks also check a local

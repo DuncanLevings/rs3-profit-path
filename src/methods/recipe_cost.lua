@@ -87,8 +87,13 @@ function RecipeCost.price(page, portion, quotes)
             local quote = quotes[material.item_id]
             local usable = quote and (quote.status == "available" or quote.status == "partial")
 
-            if not (usable and nonNegativeFinite(quote.high) and nonNegativeFinite(quote.highTime)) then
-                return nil, "No GE price for " .. material.name .. ", an ingredient."
+            -- An hourly average counts without a timestamp (see Income.inspectQuote).
+            local current = usable and (quote.highSource == "hour" or nonNegativeFinite(quote.highTime))
+
+            if not (current and nonNegativeFinite(quote.high)) then
+                local why = quote and (quote.highMessage or quote.message)
+
+                return nil, "No GE price for " .. material.name .. ", an ingredient" .. (why and (": " .. why) or ".")
             end
 
             unitPrice, timestamp = quote.high, quote.highTime

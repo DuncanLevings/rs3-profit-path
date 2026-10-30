@@ -585,8 +585,21 @@ class Context:
             self.items[str(item_id)] = definition
 
     def recipe_for(self, name, note):
-        """(recipe page, dose) for an untradeable row we can cost ourselves, or None."""
+        """(recipe page, dose) for an untradeable row we can cost ourselves, or None.
+
+        The Wiki's {{potioncost|potion}} is the price of one finished potion as
+        it's made: a 3-dose overload, a 6-dose elder overload (Template:Potioncost
+        documentation). So a dose-less potioncost row is one whole potion, which
+        is the recipe's own portion. An improved recipe tier ("adrenaline renewal
+        2") is cheaper than the standard recipe we have, so that row keeps the
+        Wiki's figure. A note naming a different potion is the guide's mistake:
+        the row's own item is what the player uses, so its recipe is costed."""
         dose = re.search(r"\((\d+)\)$", name)
+        potioncost = bool(note) and note.startswith("potioncost|")
+
+        if potioncost and re.search(r"[ _]\d+$", note.split("|")[1].strip()):
+            return None
+
         candidates = [note.split("|")[-1]] if note else []
         candidates.append(re.sub(r"\s*\(\d+\)$", "", name))
 
@@ -596,11 +609,18 @@ class Context:
             if recipe is None:
                 continue
 
-            # The row and the recipe must agree on doses, or the cost would be wrong.
-            if "portion" in recipe["output"]:
-                return (page, int(dose.group(1))) if dose else None
+            output = recipe["output"]
 
-            return None if dose else (page, None)
+            # The row and the recipe must agree on doses, or the cost would be wrong.
+            if "portion" in output:
+                if dose:
+                    return page, int(dose.group(1))
+
+                return (page, output["portion"]) if potioncost else None
+
+            # A recipe without doses: the row must be the item it makes, either
+            # by having no dose either or by name ("Adrenaline renewal potion (4)").
+            return (page, None) if not dose or output["name"] == name else None
 
         return None
 

@@ -77,6 +77,25 @@ class IncomeTests(unittest.TestCase):
         self.assertEqual((undosed["pricing"], undosed["unit_value"]), ("fixed", 159457))
         self.assertIn("calculated value", undosed["valuation_note"])
 
+    def test_potioncost_rows_follow_the_templates_meaning(self):
+        recipes = {"Aggroverload": {"output": {"name": "Aggroverload (6)", "portion": 6}},
+                   "Adrenaline renewal potion": {"output": {"name": "Adrenaline renewal potion (4)"}}}
+        ctx = context(recipes)
+        method = merge_methods.convert_guide(guide(kph=900, inputs=[
+            # {{potioncost}} with no dose is one finished potion: a whole 6-dose one.
+            ["Aggroverload", 1, "hour", "calc", 159457, "potioncost|Aggroverload"],
+            # A recipe without doses that makes exactly this item.
+            ["Adrenaline renewal potion (4)", 1, "hour", "calc", 50000, "potioncost|Adrenaline renewal potion (4)"],
+            # An improved recipe tier is cheaper than our standard recipe.
+            ["Adrenaline renewal potion (4)", 1, "hour", "calc", 40000, "potioncost|adrenaline renewal 2"],
+        ]), ctx, "pvm")
+        whole, exact, improved = method["income"]["inputs"]
+
+        self.assertEqual((whole["pricing"], whole["recipe"], whole["portion"]), ("recipe", "Aggroverload", 6))
+        self.assertEqual((exact["pricing"], exact["recipe"]), ("recipe", "Adrenaline renewal potion"))
+        self.assertNotIn("portion", exact)
+        self.assertEqual((improved["pricing"], improved["unit_value"]), ("fixed", 40000))
+
 
 class RequirementTests(unittest.TestCase):
     def convert(self, requirements, capabilities=None):
