@@ -57,6 +57,10 @@ OUTPUT = ROOT / "catalogue-source" / "wiki"
 GUIDES = OUTPUT / "guides.jsonl"
 META = OUTPUT / "meta.json"
 
+# Research inputs and outputs for the outfit pass (see import_outfits below).
+CAPABILITIES = ROOT / "catalogue-source" / "research" / "capabilities.json"
+OUTFITS = ROOT / "catalogue-source" / "research" / "outfits.json"
+
 API = "https://runescape.wiki/api.php"
 
 # The Wiki asks tools to identify themselves. Agreed with Duncan for this project.
@@ -618,6 +622,108 @@ def build(rows, revisions, item_ids, retrieved, families=None, item_names=None):
     return text, meta
 
 
+# ---- Outfits: which items make up each one -----------------------------------
+#
+# Requirements like "Master camouflage outfit" name a whole set. The Wiki has no
+# bucket for sets, but every set page starts with an {{Infobox Set}} template that
+# names one piece per equipment slot:
+#
+#   {{Infobox Set
+#   |name = Master camouflage outfit
+#   |head = Master camouflage head
+#   |body = Master camouflage body
+#   ...
+#
+# import_outfits reads that template for every outfit in research/capabilities.json,
+# resolves each piece to an item ID like any other item, and writes
+# research/outfits.json. The merge then turns an outfit requirement into "all of
+# these pieces", which the plugin can check against the bank like other items.
+
+SET_SLOTS = ("head", "neck", "cape", "back", "body", "legs", "hands", "feet", "ring", "weapon", "2h",
+             "shield", "offhand", "ammo", "pocket", "aura")
+
+
+def set_pieces(wikitext):
+    """[(slot, piece name)] from a page's {{Infobox Set}}, or [] if it has none.
+
+    Sets with several versions number their fields (head1, head2...); we keep the
+    unnumbered or first version, so each slot has one piece."""
+    match = re.search(r"\{\{\s*Infobox Set(.*?)\n\}\}", wikitext or "", re.DOTALL | re.IGNORECASE)
+
+    if not match:
+        return []
+
+    pieces = {}
+
+    for line in match.group(1).splitlines():
+        field = re.match(r"\s*\|\s*([a-z0-9]+?)(1?)\s*=\s*(.*?)\s*$", line)
+
+        if not field or field.group(1) not in SET_SLOTS:
+            continue
+
+        name = plain(field.group(3))
+
+        if name and field.group(1) not in pieces:
+            pieces[field.group(1)] = name
+
+    return [(slot, pieces[slot]) for slot in SET_SLOTS if slot in pieces]
+
+
+def import_outfits():
+    """Writes research/outfits.json for every outfit research names. Returns
+    (outfits found, names with no set template)."""
+    capabilities = json.loads(CAPABILITIES.read_text(encoding="utf-8"))["capabilities"]
+    names = sorted(name for name, entry in capabilities.items() if entry.get("kind") == "outfit")
+    outfits, missing = {}, []
+
+    for name in names:
+        data = get({"action": "parse", "page": name, "prop": "wikitext|revid", "redirects": 1})
+        parsed = data.get("parse", {})
+        pieces = set_pieces(parsed.get("wikitext", {}).get("*"))
+
+        if not pieces:
+            missing.append(name)
+            continue
+
+        outfits[name] = {"page": parsed["title"], "revision": parsed["revid"], "pieces": pieces}
+
+    # A piece with charges is named with its count ("Ghost hunter goggles (20)").
+    # If that exact name isn't an item, the uncharged name finds every charge level.
+    names = {piece for outfit in outfits.values() for _, piece in outfit["pieces"]}
+    uncharged = {re.sub(r"\s*\(\d+\)$", "", piece) for piece in names}
+    ids, families, real_names = fetch_item_ids(names | uncharged)
+
+    for outfit in outfits.values():
+        resolved = []
+
+        for slot, piece in outfit["pieces"]:
+            lookup = piece if piece in ids else re.sub(r"\s*\(\d+\)$", "", piece)
+            item_id = ids.get(lookup)
+            entry = [slot, real_names.get(item_id, piece), item_id]
+
+            # Owning any charge level (or dose) of the piece counts.
+            if lookup in families:
+                entry.append(families[lookup])
+
+            resolved.append(entry)
+
+        outfit["pieces"] = resolved
+
+    document = {
+        "schema": 1,
+        "retrieved": datetime.date.today().isoformat(),
+        "source": "{{Infobox Set}} on each outfit's RuneScape Wiki page (action=parse), pieces resolved through "
+                  "the infobox_item bucket. RuneScape Wiki contributors, CC BY-NC-SA 3.0.",
+        "note": "Each piece is [slot, item name, item ID or null], plus every charge level's ID when the piece "
+                "has several. Outfits whose page has no set template are listed in missing.",
+        "outfits": outfits,
+        "missing": missing,
+    }
+    OUTFITS.write_text(json.dumps(document, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+
+    return outfits, missing
+
+
 def verify_snapshot():
     """Checks the files on disk: every line a valid guide, sorted, no duplicates,
     and meta.json's counts and item table agreeing with them. Run by test.py, so a
@@ -653,7 +759,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bucket-file", type=Path,
                         help="reuse a saved money_making_guide download ({'retrieved', 'rows'}) instead of fetching it")
+    parser.add_argument("--outfits", action="store_true",
+                        help="instead of the guides, import the pieces of every outfit in research/capabilities.json")
     args = parser.parse_args()
+
+    if args.outfits:
+        outfits, missing = import_outfits()
+        pieces = [piece for outfit in outfits.values() for piece in outfit["pieces"]]
+        print(f"Wrote {len(outfits)} outfits ({len(pieces)} pieces, {sum(1 for p in pieces if p[2])} with item IDs) "
+              f"to {OUTFITS.relative_to(ROOT)}. No set template: {', '.join(missing) or 'none'}.")
+        return
 
     if args.bucket_file:
         saved = json.loads(args.bucket_file.read_text(encoding="utf-8"))

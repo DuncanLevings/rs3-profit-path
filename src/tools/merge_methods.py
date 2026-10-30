@@ -34,7 +34,8 @@ and report what still needs research."""
 #          "see also" notes, not checks. Everything else is a "capability" check,
 #          shown as unknown: outfits, abilities, perks... A capability records its
 #          kind and gets its sprite when the research file has them; unmapped quests
-#          get the quest icon.
+#          get the quest icon. An outfit whose pieces we know (research/outfits.json)
+#          becomes "all of these pieces", checked like any other items.
 from __future__ import annotations
 
 import collections
@@ -79,6 +80,29 @@ def tidy_name(name):
     return base.replace("/", ": ")
 
 
+def load_outfits():
+    """{outfit name: [[slot, piece name, item ID, (every charge level's ID)], ...]}
+    for outfits whose pieces all resolved, from research/outfits.json."""
+    if not wiki_methods.OUTFITS.exists():
+        return {}
+
+    source = json.loads(wiki_methods.OUTFITS.read_text(encoding="utf-8"))
+
+    if source.get("schema") != 1 or not isinstance(source.get("outfits"), dict):
+        raise ValueError("Unsupported outfits research file")
+
+    outfits = {}
+
+    for name, outfit in source["outfits"].items():
+        pieces = outfit.get("pieces") or []
+
+        # Half an outfit isn't the outfit: only use ones where every piece is known.
+        if pieces and all(catalogue.positive_integer(piece[2]) for piece in pieces):
+            outfits[name] = pieces
+
+    return outfits
+
+
 def load_snapshot():
     """(guides, meta) from catalogue-source/wiki, or ([], None) before any import."""
     if not wiki_methods.GUIDES.exists():
@@ -92,12 +116,13 @@ def load_snapshot():
 class Context:
     """Shared lookups while converting guides, plus the items table they fill in."""
 
-    def __init__(self, items, meta, capabilities, recipes, quests=None):
+    def __init__(self, items, meta, capabilities, recipes, quests=None, outfits=None):
         self.items = items
         self.meta = meta
         self.capabilities = capabilities
         self.recipes = recipes or {}
         self.quests = quests or {}
+        self.outfits = outfits or {}
 
         # Wiki advice links found while converting the current method.
         self.advice = []
@@ -123,6 +148,16 @@ class Context:
             self.items[str(item_id)] = definition
 
         return item_id
+
+    def define_item(self, item_id, name, ownership_ids=None):
+        """Adds an item we found outside the guide snapshot (an outfit piece)."""
+        if str(item_id) not in self.items:
+            definition = {"name": name, "source": "RuneScape Wiki outfit page and infobox_item"}
+
+            if ownership_ids:
+                definition["ownership_ids"] = ownership_ids
+
+            self.items[str(item_id)] = definition
 
     def recipe_for(self, name, note):
         """(recipe page, dose) for an untradeable row we can cost ourselves, or None."""
@@ -157,6 +192,18 @@ def capability(name, ctx, quest=False):
     if research.get("kind") == "guidance":
         ctx.advice.append(tidy_name(name))
         return None
+
+    # A known outfit is all of its pieces. The plugin checks each one like an item
+    # (backpack, worn or bank) and shows them as a grid of icons.
+    if name in ctx.outfits:
+        children = []
+
+        for slot, piece, item_id, *family in ctx.outfits[name]:
+            ctx.define_item(item_id, piece, family[0] if family else None)
+            children.append({"kind": "item", "itemId": item_id, "quantity": 1, "text": piece})
+
+        return {"kind": "all", "text": tidy_name(name), "children": children,
+                "display_items": [child["itemId"] for child in children]}
 
     check = {"kind": "capability", "text": tidy_name(name)}
 
@@ -403,7 +450,7 @@ def merge(recipe_source=None):
 
     items = dict(curated["items"])
     ctx = Context(items, meta or {"items": {}, "retrieved": None}, catalogue.load_capabilities(), recipes,
-                  catalogue.load_quests())
+                  catalogue.load_quests(), load_outfits())
 
     # Rule 1: which guides our curated methods replace.
     by_key = {(guide["page"], (guide.get("version") or "").lower()): guide for guide in guides}

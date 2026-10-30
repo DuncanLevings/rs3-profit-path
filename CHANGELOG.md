@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2-dev — 2026-10-29
+
+- Research pass 2, outfits. `wiki_methods.py --outfits` reads each outfit's `{{Infobox Set}}` on the Wiki (with its page revision) and resolves every piece to an item ID, retrying charged pieces like "Ghost hunter goggles (20)" by name so any charge level counts. 19 outfits, all 94 pieces resolved (`catalogue-source/research/outfits.json`).
+- An outfit requirement now becomes "all of these pieces": checked against your backpack, worn items and bank like other items, and shown as a grid of piece icons. Unknown checks fall from 1,044 to 879; Dragon bane equipment and Trapper outfit have no set template on the Wiki and stay unknown.
+- Validate with 120 Lua behaviour tests and 65 Python tests.
+
 ## 0.8.1-dev — 2026-10-29
 
 - Research pass 1, requirements the plugin couldn't check. Quests now map to their in-game quest configs by exact name (`catalogue-source/research/quests.json`, built by `catalogue.py map-quests` from Skill Tips' verified in-game quest dump; deprecated configs never used). 115 Wiki quest names are mapped, so 399 quest requirements are real checks instead of unknowns, including Wiki links that are really quests (New Foundations).

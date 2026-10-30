@@ -68,7 +68,8 @@ Derived from the RuneScape Wiki's money_making_guide and infobox_item structured
 and page revision IDs, retrieved 2026-10-29 with User-Agent "ProfitPath-development (Discord: Tatsuya)".
 https://runescape.wiki/w/Bucket:Money_making_guide
 https://runescape.wiki/w/Bucket:Infobox_item
-Each guide in catalogue-source/wiki/guides.jsonl records its page title and revision. Guides the Wiki
+Each guide in catalogue-source/wiki/guides.jsonl records its page title and revision. Outfit pieces in
+catalogue-source/research/outfits.json come from each outfit page's set infobox, with its revision. Guides the Wiki
 marks as obsolete are not included. Wiki contributor attribution and the CC BY-NC-SA 3.0 licence above apply.
 
 rsprite runtime dependency

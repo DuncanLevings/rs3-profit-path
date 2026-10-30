@@ -1,0 +1,596 @@
+{
+ "schema": 1,
+ "retrieved": "2026-10-29",
+ "source": "{{Infobox Set}} on each outfit's RuneScape Wiki page (action=parse), pieces resolved through the infobox_item bucket. RuneScape Wiki contributors, CC BY-NC-SA 3.0.",
+ "note": "Each piece is [slot, item name, item ID or null], plus every charge level's ID when the piece has several. Outfits whose page has no set template are listed in missing.",
+ "outfits": {
+  "Artisan's outfit": {
+   "page": "Artisan's outfit",
+   "revision": 37212565,
+   "pieces": [
+    [
+     "head",
+     "Artisan's bandana",
+     25185
+    ],
+    [
+     "body",
+     "Artisan's top",
+     25186
+    ],
+    [
+     "legs",
+     "Artisan's legs",
+     25187
+    ],
+    [
+     "hands",
+     "Artisan's gloves",
+     25189
+    ],
+    [
+     "feet",
+     "Artisan's boots",
+     25188
+    ]
+   ]
+  },
+  "Blacksmith's outfit": {
+   "page": "Blacksmith's outfit",
+   "revision": 37203201,
+   "pieces": [
+    [
+     "head",
+     "Blacksmith's helmet",
+     25195
+    ],
+    [
+     "body",
+     "Blacksmith's top",
+     25196
+    ],
+    [
+     "legs",
+     "Blacksmith's apron",
+     25197
+    ],
+    [
+     "hands",
+     "Blacksmith's gloves",
+     25199
+    ],
+    [
+     "feet",
+     "Blacksmith's boots",
+     25198
+    ]
+   ]
+  },
+  "Cryptbloom armour": {
+   "page": "Cryptbloom armour",
+   "revision": 37035251,
+   "pieces": [
+    [
+     "head",
+     "Cryptbloom helm",
+     52262
+    ],
+    [
+     "body",
+     "Cryptbloom top",
+     52274
+    ],
+    [
+     "legs",
+     "Cryptbloom bottoms",
+     52280
+    ],
+    [
+     "hands",
+     "Cryptbloom gloves",
+     52266
+    ],
+    [
+     "feet",
+     "Cryptbloom boots",
+     52270
+    ]
+   ]
+  },
+  "Diviner's outfit": {
+   "page": "Diviner's outfit",
+   "revision": 37212566,
+   "pieces": [
+    [
+     "head",
+     "Diviner's headwear",
+     29865
+    ],
+    [
+     "body",
+     "Diviner's robe",
+     29866
+    ],
+    [
+     "legs",
+     "Diviner's legwear",
+     29867
+    ],
+    [
+     "hands",
+     "Diviner's handwear",
+     29869
+    ],
+    [
+     "feet",
+     "Diviner's footwear",
+     29868
+    ]
+   ]
+  },
+  "Elder divination outfit": {
+   "page": "Elder divination outfit",
+   "revision": 37200705,
+   "pieces": [
+    [
+     "head",
+     "Elder divination head",
+     35978
+    ],
+    [
+     "body",
+     "Elder divination body",
+     35979
+    ],
+    [
+     "legs",
+     "Elder divination legs",
+     35980
+    ],
+    [
+     "hands",
+     "Elder divination hands",
+     35981
+    ],
+    [
+     "feet",
+     "Elder divination feet",
+     35982
+    ]
+   ]
+  },
+  "First age outfit": {
+   "page": "First age outfit",
+   "revision": 36975404,
+   "pieces": [
+    [
+     "head",
+     "First age tiara",
+     27587
+    ],
+    [
+     "neck",
+     "First age amulet",
+     27589
+    ],
+    [
+     "back",
+     "First age cape",
+     27588
+    ],
+    [
+     "hands",
+     "First age bracelet",
+     27591
+    ],
+    [
+     "ring",
+     "First age ring",
+     27590
+    ]
+   ]
+  },
+  "Fury shark outfit": {
+   "page": "Fury shark outfit",
+   "revision": 37165341,
+   "pieces": [
+    [
+     "head",
+     "Fury shark head",
+     34215
+    ],
+    [
+     "body",
+     "Fury shark body",
+     34216
+    ],
+    [
+     "legs",
+     "Fury shark legs",
+     34217
+    ],
+    [
+     "hands",
+     "Fury shark hands",
+     34218
+    ],
+    [
+     "feet",
+     "Fury shark feet",
+     34219
+    ]
+   ]
+  },
+  "Ghost hunter equipment": {
+   "page": "Ghost hunter equipment",
+   "revision": 37218547,
+   "pieces": [
+    [
+     "head",
+     "Ghost hunter goggles",
+     32386
+    ],
+    [
+     "back",
+     "Ghost hunter backpack",
+     32389
+    ],
+    [
+     "body",
+     "Ghost hunter body",
+     32380
+    ],
+    [
+     "legs",
+     "Ghost hunter legs",
+     32383
+    ]
+   ]
+  },
+  "Golden mining suit": {
+   "page": "Golden mining suit",
+   "revision": 37181230,
+   "pieces": [
+    [
+     "head",
+     "Golden mining helmet",
+     20789
+    ],
+    [
+     "body",
+     "Golden mining top",
+     20791
+    ],
+    [
+     "legs",
+     "Golden mining trousers",
+     20790
+    ],
+    [
+     "hands",
+     "Golden mining gloves",
+     20787
+    ],
+    [
+     "feet",
+     "Golden mining boots",
+     20788
+    ]
+   ]
+  },
+  "Infinity ethereal outfit": {
+   "page": "Infinity ethereal outfit",
+   "revision": 37060656,
+   "pieces": [
+    [
+     "head",
+     "Infinity ethereal head",
+     32357
+    ],
+    [
+     "body",
+     "Infinity ethereal body",
+     32358
+    ],
+    [
+     "legs",
+     "Infinity ethereal legs",
+     32359
+    ],
+    [
+     "hands",
+     "Infinity ethereal hands",
+     32360
+    ],
+    [
+     "feet",
+     "Infinity ethereal feet",
+     32361
+    ]
+   ]
+  },
+  "Magic golem outfit": {
+   "page": "Magic golem outfit",
+   "revision": 37024081,
+   "pieces": [
+    [
+     "head",
+     "Magic golem head",
+     31590
+    ],
+    [
+     "body",
+     "Magic golem torso",
+     31591
+    ],
+    [
+     "legs",
+     "Magic golem legs",
+     31592
+    ],
+    [
+     "hands",
+     "Magic golem gloves",
+     31593
+    ],
+    [
+     "feet",
+     "Magic golem boots",
+     31594
+    ]
+   ]
+  },
+  "Master archaeologist's outfit": {
+   "page": "Master archaeologist's outfit",
+   "revision": 37082553,
+   "pieces": [
+    [
+     "head",
+     "Master archaeologist's hat",
+     49941
+    ],
+    [
+     "body",
+     "Master archaeologist's jacket",
+     49942
+    ],
+    [
+     "legs",
+     "Master archaeologist's trousers",
+     49943
+    ],
+    [
+     "hands",
+     "Master archaeologist's gloves",
+     49944
+    ],
+    [
+     "feet",
+     "Master archaeologist's boots",
+     49945
+    ]
+   ]
+  },
+  "Master camouflage outfit": {
+   "page": "Master camouflage outfit",
+   "revision": 37195287,
+   "pieces": [
+    [
+     "head",
+     "Master camouflage head",
+     37358
+    ],
+    [
+     "body",
+     "Master camouflage body",
+     37359
+    ],
+    [
+     "legs",
+     "Master camouflage legs",
+     37360
+    ],
+    [
+     "hands",
+     "Master camouflage hands",
+     37361
+    ],
+    [
+     "feet",
+     "Master camouflage feet",
+     37362
+    ]
+   ]
+  },
+  "Master constructor's outfit": {
+   "page": "Master constructor's outfit",
+   "revision": 37183026,
+   "pieces": [
+    [
+     "head",
+     "Master constructor's hat",
+     51017
+    ],
+    [
+     "body",
+     "Master constructor's jacket",
+     51018
+    ],
+    [
+     "legs",
+     "Master constructor's trousers",
+     51019
+    ],
+    [
+     "hands",
+     "Master constructor's gloves",
+     51020
+    ],
+    [
+     "feet",
+     "Master constructor's boots",
+     51021
+    ]
+   ]
+  },
+  "Master farmer outfit": {
+   "page": "Master farmer outfit",
+   "revision": 37075483,
+   "pieces": [
+    [
+     "head",
+     "Master farmer hat",
+     44017
+    ],
+    [
+     "body",
+     "Master farmer jacket",
+     44018
+    ],
+    [
+     "legs",
+     "Master farmer legwear",
+     44019
+    ],
+    [
+     "hands",
+     "Master farmer gloves",
+     44020
+    ],
+    [
+     "feet",
+     "Master farmer boots",
+     44021
+    ]
+   ]
+  },
+  "Nature's sentinel outfit": {
+   "page": "Nature's sentinel outfit",
+   "revision": 37185580,
+   "pieces": [
+    [
+     "head",
+     "Nature's sentinel helm",
+     39745
+    ],
+    [
+     "body",
+     "Nature's sentinel chest",
+     39746
+    ],
+    [
+     "legs",
+     "Nature's sentinel trunks",
+     39747
+    ],
+    [
+     "hands",
+     "Nature's sentinel branch",
+     39748
+    ],
+    [
+     "feet",
+     "Nature's sentinel boots",
+     39749
+    ]
+   ]
+  },
+  "Vestments of havoc": {
+   "page": "Vestments of havoc armour",
+   "revision": 37034002,
+   "pieces": [
+    [
+     "head",
+     "Vestments of havoc hood",
+     53375
+    ],
+    [
+     "body",
+     "Vestments of havoc robe top",
+     53378
+    ],
+    [
+     "legs",
+     "Vestments of havoc robe bottom",
+     53381
+    ],
+    [
+     "feet",
+     "Vestments of havoc boots",
+     53384
+    ]
+   ]
+  },
+  "Void knight equipment": {
+   "page": "Void knight equipment",
+   "revision": 37170143,
+   "pieces": [
+    [
+     "head",
+     "Void knight melee helm",
+     11665
+    ],
+    [
+     "neck",
+     "Void knight seal",
+     25207
+    ],
+    [
+     "body",
+     "Void knight top",
+     8839
+    ],
+    [
+     "legs",
+     "Void knight robes",
+     8840
+    ],
+    [
+     "hands",
+     "Void knight gloves",
+     8842
+    ],
+    [
+     "shield",
+     "Void knight deflector",
+     19712
+    ]
+   ]
+  },
+  "Volcanic trapper outfit": {
+   "page": "Volcanic trapper outfit",
+   "revision": 37146477,
+   "pieces": [
+    [
+     "head",
+     "Volcanic trapper head",
+     41023
+    ],
+    [
+     "body",
+     "Volcanic trapper chest",
+     41024
+    ],
+    [
+     "legs",
+     "Volcanic trapper legguards",
+     41025
+    ],
+    [
+     "hands",
+     "Volcanic trapper arms",
+     41026
+    ],
+    [
+     "feet",
+     "Volcanic trapper boots",
+     41027
+    ]
+   ]
+  }
+ },
+ "missing": [
+  "Dragon bane equipment",
+  "Trapper outfit"
+ ]
+}

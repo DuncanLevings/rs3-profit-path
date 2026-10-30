@@ -183,6 +183,30 @@ class ResearchTests(unittest.TestCase):
         self.assertNotIn("capability_kind", other)
 
 
+class OutfitTests(unittest.TestCase):
+    def test_a_known_outfit_becomes_all_of_its_pieces(self):
+        ctx = context(capabilities={"Ghost hunter equipment": {"kind": "outfit"}})
+        ctx.outfits = {"Ghost hunter equipment": [
+            ["head", "Ghost hunter goggles", 32386],
+            ["body", "Ghost hunter body", 32380, [32378, 32380]],
+        ]}
+        method = merge_methods.convert_guide(guide(requirements={"recommended": ["item:Ghost hunter equipment"]}),
+                                             ctx, "pvm")
+        outfit = method["requirements"]["recommended"]["children"][0]
+
+        self.assertEqual(outfit["kind"], "all")
+        self.assertEqual(outfit["text"], "Ghost hunter equipment (recommended)")
+        self.assertEqual(outfit["display_items"], [32386, 32380])
+        self.assertEqual([child["itemId"] for child in outfit["children"]], [32386, 32380])
+
+        # Owning any charge level of a piece counts.
+        self.assertEqual(ctx.items["32380"]["ownership_ids"], [32378, 32380])
+        self.assertEqual(ctx.items["32386"]["name"], "Ghost hunter goggles")
+
+        # And it passes the same validator as curated methods.
+        catalogue.validate_methods({"schema": 1, "items": ctx.items, "methods": [method]}, {"monsters": []})
+
+
 class NamingTests(unittest.TestCase):
     def test_ids_categories_and_names(self):
         self.assertEqual(merge_methods.method_id(guide(version="Hard Mode w/ Flight Skip")),

@@ -199,5 +199,32 @@ class ItemLookupTests(unittest.TestCase):
                              ({"Adamant Pickaxe": 1271}, {}, {1271: "Adamant pickaxe"}))
 
 
+class OutfitTests(unittest.TestCase):
+    def test_set_pieces_reads_one_piece_per_slot_from_the_set_template(self):
+        wikitext = "\n".join([
+            "{{Redirect|Mco}}",
+            "{{Infobox Set",
+            "|name = Master camouflage outfit",
+            "|release = [[3 May]] [[2016]]",
+            "|head = [[Master camouflage head]]",
+            "|head2 = Keldagrim camouflage head",
+            "|body1 = Master camouflage body",
+            "|feet = Master camouflage feet",
+            "|tradeable = No",
+            "}}",
+            "The master camouflage outfit is an elite skilling outfit.",
+        ])
+
+        # Pieces come out in body order; numbered versions after the first and
+        # non-slot fields (release, tradeable) are skipped.
+        self.assertEqual(wiki_methods.set_pieces(wikitext), [
+            ("head", "Master camouflage head"), ("body", "Master camouflage body"), ("feet", "Master camouflage feet"),
+        ])
+
+    def test_a_page_without_a_set_template_has_no_pieces(self):
+        self.assertEqual(wiki_methods.set_pieces("{{Infobox Item\n|name = Trapper top\n}}"), [])
+        self.assertEqual(wiki_methods.set_pieces(None), [])
+
+
 if __name__ == "__main__":
     unittest.main()
