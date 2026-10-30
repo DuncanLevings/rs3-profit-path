@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.5-dev — 2026-10-29
+
+- Research pass 5, PvM drops. The build now checks every PvM guide's per-kill drops against the monster drop tables in our snapshot (rate × average quantity over every row for the item, within 10%). Each PvM method gets a status that its "Partly researched" note explains: drops checked (16), partly checked because some rare drops depend on conditions (18), setting-specific for enrage, killstreak and hard-mode versions the base table can't check (27), drops that don't match the table yet (66, listed by value in `catalogue.py report`), or no drop table (54).
+- Validate with 122 Lua behaviour tests and 74 Python tests.
+
 ## 0.8.4-dev — 2026-10-29
 
 - Research pass 4, recurring guides. The 94 daily/weekly Wiki guides are now methods, counted per run: "Profit per run", "Per run" columns and "1.2M / RUN" in Browse, with the cycle shown on the row ("every 24 hours") and in Notes with the minutes per run. Their rate box is "Yield (% of guide)" (100 is the guide's own amounts). They have their own Recurring section in the Browse sidebar, after Production, with a subtle orange title colour; under All activities they're always listed after hourly methods, so a two-minute daily never outranks a real hourly method. The catalogue is now 676 methods (889 KB).

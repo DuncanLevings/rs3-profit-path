@@ -1553,18 +1553,18 @@ def from_lua(value):
     return {key: from_lua(value[key]) for key in keys}
 
 
-def build_catalogue(recipe_source):
+def build_catalogue(recipe_source, monsters=None):
     """The full catalogue the plugin ships: our curated methods merged with every
     current Wiki guide (see src/tools/merge_methods.py)."""
     import merge_methods
 
-    return merge_methods.merge(recipe_source)[0]
+    return merge_methods.merge(recipe_source, monsters)[0]
 
 
 def verify_methods(monsters, recipe_source):
     # Same idea as verify(): the file on disk must match a fresh build, and every
     # method read back through the plugin's own reader must equal its full record.
-    catalogue = build_catalogue(recipe_source)
+    catalogue = build_catalogue(recipe_source, monsters)
     recipes = choose_recipes(recipe_source) if recipe_source else None
     expected = methods_text(catalogue, monsters, recipes)
 
@@ -1769,7 +1769,7 @@ def main():
             generated_recipes = recipes_text(recipe_source)
 
         if METHOD_SOURCE.exists():
-            methods = build_catalogue(recipe_source)
+            methods = build_catalogue(recipe_source, source)
             recipes = choose_recipes(recipe_source) if recipe_source else None
             generated_methods = methods_text(methods, source, recipes)
 

@@ -552,8 +552,18 @@ function MethodView.researchGaps(method)
             .. " can't be checked yet"
     end
 
-    if research.pvm == "wiki drops" then
-        gaps[#gaps + 1] = "drops use the Wiki's own figures"
+    -- How the drops compare with the monster's drop table (see the catalogue build).
+    local drops = {
+        ["drops partly checked"] = "rare drops use the Wiki's figures for this setup",
+        ["drops differ"] = (research.drops_differ or 0) .. " drop amount"
+            .. ((research.drops_differ or 0) == 1 and " doesn't" or "s don't") .. " match the drop table yet",
+        ["setting-specific"] = "drops depend on enrage, killstreak or hard mode; these are the Wiki's figures for this setting",
+        ["no drop table"] = "drops use the Wiki's own figures",
+        ["wiki drops"] = "drops use the Wiki's own figures",
+    }
+
+    if drops[research.pvm] then
+        gaps[#gaps + 1] = drops[research.pvm]
     end
 
     if research.unpriced > 0 then

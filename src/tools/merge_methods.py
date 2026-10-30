@@ -455,29 +455,145 @@ def count_checks(node, kinds):
     return own + sum(count_checks(child, kinds) for child in node.get("children", []))
 
 
-def research_status(method, curated):
+# ---- Checking PvM drops against the monster drop tables -----------------------
+#
+# A Wiki guide lists each drop's expected amount per kill. Our monster snapshot
+# (catalogue-source/monsters.json) has the drop tables themselves. For each per-kill
+# output we work out rate x average quantity over every table row for that item and
+# compare. The result is one status per method:
+#
+#   drops checked        every drop with a fixed rate matches within 10%
+#   drops partly checked fixed-rate drops match; some rare drops have a rate that
+#                        depends on conditions ("1/284-1/1,988", "1/640; 1/632"),
+#                        so the guide's figure for its setup is used
+#   drops differ         some fixed-rate drops don't match (listed in the report)
+#   setting-specific     a guide version for a set enrage, killstreak or hard mode:
+#                        its drops come from rates or a table the base drop table
+#                        doesn't hold, so it can't be checked against it
+#   no drop table        no monster in the snapshot matches the guide
+
+DROP_TOLERANCE = 0.10
+
+_monsters = None
+
+
+def monster_tables(monsters=None):
+    """{lower-case monster title: monster} from the snapshot, loaded once."""
+    global _monsters
+
+    if monsters is not None:
+        return {monster["title"].lower(): monster for monster in monsters["monsters"]}
+
+    if _monsters is None:
+        source = json.loads(catalogue.SOURCE.read_text(encoding="utf-8"))
+        _monsters = {monster["title"].lower(): monster for monster in source["monsters"]}
+
+    return _monsters
+
+
+def monster_for(page, tables):
+    """The monster a guide is about, by name: "Killing abyssal demons" -> "Abyssal
+    demon". Tries the name as written, then common singular forms."""
+    name = re.sub(r"^(Killing|Completing|Fighting|Defeating)\s+(the\s+)?", "", page[len(PREFIX):], flags=re.IGNORECASE)
+    forms = [name]
+
+    for plural, singular in (("ies", "y"), ("es", ""), ("s", "")):
+        if name.endswith(plural):
+            forms.append(name[:-len(plural)] + singular)
+
+    forms += [form.split(" and ")[0] for form in list(forms)]
+
+    return next((tables[form.lower()] for form in forms if form.lower() in tables), None)
+
+
+def drop_rate(text):
+    """A fixed drop rate as a number ("1/128", "2 x 1/128", "Always"), or None for
+    one that depends on conditions (a range, several rates, "Common")."""
+    text = (text or "").replace(",", "").replace(" ", "").replace("\u00d7", "*")
+
+    if text == "Always":
+        return 1.0
+
+    match = re.fullmatch(r"(?:(\d+\.?\d*)\*)?(\d+\.?\d*)/(\d+\.?\d*)", text)
+
+    return float(match.group(1) or 1) * float(match.group(2)) / float(match.group(3)) if match else None
+
+
+def drop_quantity(drop):
+    if "quantity_low" in drop:
+        return (drop["quantity_low"] + drop.get("quantity_high", drop["quantity_low"])) / 2
+
+    numbers = [float(n) for n in re.findall(r"\d+(?:\.\d+)?", (drop.get("quantity") or "").replace(",", ""))][:2]
+
+    return sum(numbers) / len(numbers) if numbers else None
+
+
+def check_drops(guide, tables):
+    """{"status", "agree", "conditional", "differ": [names]} for one PvM guide."""
+    if re.search(r"enrage|killstreak|hard mode", guide.get("version") or "", re.IGNORECASE):
+        return {"status": "setting-specific", "agree": 0, "conditional": 0, "differ": []}
+
+    monster = monster_for(guide["page"], tables) if "kph" in guide else None
+
+    if monster is None:
+        return {"status": "no drop table", "agree": 0, "conditional": 0, "differ": []}
+
+    agree, conditional, differ = 0, 0, []
+
+    for name, quantity, basis, *_ in guide["outputs"]:
+        if basis != "action":
+            continue
+
+        rows = [drop for section in monster["sections"] for drop in section["drops"]
+                if drop["name"].lower() == name.lower()]
+        rates = [drop_rate(drop.get("rate")) for drop in rows]
+        amounts = [drop_quantity(drop) for drop in rows]
+
+        if not rows or any(amount is None for amount in amounts):
+            differ.append(name)
+        elif any(rate is None for rate in rates):
+            conditional += 1
+        else:
+            expected = sum(rate * amount for rate, amount in zip(rates, amounts))
+
+            if expected > 0 and abs(quantity - expected) / expected <= DROP_TOLERANCE:
+                agree += 1
+            else:
+                differ.append(name)
+
+    status = "drops differ" if differ else ("drops partly checked" if conditional else "drops checked")
+
+    return {"status": status, "agree": agree, "conditional": conditional, "differ": differ}
+
+
+def research_status(method, curated, drops=None):
     """What's been researched for one method. Computed, never hand-written."""
     requirements = method["requirements"]
     unknown = sum(count_checks(requirements[group], {"capability"}) for group in ("access", "recommended"))
 
     if method["category"] != "pvm":
         pvm = "n/a"
+    elif curated and "loot" in method["income"]:
+        pvm = "loot checked"
     else:
-        pvm = "loot checked" if curated and "loot" in method["income"] else "wiki drops"
+        pvm = drops["status"] if drops else "no drop table"
 
     return {
         "income": "curated" if curated else "wiki",
         "unpriced": len(method["income"]["unresolved"]),
         "unknown_checks": unknown,
         "pvm": pvm,
+        "drops_differ": len(drops["differ"]) if drops else 0,
         "steps": bool(method["instructions"]),
         "location": method["location"]["coverage"] == "complete",
     }
 
 
-def merge(recipe_source=None):
+def merge(recipe_source=None, monsters=None):
     """Returns (catalogue, details). The catalogue holds every method in full; the
-    details say where each came from and what was left out."""
+    details say where each came from and what was left out. `monsters` is the
+    monster snapshot if the caller already has it loaded (it's 12 MB)."""
+    tables = monster_tables(monsters)
     curated = catalogue.expand_methods(catalogue.load_method_source())
     guides, meta = load_snapshot()
     recipes = catalogue.choose_recipes(recipe_source) if recipe_source else {}
@@ -532,7 +648,11 @@ def merge(recipe_source=None):
             details["recurring"].append(guide)
 
         method = convert_guide(guide, ctx, page_categories[guide["page"]].most_common(1)[0][0])
-        method["research"] = research_status(method, False)
+        drops = check_drops(guide, tables) if method["category"] == "pvm" else None
+        method["research"] = research_status(method, False, drops)
+
+        if drops and drops["differ"]:
+            details.setdefault("drops_differ", {})[method["id"]] = drops["differ"]
         pages[guide["page"]].append(method)
         methods.append(method)
         details["research"][method["id"]] = method["research"]
@@ -571,7 +691,7 @@ def merge(recipe_source=None):
 def verify_merge(monsters, recipe_source):
     """Builds the merged catalogue and checks every method with the same validator
     as the curated ones. Run by test.py. Returns the method count."""
-    merged, _ = merge(recipe_source)
+    merged, _ = merge(recipe_source, monsters)
     recipes = catalogue.choose_recipes(recipe_source) if recipe_source else None
     catalogue.validate_methods(merged, monsters, recipes)
 
@@ -586,7 +706,7 @@ def walk_checks(node):
 
 
 def print_report(monsters, recipe_source):
-    merged, details = merge(recipe_source)
+    merged, details = merge(recipe_source, monsters)
     recipes = catalogue.choose_recipes(recipe_source) if recipe_source else None
     catalogue.validate_methods(merged, monsters, recipes)
 
@@ -640,8 +760,15 @@ def print_report(monsters, recipe_source):
     for name, count in unknown_names.most_common(15):
         print(f"    {count:3}  {name[:90]}")
 
-    pvm = collections.Counter(status["pvm"] for status in research.values())
-    print(f"\nPvM: {pvm['loot checked']} loot checked, {pvm['wiki drops']} using the Wiki's drop figures")
+    pvm = collections.Counter(status["pvm"] for status in research.values() if status["pvm"] != "n/a")
+    print(f"\nPvM drops: {dict(pvm.most_common())}")
+    print("  Highest-value methods whose drops differ from the drop table:")
+
+    differing = sorted(details.get("drops_differ", {}).items(),
+                       key=lambda pair: details["wiki_profit"].get(pair[0], 0), reverse=True)
+
+    for method_id, names in differing[:10]:
+        print(f"    {method_id[:48]:48} {', '.join(names)[:80]}")
     print(f"Steps written: {sum(s['steps'] for s in research.values())}; "
           f"locations written: {sum(s['location'] for s in research.values())} of {len(methods)}")
 
@@ -660,8 +787,8 @@ def print_report(monsters, recipe_source):
         if status["unknown_checks"]:
             gaps.append(f"{status['unknown_checks']} unknown checks")
 
-        if status["pvm"] == "wiki drops":
-            gaps.append("drops unchecked")
+        if status["pvm"] not in ("n/a", "loot checked", "drops checked"):
+            gaps.append(status["pvm"])
 
         gaps.append("no steps")
         label = method["title"] + (f" - {method['variant']}" if method.get("variant") else "")

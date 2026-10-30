@@ -183,6 +183,46 @@ class ResearchTests(unittest.TestCase):
         self.assertNotIn("capability_kind", other)
 
 
+class DropCheckTests(unittest.TestCase):
+    """Comparing a guide's per-kill drops with the monster's drop table."""
+
+    def setUp(self):
+        self.tables = merge_methods.monster_tables({"monsters": [{"title": "Fixture beast", "sections": [
+            {"title": "Main", "drops": [
+                {"name": "Bones", "quantity": "1", "rate": "Always"},
+                {"name": "Coins", "quantity": "100-300", "quantity_low": 100, "quantity_high": 300, "rate": "1/4"},
+                {"name": "Coins", "quantity": "1000", "rate": "1/100"},
+            ]},
+            {"title": "Unique", "drops": [{"name": "Fixture blade", "quantity": "1", "rate": "1/284–1/1,988"}]},
+        ]}]})
+
+    def check(self, outputs, version=None, page="Money making guide/Killing fixture beasts"):
+        return merge_methods.check_drops(guide(page=page, version=version, kph=100, outputs=outputs), self.tables)
+
+    def test_matching_fixed_rate_drops_are_checked(self):
+        # Coins: 1/4 x 200 + 1/100 x 1000 = 60 per kill, summed over both rows.
+        result = self.check([["Bones", 1, "action", "ge", 1], ["Coins", 58, "action", "value", 1]])
+        self.assertEqual((result["status"], result["agree"]), ("drops checked", 2))
+
+    def test_condition_dependent_rare_drops_leave_it_partly_checked(self):
+        result = self.check([["Bones", 1, "action", "ge", 1], ["Fixture blade", 0.003, "action", "ge", 1]])
+        self.assertEqual((result["status"], result["conditional"]), ("drops partly checked", 1))
+
+    def test_a_fixed_rate_drop_that_doesnt_match_is_listed(self):
+        result = self.check([["Coins", 120, "action", "value", 1], ["Dragon bones", 1, "action", "ge", 1]])
+        self.assertEqual(result["status"], "drops differ")
+        self.assertEqual(result["differ"], ["Coins", "Dragon bones"])
+
+    def test_settings_the_base_table_cant_check_and_missing_monsters(self):
+        self.assertEqual(self.check([["Bones", 9, "action", "ge", 1]], version="2000 Enrage")["status"], "setting-specific")
+        self.assertEqual(self.check([], version="Hard mode")["status"], "setting-specific")
+        self.assertEqual(self.check([], page="Money making guide/Killing ghosts")["status"], "no drop table")
+
+        # Plural guide names find the singular monster.
+        self.assertEqual(merge_methods.monster_for("Money making guide/Killing fixture beasts", self.tables)["title"],
+                         "Fixture beast")
+
+
 class RecurringTests(unittest.TestCase):
     def test_recurring_guides_count_per_run_with_a_yield_and_their_cycle(self):
         ctx = context()
