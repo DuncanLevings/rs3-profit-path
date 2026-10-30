@@ -281,10 +281,13 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
                 x = ROW_INSET, y = 36, width = -242, widthAnchor = 1, height = 24, colour = Style.muted,
             })
 
+            -- ROI stays quiet grey normally, but a negative ROI is a loss, so it
+            -- gets the same red as the profit figure and the Inputs values.
             if available and estimate.roi then
                 row:AddText({
                     text = Style.number(estimate.roi, 1) .. "% ROI",
-                    x = -184, xAnchor = 1, y = 36, width = 174, height = 24, colour = Style.muted,
+                    x = -184, xAnchor = 1, y = 36, width = 174, height = 24,
+                    colour = estimate.roi < 0 and Style.bad or Style.muted,
                 })
             end
 

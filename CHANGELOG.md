@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.4-dev — 2026-10-29
+
+- Show a negative ROI in the same red as losses and the Inputs values, on the method page and in Browse. A positive Browse ROI stays grey; on the method page it stays green.
+- Validate with 116 Lua behaviour tests and 39 Python catalogue tests.
+
 ## 0.7.3-dev — 2026-10-29
 
 - Price items at the last hour's average trades instead of the single latest trade, the same fix Monster Lookup uses. A player dumping steel bars at 15 GP had made 2,000 bars an hour look worth 30,000 GP; the hour's average sell price was about 1,051. Supplies use the average instant-buy price and outputs the average instant-sell price, and creation costs follow automatically.

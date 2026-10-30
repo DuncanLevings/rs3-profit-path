@@ -741,7 +741,7 @@ function MethodView.mount(view, method, calculator, guarded, options)
 
         profit.rgba = headlineColour
         roi.content = result.roi and Style.number(result.roi, 1) .. "% ROI" or ""
-        roi.rgba = headlineColour
+        roi.rgba = result.roi and (result.roi < 0 and Style.bad or Style.good) or headlineColour
 
         updateOutputs(result.outputs or {}, result.revenue)
         updateInputs(result.inputs or {}, result.cost)

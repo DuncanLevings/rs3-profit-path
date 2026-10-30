@@ -233,6 +233,43 @@ return function(test, equal, client, pretty)
         end
     end)
 
+    -- Supplies cost far more than outputs sell for, so every priced method loses
+    -- money: its profit and its negative ROI must both be red in Browse.
+    test("losses show red profit and red ROI in Browse", function()
+        client()
+        prettyui = pretty()
+        gepl = {
+            isReady = function() return true end,
+            getLatest = function()
+                return { high = 1000, low = 1, highTime = 1, lowTime = 1 }
+            end,
+        }
+
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
+        prettyui:findButton("Open Profit Path")()
+
+        local Style = require("src/ui/view_style")
+        local redProfits, redRois = 0, 0
+
+        for _, label in ipairs(prettyui.views[2]:allTexts()) do
+            local text = tostring(label.content)
+
+            if text:find(" / h", 1, true) and text:sub(1, 1) == "-" then
+                equal(label.options.colour, Style.bad, "Loss colour for " .. text)
+                redProfits = redProfits + 1
+            end
+
+            if text:find("% ROI", 1, true) and text:sub(1, 1) == "-" then
+                equal(label.options.colour, Style.bad, "Negative ROI colour for " .. text)
+                redRois = redRois + 1
+            end
+        end
+
+        assert(redProfits > 0 and redRois > 0, "Expected losses with negative ROI in Browse")
+        PluginShutdown()
+    end)
+
     test("opening refreshes estimates while filtering and returning reuse captured prices", function()
         client()
         prettyui = pretty()
@@ -266,6 +303,12 @@ return function(test, equal, client, pretty)
                 local expected = text:sub(1, 1) == "-" and Style.bad or Style.good
                 equal(label.options.colour, expected, "Profit colour for " .. text)
                 coloured = coloured + 1
+            end
+
+            -- ROI stays grey unless it's negative, which is red like a loss.
+            if text:find("% ROI", 1, true) then
+                local expected = text:sub(1, 1) == "-" and Style.bad or Style.muted
+                equal(label.options.colour, expected, "ROI colour for " .. text)
             end
         end
 
