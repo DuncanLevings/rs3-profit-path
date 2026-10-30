@@ -353,6 +353,62 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
     -- Temporary development probes, used only by diagnostics.lua. Remove these
     -- functions and the diagnostics state above together with that module.
 
+    -- Unlock flags: game variables such as ARCH_RELIC_DEATH_NOTE_UNLOCKED, read by
+    -- name. Only names seen in game (Diagnostics' unlock scan) are ever asked for;
+    -- a missing or unreadable one is unknown, never "not unlocked".
+    function self:readFlags(names)
+        local flags = {}
+
+        if not self.active or not Player.IsAvailable() then
+            return flags
+        end
+
+        for name in pairs(names) do
+            local ok, value = pcall(function()
+                local setting = var.VarPlayer[name]
+                return setting and setting.value
+            end)
+
+            if ok and type(value) == "number" then
+                flags[name] = { status = "available", value = value }
+            else
+                flags[name] = { status = "unknown" }
+            end
+        end
+
+        return flags
+    end
+
+    -- Achievement completion by in-game ID (config.Achievement). Its progress is
+    -- COMPLETE (-2) when done; GRACE (-3) also counts as done. DEPRECATED (-4)
+    -- can't be done any more, so it never blocks a diary tier.
+    function self:readAchievements(ids)
+        local achievements = {}
+
+        if not self.active or not Player.IsAvailable() then
+            return achievements
+        end
+
+        for achievementId in pairs(ids) do
+            local ok, progress = pcall(function()
+                local achievement = config.Achievement.FromID(achievementId)
+                return achievement and achievement.progress
+            end)
+
+            if ok and type(progress) == "number" then
+                achievements[achievementId] = {
+                    status = "available",
+                    complete = progress == -2 or progress == -3,
+                    retired = progress == -4,
+                }
+            else
+                achievements[achievementId] = { status = "unknown" }
+            end
+        end
+
+        return achievements
+    end
+
     -- The player's combat level, straight from the client (Player.GetCombatLevel).
     -- The client applies its own rules, including free-to-play worlds, so we don't
     -- work it out ourselves.

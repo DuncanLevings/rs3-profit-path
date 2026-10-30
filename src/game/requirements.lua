@@ -87,6 +87,43 @@ function Requirements.evaluate(requirement, account)
         return result(requirement, status, reason, nil, children)
     end
 
+    -- An unlock flag (a relic, say) is met when the game variable is set.
+    if kind == "flag" then
+        local entry = account.flags and account.flags[requirement.var]
+
+        if not available(entry) or type(entry.value) ~= "number" then
+            return result(requirement, "unknown", "Unlock status is unavailable.")
+        end
+
+        local met = entry.value >= 1
+
+        return result(requirement, met and "met" or "unmet",
+            met and "Unlocked." or "Not unlocked yet.", { { var = requirement.var, value = entry.value } })
+    end
+
+    -- One achievement, or every achievement in a diary tier, must be complete.
+    if kind == "achievement" then
+        local left, unknown = 0, 0
+
+        for _, achievementId in ipairs(requirement.ids) do
+            local entry = account.achievements and account.achievements[achievementId]
+
+            if not available(entry) then
+                unknown = unknown + 1
+            elseif not entry.complete and not entry.retired then
+                left = left + 1
+            end
+        end
+
+        if left > 0 then
+            return result(requirement, "unmet", left .. " of " .. #requirement.ids .. " achievements still to do.")
+        elseif unknown > 0 then
+            return result(requirement, "unknown", "Achievement progress is unavailable.")
+        end
+
+        return result(requirement, "met", "Achievements complete.")
+    end
+
     -- Combat level, as the client reports it (account.combat, from
     -- Player.GetCombatLevel).
     if kind == "combat_level" then

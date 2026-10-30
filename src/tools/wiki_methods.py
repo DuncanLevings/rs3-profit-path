@@ -60,6 +60,7 @@ META = OUTPUT / "meta.json"
 # Research inputs and outputs for the outfit pass (see import_outfits below).
 CAPABILITIES = ROOT / "catalogue-source" / "research" / "capabilities.json"
 OUTFITS = ROOT / "catalogue-source" / "research" / "outfits.json"
+ACHIEVEMENTS = ROOT / "catalogue-source" / "research" / "achievements.json"
 
 API = "https://runescape.wiki/api.php"
 
@@ -724,6 +725,73 @@ def import_outfits():
     return outfits, missing
 
 
+# ---- Achievements: in-game IDs for achievement requirements ----------------------
+#
+# Requirements name single achievements ("It Should Have Been Called Aetherium") or
+# whole achievement diary tiers ("Hard Ardougne achievements"). The Wiki's
+# `achievement` bucket gives every achievement's in-game ID, and diary tiers are
+# its Area Tasks subcategories ("Hard Ardougne"). The plugin then reads completion
+# in game: an achievement is complete when config.Achievement.FromID(id).progress
+# is COMPLETE (-2), and a tier when every achievement in it is.
+
+def fetch_achievements():
+    """Every achievement row: name, in-game ID and categories."""
+    rows, offset = [], 0
+
+    while True:
+        page = bucket("bucket('achievement').select('name','id','maincategory','subcategory')"
+                      f".limit({PAGE_SIZE}).offset({offset}).run()")
+        rows += page
+
+        if len(page) < PAGE_SIZE:
+            return rows
+
+        offset += PAGE_SIZE
+
+
+def import_achievements():
+    """Writes research/achievements.json for every achievement research names.
+    Returns (mapped names, names that matched nothing)."""
+    capabilities = json.loads(CAPABILITIES.read_text(encoding="utf-8"))["capabilities"]
+    names = sorted(name for name, entry in capabilities.items() if entry.get("kind") == "achievement")
+    rows = [row for row in fetch_achievements() if isinstance(row.get("id"), int) and row["id"] >= 0]
+
+    by_name = {}
+    tiers = {}
+
+    for row in rows:
+        by_name.setdefault((row.get("name") or "").lower(), set()).add(row["id"])
+
+        if row.get("maincategory") == "Area Tasks" and row.get("subcategory"):
+            tiers.setdefault(row["subcategory"].lower(), set()).add(row["id"])
+
+    mapped, missing = {}, []
+
+    for name in names:
+        tier = re.fullmatch(r"(.+) achievements", name, re.IGNORECASE)
+        ids = by_name.get(name.lower())
+
+        if tier and tier.group(1).lower() in tiers:
+            mapped[name] = {"tier": tier.group(1), "ids": sorted(tiers[tier.group(1).lower()])}
+        elif ids and len(ids) == 1:
+            mapped[name] = {"ids": sorted(ids)}
+        else:
+            missing.append(name)
+
+    document = {
+        "schema": 1,
+        "retrieved": datetime.date.today().isoformat(),
+        "source": "RuneScape Wiki achievement bucket (in-game achievement IDs; Area Tasks subcategories for diary "
+                  "tiers). RuneScape Wiki contributors, CC BY-NC-SA 3.0.",
+        "note": "A requirement is met when every listed achievement is complete in game (progress COMPLETE).",
+        "achievements": mapped,
+        "missing": missing,
+    }
+    ACHIEVEMENTS.write_text(json.dumps(document, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+
+    return mapped, missing
+
+
 def verify_snapshot():
     """Checks the files on disk: every line a valid guide, sorted, no duplicates,
     and meta.json's counts and item table agreeing with them. Run by test.py, so a
@@ -759,9 +827,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bucket-file", type=Path,
                         help="reuse a saved money_making_guide download ({'retrieved', 'rows'}) instead of fetching it")
+    parser.add_argument("--achievements", action="store_true",
+                        help="instead of the guides, import the in-game IDs of every achievement requirement")
     parser.add_argument("--outfits", action="store_true",
                         help="instead of the guides, import the pieces of every outfit in research/capabilities.json")
     args = parser.parse_args()
+
+    if args.achievements:
+        mapped, missing = import_achievements()
+        print(f"Wrote {len(mapped)} achievement requirements to {ACHIEVEMENTS.relative_to(ROOT)}. "
+              f"No match: {', '.join(missing) or 'none'}.")
+        return
 
     if args.outfits:
         outfits, missing = import_outfits()

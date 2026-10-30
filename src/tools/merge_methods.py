@@ -86,6 +86,16 @@ def tidy_name(name):
     return base.replace("/", ": ")
 
 
+def load_achievements():
+    """{requirement name: [in-game achievement IDs]} from research/achievements.json."""
+    if not wiki_methods.ACHIEVEMENTS.exists():
+        return {}
+
+    source = json.loads(wiki_methods.ACHIEVEMENTS.read_text(encoding="utf-8"))
+
+    return {name: entry["ids"] for name, entry in source.get("achievements", {}).items()}
+
+
 def load_outfits():
     """{outfit name: [[slot, piece name, item ID, (every charge level's ID)], ...]}
     for outfits whose pieces all resolved, from research/outfits.json."""
@@ -122,13 +132,14 @@ def load_snapshot():
 class Context:
     """Shared lookups while converting guides, plus the items table they fill in."""
 
-    def __init__(self, items, meta, capabilities, recipes, quests=None, outfits=None):
+    def __init__(self, items, meta, capabilities, recipes, quests=None, outfits=None, achievements=None):
         self.items = items
         self.meta = meta
         self.capabilities = capabilities
         self.recipes = recipes or {}
         self.quests = quests or {}
         self.outfits = outfits or {}
+        self.achievements = achievements or {}
 
         # Wiki advice links found while converting the current method.
         self.advice = []
@@ -198,6 +209,32 @@ def capability(name, ctx, quest=False):
     if research.get("kind") == "guidance":
         ctx.advice.append(tidy_name(name))
         return None
+
+    # A relic (or other unlock) with a flag verified in game is checked directly.
+    if research.get("flag"):
+        check = {"kind": "flag", "var": research["flag"], "text": tidy_name(name)}
+
+        if research.get("sprite"):
+            check["display_icon"] = catalogue.capability_icon(research["sprite"])
+
+        return check
+
+    # A spell or prayer that only needs levels (and sometimes a quest), per the
+    # Wiki's spell and prayer data, is checked as all of those. "requires" uses the
+    # same shorthand as guide requirements ("skill:MAGIC:67", "quest:Desert Treasure").
+    if research.get("requires"):
+        children = [convert_requirement(entry, ctx) for entry in research["requires"]]
+        check = {"kind": "all", "children": children,
+                 "text": f"{tidy_name(name)} ({', '.join(child['text'] for child in children)})"}
+
+        if research.get("sprite"):
+            check["display_icon"] = catalogue.capability_icon(research["sprite"])
+
+        return check
+
+    # An achievement, or a whole diary tier, by in-game IDs.
+    if name in ctx.achievements:
+        return {"kind": "achievement", "ids": ctx.achievements[name], "text": tidy_name(name)}
 
     # A known outfit is all of its pieces. The plugin checks each one like an item
     # (backpack, worn or bank) and shows them as a grid of icons.
@@ -291,6 +328,11 @@ def convert_requirement(entry, ctx):
         if item_id:
             check = {"kind": "item", "itemId": item_id, "quantity": quantity,
                      "text": name if quantity == 1 else f"{quantity:,} {name}"}
+
+            # The Requirements tab draws an item's icon (with its owned / missing
+            # border) from display_items. A stack keeps its text so the amount shows.
+            if quantity == 1:
+                check["display_items"] = [item_id]
         else:
             check = capability(name, ctx)
 
@@ -315,8 +357,26 @@ def convert_requirement(entry, ctx):
     return check
 
 
+def unknown_only(check):
+    """True if nothing in this requirement can be checked in game yet."""
+    if check["kind"] in ("all", "any"):
+        return all(unknown_only(child) for child in check["children"])
+
+    return check["kind"] == "capability"
+
+
+def check_icons(check):
+    """Every icon alias in a requirement, in order, without repeats."""
+    icons = [check["display_icon"]] if check.get("display_icon") else []
+
+    for child in check.get("children", []):
+        icons += [icon for icon in check_icons(child) if icon not in icons]
+
+    return icons
+
+
 def convert_requirements(requirements, ctx):
-    access, recommended = [], []
+    access, recommended, tips = [], [], []
     ctx.advice = []
 
     for importance, entries in requirements.items():
@@ -324,6 +384,23 @@ def convert_requirements(requirements, ctx):
             check = convert_requirement(entry, ctx)
 
             if check is None:
+                continue
+
+            # Something only recommended that the plugin can't check (a relic, an
+            # ability, a diary) is a tip, not a grey "unknown" check: it never
+            # decides whether you can do the method.
+            # The Wiki sometimes lists a suggestion under "required" ("Tomes of the
+            # Warlock recommended for Darkness"); its own wording says what it is.
+            suggested = importance != "required" or re.search(r"\brecommended\b|\boptional\b", check["text"], re.I)
+
+            if suggested and unknown_only(check):
+                tip = {"text": check["text"]}
+                icons = check_icons(check)
+
+                if icons:
+                    tip["icons"] = icons[:4]
+
+                tips.append(tip)
                 continue
 
             suffix = SUFFIX[importance]
@@ -344,6 +421,9 @@ def convert_requirements(requirements, ctx):
 
         # Wiki pages worth reading for this method, in the guide's order.
         "advice": list(dict.fromkeys(ctx.advice)),
+
+        # Recommended things the plugin can't check, shown as tips with icons.
+        "tips": tips,
     }
 
 
@@ -600,7 +680,7 @@ def merge(recipe_source=None, monsters=None):
 
     items = dict(curated["items"])
     ctx = Context(items, meta or {"items": {}, "retrieved": None}, catalogue.load_capabilities(), recipes,
-                  catalogue.load_quests(), load_outfits())
+                  catalogue.load_quests(), load_outfits(), load_achievements())
 
     # Rule 1: which guides our curated methods replace.
     by_key = {(guide["page"], (guide.get("version") or "").lower()): guide for guide in guides}
@@ -677,6 +757,10 @@ def merge(recipe_source=None, monsters=None):
                for entry in ctx.capabilities.values() if entry.get("sprite")}
     used = {check.get("display_icon") for method in methods for group in ("access", "recommended")
             for check in walk_checks(method["requirements"][group])}
+
+    # Tips draw their icons too.
+    used |= {icon for method in methods for tip in method["requirements"].get("tips", [])
+             for icon in tip.get("icons", [])}
 
     merged = {"schema": 1, "items": items, "methods": methods,
               "icons": {alias: sprite for alias, sprite in sorted(sprites.items()) if alias in used}}
@@ -755,6 +839,8 @@ def print_report(monsters, recipe_source):
     print(f"  By kind: {dict(capability_kinds.most_common())}")
     print(f"  Wiki advice links shown as notes instead of checks: "
           f"{sum(len(method['requirements'].get('advice', [])) for method in methods)}")
+    print(f"  Recommended things shown as tips instead of checks: "
+          f"{sum(len(method['requirements'].get('tips', [])) for method in methods)}")
     print("  Most common checks not researched yet (add these to capabilities.json first):")
 
     for name, count in unknown_names.most_common(15):

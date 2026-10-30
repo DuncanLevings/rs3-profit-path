@@ -187,6 +187,9 @@ function App.start()
     -- are included so a basic hatchet can satisfy 'your highest-tier hatchet'.
     local wanted, skillNames, questNames = {}, {}, {}
 
+    -- Unlock flags (game variable names) and achievement IDs that requirements check.
+    local flagNames, achievementIds = {}, {}
+
     -- Whether any method has a combat level requirement (then we read it with skills).
     local needsCombat = false
     local equipment = catalogue.equipment or {}
@@ -207,6 +210,12 @@ function App.start()
             skillNames[requirement.skill] = true
         elseif requirement.kind == "combat_level" then
             needsCombat = true
+        elseif requirement.kind == "flag" then
+            flagNames[requirement.var] = true
+        elseif requirement.kind == "achievement" then
+            for _, achievementId in ipairs(requirement.ids) do
+                achievementIds[achievementId] = true
+            end
         elseif requirement.kind == "quest" then
             questNames[requirement.quest] = true
         elseif requirement.kind == "item" then
@@ -276,6 +285,11 @@ function App.start()
             for name in pairs(questNames) do
                 evidence.quests[name] = account:readQuest(name)
             end
+
+            -- Relics and achievements change rarely; read them with quests and on
+            -- every full refresh (opening the window).
+            evidence.flags = account:readFlags(flagNames)
+            evidence.achievements = account:readAchievements(achievementIds)
         end
 
         -- A live total and a historical hint are separate fields all the way to

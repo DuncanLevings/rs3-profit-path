@@ -98,6 +98,11 @@ class RequirementTests(unittest.TestCase):
         self.assertEqual(bag["display_items"], [31455, 50805])
         self.assertEqual((coins["quantity"], coins["text"]), (500, "500 Coins"))
 
+        # A single item shows its icon (with an owned / missing border); a stack keeps
+        # its text so the amount is visible.
+        self.assertNotIn("display_items", coins)
+        self.assertEqual(bag["children"][0]["display_items"], [31455])
+
         # A dose-less potion is any dose: its item lists every dose to own.
         self.assertEqual(requirements["recommended"]["children"][0]["text"], "Aggroverload (recommended)")
         self.assertEqual(items["48239"]["ownership_ids"], [48229, 48239])
@@ -118,8 +123,9 @@ class RequirementTests(unittest.TestCase):
         self.assertEqual(relic["display_icon"], catalogue.capability_icon("ARCH_ICON_RELIC_64PX_DEATH_NOTE"))
         self.assertEqual(page["text"], "Magic armour: High level equipment (61+)")
 
-        # Optional requirements sit with the recommended ones, marked optional.
-        self.assertEqual(requirements["recommended"]["children"][0]["text"], "A team of 1-3 other players (optional)")
+        # An optional (or recommended) thing that can't be checked is a tip, not a check.
+        self.assertEqual(requirements["tips"], [{"text": "A team of 1-3 other players"}])
+        self.assertEqual(requirements["recommended"]["children"], [])
 
     def test_the_wikis_own_wording_wins_and_recommended_isnt_said_twice(self):
         requirements, _ = self.convert({
@@ -128,7 +134,8 @@ class RequirementTests(unittest.TestCase):
         })
 
         self.assertEqual(requirements["access"]["children"][0]["text"], "Coins or above")
-        self.assertEqual(requirements["recommended"]["children"][0]["text"], "Priest in Peril recommended for teleports")
+        self.assertEqual(requirements["tips"][0]["text"], "Priest in Peril recommended for teleports")
+        self.assertEqual(requirements["tips"][0]["icons"], ["quest"])
 
 
 class ResearchTests(unittest.TestCase):
@@ -337,3 +344,42 @@ class NamingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UnlockTests(unittest.TestCase):
+    def test_relics_with_a_verified_flag_and_mapped_achievements_become_checks(self):
+        ctx = context(capabilities={
+            "Death Note": {"kind": "relic", "flag": "ARCH_RELIC_DEATH_NOTE_UNLOCKED"},
+            "Hard Ardougne achievements": {"kind": "achievement"},
+        })
+        ctx.achievements = {"Hard Ardougne achievements": [101, 102]}
+        method = merge_methods.convert_guide(guide(requirements={
+            "required": ["item:Death Note", "item:Hard Ardougne achievements"],
+        }), ctx, "pvm")
+        relic, diary = method["requirements"]["access"]["children"]
+
+        self.assertEqual(relic, {"kind": "flag", "var": "ARCH_RELIC_DEATH_NOTE_UNLOCKED", "text": "Death Note"})
+        self.assertEqual(diary, {"kind": "achievement", "ids": [101, 102], "text": "Hard Ardougne achievements"})
+
+        catalogue.validate_methods({"schema": 1, "items": ctx.items, "methods": [method]}, {"monsters": []})
+
+    def test_bad_flag_names_and_achievement_ids_are_refused(self):
+        with self.assertRaisesRegex(ValueError, "game variable"):
+            catalogue.validate_requirement({"kind": "flag", "var": "lower case", "text": "Relic"}, {})
+
+        with self.assertRaisesRegex(ValueError, "achievement IDs"):
+            catalogue.validate_requirement({"kind": "achievement", "ids": [], "text": "Diary"}, {})
+
+
+class SpellTests(unittest.TestCase):
+    def test_a_spell_with_known_unlocks_becomes_its_quest_and_level(self):
+        ctx = context(capabilities={"Vampyrism": {"kind": "spell", "requires": ["quest:Desert Treasure", "skill:MAGIC:69"]}},
+                      quests={"Desert Treasure": "DESERT_TREASURE"})
+        method = merge_methods.convert_guide(guide(requirements={"required": ["item:Vampyrism"]}), ctx, "pvm")
+        spell = method["requirements"]["access"]["children"][0]
+
+        self.assertEqual(spell["kind"], "all")
+        self.assertEqual(spell["text"], "Vampyrism (Desert Treasure, 69 Magic)")
+        self.assertEqual([child["kind"] for child in spell["children"]], ["quest", "skill"])
+
+        catalogue.validate_methods({"schema": 1, "items": ctx.items, "methods": [method]}, {"monsters": []})

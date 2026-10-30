@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.6-dev — 2026-10-29
+
+- Recommended things the plugin can't check (relics, abilities, diaries, perks, and lines the Wiki words as "recommended" or "optional") are now tips: listed under "Also helps" on the Requirements tab with their icons, never coloured or counted as unknown. Unknown checks fall from 1,039 to 482 (523 tips).
+- Single required items show their icon with the owned / missing border, like curated ones (a stack such as "500 Coins" keeps its text).
+- Methods whose drops don't match the drop table now just say their drops use the Wiki's own figures; the mismatches stay in `catalogue.py report`.
+- Relics and achievements are real checks now. 13 relics (Death Note, Berserker's Fury, Shadow's Grace and others) are read from their in-game unlock variables (`ARCH_RELIC_<NAME>_UNLOCKED`, found with the new Diagnostics unlock scan), and 30 achievements and achievement-diary tiers are read by in-game ID (`config.Achievement`; a tier is met when every task in it is complete, and retired tasks never block it). The IDs come from the Wiki's achievement data (`wiki_methods.py --achievements`, saved in `research/achievements.json`). 128 relic and 91 achievement requirements become checks; unknown checks fall from 482 to 420.
+- More unlocks from a second, narrower scan: the War's Retreat adrenaline crystal, the Ranger's Workroom, the large dinosaur pen, the bonecrusher upgrade and Restocking Cannon. Lodestones and Invention machines aren't stored under names the scan can find, so they stay unknown.
+- Spells and prayers with a clear unlock rule in the Wiki's spell and prayer data are checked as their level plus the quest that opens their book: Crumble Undead, Penance, Vampyrism, Animate Dead, Incite Fear, Crystal Mask, Lunar spells, Ancient curses, Soul Split, Torment and Affliction ("Vampyrism (Desert Treasure, 69 Magic)"). Abilities stay unknown: the Wiki doesn't say which need a codex or quest, and a level-only check could wrongly show green. Unknown checks are now 388.
+- Diagnostics has temporary unlock-variable and achievement inspectors for this research.
+- Validate with 123 Lua behaviour tests and 77 Python tests.
+
 ## 0.8.5-dev — 2026-10-29
 
 - Research pass 5, PvM drops. The build now checks every PvM guide's per-kill drops against the monster drop tables in our snapshot (rate × average quantity over every row for the item, within 10%). Each PvM method gets a status that its "Partly researched" note explains: drops checked (16), partly checked because some rare drops depend on conditions (18), setting-specific for enrage, killstreak and hard-mode versions the base table can't check (27), drops that don't match the table yet (66, listed by value in `catalogue.py report`), or no drop table (54).

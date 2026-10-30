@@ -1105,6 +1105,47 @@ test("combat level checks use the client's combat level and stay unknown without
     account:destroy()
 end)
 
+-- Relics are game variables (flags) and diaries are lists of achievements. Both
+-- are read straight from the client; anything unreadable stays unknown.
+test("unlock flags and achievements are read from the client and checked", function()
+    local relic = { kind = "flag", var = "ARCH_RELIC_DEATH_NOTE_UNLOCKED", text = "Death Note" }
+
+    equal(Requirements.evaluate(relic, { flags = { ARCH_RELIC_DEATH_NOTE_UNLOCKED = { status = "available", value = 1 } } }).status, "met")
+    equal(Requirements.evaluate(relic, { flags = { ARCH_RELIC_DEATH_NOTE_UNLOCKED = { status = "available", value = 0 } } }).status, "unmet")
+    equal(Requirements.evaluate(relic, {}).status, "unknown")
+
+    local diary = { kind = "achievement", ids = { 1, 2, 3 }, text = "Hard Ardougne achievements" }
+    local done = { status = "available", complete = true }
+
+    -- A retired achievement can't be done any more, so it never blocks the tier.
+    equal(Requirements.evaluate(diary, { achievements = { done, done, { status = "available", retired = true } } }).status, "met")
+    equal(Requirements.evaluate(diary, { achievements = { done, { status = "available" }, { status = "unknown" } } }).status, "unmet")
+    equal(Requirements.evaluate(diary, { achievements = { done, done, { status = "unknown" } } }).status, "unknown")
+
+    -- Account reads: the variable's value, and COMPLETE (-2) / GRACE (-3) as done.
+    local state = client()
+    var = { VarPlayer = { ARCH_RELIC_DEATH_NOTE_UNLOCKED = { value = 1 } } }
+    config.Achievement = { FromID = function(achievementId)
+        return ({ [1] = { progress = -2 }, [2] = { progress = -3 }, [3] = { progress = 0 } })[achievementId]
+    end }
+
+    local account = Account.new(function() end)
+    local flags = account:readFlags({ ARCH_RELIC_DEATH_NOTE_UNLOCKED = true, MISSING_FLAG = true })
+    equal(flags.ARCH_RELIC_DEATH_NOTE_UNLOCKED.value, 1)
+    equal(flags.MISSING_FLAG.status, "unknown")
+
+    local achievements = account:readAchievements({ [1] = true, [2] = true, [3] = true, [4] = true })
+    equal(achievements[1].complete, true)
+    equal(achievements[2].complete, true)
+    equal(achievements[3].complete, false)
+    equal(achievements[4].status, "unknown")
+
+    state.available = false
+    equal(next(account:readFlags({ ARCH_RELIC_DEATH_NOTE_UNLOCKED = true })), nil)
+    account:destroy()
+    config.Achievement = nil
+end)
+
 test("invalid numerical evidence cannot qualify a requirement", function()
     for _, value in ipairs({ -1, 2.5, math.huge, 0 / 0, "99" }) do
         local account = {

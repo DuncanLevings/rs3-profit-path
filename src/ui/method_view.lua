@@ -262,6 +262,30 @@ local function mountRequirements(parent, method, calculator, fitter)
         end
     end
 
+    -- Recommended things the plugin can't check (a relic, an ability, a diary):
+    -- tips with their icons, never coloured, never counted as unknown.
+    local tips = method.requirements.tips or {}
+
+    if #tips > 0 then
+        parent:AddTitle("Also helps")
+
+        -- One tip per line: the first part (icon, or the text if there's no icon)
+        -- starts a new line, and the rest of that tip sits beside it.
+        for _, tip in ipairs(tips) do
+            local started = false
+
+            for _, icon in ipairs(tip.icons or {}) do
+                -- Style.icon returns nil when the sprite is missing; then the next
+                -- part still has to start the line.
+                if Style.icon(parent, icon, { size = 22, inline = started }) then
+                    started = true
+                end
+            end
+
+            parent:AddText({ text = tip.text, colour = Style.muted, inline = started })
+        end
+    end
+
     -- Wiki pages the guide points to for gear and set-up advice. They're worth a
     -- read, but they aren't requirements, so they're never checked or coloured.
     local advice = method.requirements.advice or {}
@@ -555,8 +579,9 @@ function MethodView.researchGaps(method)
     -- How the drops compare with the monster's drop table (see the catalogue build).
     local drops = {
         ["drops partly checked"] = "rare drops use the Wiki's figures for this setup",
-        ["drops differ"] = (research.drops_differ or 0) .. " drop amount"
-            .. ((research.drops_differ or 0) == 1 and " doesn't" or "s don't") .. " match the drop table yet",
+        -- Mismatches are listed in the catalogue report for maintainers; players
+        -- just see that these are the Wiki's own figures.
+        ["drops differ"] = "drops use the Wiki's own figures",
         ["setting-specific"] = "drops depend on enrage, killstreak or hard mode; these are the Wiki's figures for this setting",
         ["no drop table"] = "drops use the Wiki's own figures",
         ["wiki drops"] = "drops use the Wiki's own figures",

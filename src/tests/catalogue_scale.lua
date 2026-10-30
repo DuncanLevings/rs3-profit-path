@@ -173,6 +173,28 @@ return function(test, equal, client, pretty)
 
         local all = table.concat(texts, " / ")
         assert(all:find("See also on the Wiki", 1, true), "Advice section")
+
+        -- Recommended things the plugin can't check show as tips, not grey checks.
+        if #(chosen.requirements.tips or {}) > 0 then
+            assert(all:find("Also helps", 1, true), "Tips section")
+            assert(all:find(chosen.requirements.tips[1].text, 1, true), "First tip")
+        end
+
+        -- Each tip starts its own line: a tip without icons never sits inline after
+        -- the previous one.
+        local plainTips = {}
+
+        for _, tip in ipairs(chosen.requirements.tips or {}) do
+            if not tip.icons then
+                plainTips[tip.text] = true
+            end
+        end
+
+        for _, label in ipairs(requirements:allTexts()) do
+            if plainTips[label.content] then
+                assert(not label.options.inline, "Tip shares a line: " .. label.content)
+            end
+        end
         assert(all:find(chosen.requirements.advice[1], 1, true), "First advice link")
 
         PluginShutdown()

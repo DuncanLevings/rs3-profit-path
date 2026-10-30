@@ -2,14 +2,22 @@
   "schema": 1,
   "note": "What non-item requirements are, and the native sprite (from rsprite's reference list) that shows each one where there is one. Sprites were drafted by catalogue.py match-sprites; kinds were classified by hand. \"guidance\" marks Wiki advice pages: shown as notes, not checked. Everything else can't be checked in game yet, so the plugin shows it as unknown.",
   "capabilities": {
-    "Abyssal Link": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_ABYSSAL_LINK"},
-    "Adrenaline crystal (War's Retreat)": {"kind": "place"},
-    "Affliction": {"kind": "prayer"},
+    "Abyssal Link": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_ABYSSAL_LINK",
+      "flag": "ARCH_RELIC_ABYSSAL_LINK_UNLOCKED"
+    },
+    "Adrenaline crystal (War's Retreat)": {"kind": "place", "flag": "PVM_HUB_ADRENALINE_CRYSTAL_UNLOCKED"},
+    "Affliction": {"kind": "prayer", "requires": ["quest:The Temple at Senntisten", "skill:PRAYER:99"]},
     "Aftershock": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_WEAPONS_AFTERSHOCK"},
     "Ali the Trader": {"kind": "place"},
     "Anachronia Dinosaur Farm#Perks": {"kind": "place"},
-    "Ancient curses": {"kind": "prayer"},
-    "Animate Dead": {"kind": "spell", "sprite": "SPELL_ANCIENT_MAGICKS_ICON_ANIMATE_DEAD"},
+    "Ancient curses": {"kind": "prayer", "requires": ["quest:The Temple at Senntisten"]},
+    "Animate Dead": {
+      "kind": "spell",
+      "sprite": "SPELL_ANCIENT_MAGICKS_ICON_ANIMATE_DEAD",
+      "requires": ["quest:City of Senntisten", "skill:MAGIC:84"]
+    },
     "Ardougne lodestone": {"kind": "place"},
     "Armour": {"kind": "guidance"},
     "Armour/Hybrid armour": {"kind": "guidance"},
@@ -29,15 +37,23 @@
     "Bandit Camp lodestone": {"kind": "place"},
     "Barbarian Training": {"kind": "unlock"},
     "Barge": {"kind": "ability"},
-    "Berserker's Fury": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_BERSERKERS_FURY"},
+    "Berserker's Fury": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_BERSERKERS_FURY",
+      "flag": "ARCH_RELIC_BERSERKERS_FURY_UNLOCKED"
+    },
     "Biting": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_COMBAT_BITING"},
     "Blacksmith's outfit": {"kind": "outfit"},
     "Bladed Dive": {"kind": "ability", "sprite": "COMBAT_ABILITY_ICON_ATTACK_BLADED_DIVE"},
-    "Blessing of Het": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_BLESSING_OF_HET"},
+    "Blessing of Het": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_BLESSING_OF_HET",
+      "flag": "ARCH_RELIC_BLESSING_OF_HET_UNLOCKED"
+    },
     "Blood essence": {"kind": "item"},
     "Blood reaver": {"kind": "familiar"},
-    "Bonecrusher upgrade": {"kind": "unlock"},
-    "Bonecrusher#Bonecrusher upgrade": {"kind": "unlock"},
+    "Bonecrusher upgrade": {"kind": "unlock", "flag": "ELR2_BONECRUSHER_UPGRADE_UNLOCKED"},
+    "Bonecrusher#Bonecrusher upgrade": {"kind": "unlock", "flag": "ELR2_BONECRUSHER_UPGRADE_UNLOCKED"},
     "Bountiful Harvest 2": {"kind": "other"},
     "Caroming": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_COMBAT_CAROMING"},
     "Comparison of high-level magic weapons": {"kind": "guidance"},
@@ -62,17 +78,33 @@
     "Corruption Shot": {"kind": "ability", "sprite": "COMBAT_ABILITY_ICON_RANGED_CORRUPTION_SHOT"},
     "Crackling": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_COMBAT_CRACKLING"},
     "Crossing that Bridge": {"kind": "achievement"},
-    "Crumble Undead": {"kind": "spell", "sprite": "SPELL_ICON_STANDARD_COMBAT_CRUMBLE_UNDEAD"},
+    "Crumble Undead": {
+      "kind": "spell",
+      "sprite": "SPELL_ICON_STANDARD_COMBAT_CRUMBLE_UNDEAD",
+      "requires": ["skill:MAGIC:78"]
+    },
     "Cryptbloom armour": {"kind": "outfit"},
-    "Crystal Mask": {"kind": "spell"},
+    "Crystal Mask": {"kind": "spell", "requires": ["quest:The Light Within", "skill:MAGIC:90"]},
     "Dagon Bye": {"kind": "achievement"},
     "Darkness": {"kind": "spell", "sprite": "SPELL_ICON_NECROMANCY_DARKNESS"},
-    "Death Note": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_DEATH_NOTE"},
-    "Death Ward": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_DEATH_WARD"},
+    "Death Note": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_DEATH_NOTE",
+      "flag": "ARCH_RELIC_DEATH_NOTE_UNLOCKED"
+    },
+    "Death Ward": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_DEATH_WARD",
+      "flag": "ARCH_RELIC_DEATH_WARD_UNLOCKED"
+    },
     "Demon Slayer (perk)": {"kind": "perk"},
     "Desert achievements": {"kind": "achievement"},
     "Dive": {"kind": "ability", "sprite": "COMBAT_ABILITY_ICON_ATTACK_DIVE"},
-    "Divine Conversion": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_DIVINE_CONVERSION"},
+    "Divine Conversion": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_DIVINE_CONVERSION",
+      "flag": "ARCH_RELIC_DIVINE_CONVERSION_UNLOCKED"
+    },
     "Diviner's outfit": {"kind": "outfit"},
     "Double Surge": {"kind": "ability"},
     "Double surge": {"kind": "ability"},
@@ -97,7 +129,11 @@
     "Embrace the Chaos": {"kind": "achievement"},
     "First age outfit": {"kind": "outfit"},
     "Five finger discount": {"kind": "relic"},
-    "Flow State": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_FLOW_STATE"},
+    "Flow State": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_FLOW_STATE",
+      "flag": "ARCH_RELIC_FLOW_STATE_UNLOCKED"
+    },
     "Fortune": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_FORTUNE"},
     "Fungus soup": {"kind": "item"},
     "Fur n Seek/Wish list": {"kind": "unlock"},
@@ -124,12 +160,16 @@
     "Honed": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_HONED"},
     "Hunter Lodge": {"kind": "place"},
     "Imp Souled": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_IMP_SOULED"},
-    "Incite Fear": {"kind": "spell", "sprite": "SPELL_ANCIENT_MAGICKS_ICON_INCITE_FEAR"},
+    "Incite Fear": {
+      "kind": "spell",
+      "sprite": "SPELL_ANCIENT_MAGICKS_ICON_INCITE_FEAR",
+      "requires": ["quest:City of Senntisten", "skill:MAGIC:98"]
+    },
     "Infinity ethereal outfit": {"kind": "outfit"},
     "Invoke Death": {"kind": "spell", "sprite": "SPELL_ICON_NECROMANCY_INVOKE_DEATH"},
     "It Should Have Been Called Aetherium": {"kind": "achievement"},
     "Know Thy Measure": {"kind": "achievement"},
-    "Large dinosaur pen": {"kind": "place"},
+    "Large dinosaur pen": {"kind": "place", "flag": "POF_PADDOCK_DINOSAUR_LARGE_1_BUILT"},
     "Law runes": {"kind": "item"},
     "Legacy Mode#Combat": {"kind": "guidance"},
     "Legendary pet": {"kind": "unlock"},
@@ -139,9 +179,10 @@
     "Luck": {"kind": "other"},
     "Luck of the Dwarves (relic power)": {
       "kind": "relic",
-      "sprite": "ARCH_ICON_RELIC_64PX_LUCK_OF_THE_DWARVES"
+      "sprite": "ARCH_ICON_RELIC_64PX_LUCK_OF_THE_DWARVES",
+      "flag": "ARCH_RELIC_LUCK_OF_THE_DWARVES_UNLOCKED"
     },
-    "Lunar spells": {"kind": "spell"},
+    "Lunar spells": {"kind": "spell", "requires": ["quest:Lunar Diplomacy"]},
     "Magic armour": {"kind": "guidance"},
     "Magic armour#High level equipment (61+)": {"kind": "guidance"},
     "Magic golem outfit": {"kind": "outfit"},
@@ -174,17 +215,33 @@
     "Necromancy_armour#High_level_equipment_(90+)Necromancy tank armour": {"kind": "guidance"},
     "Necromancy_weapons#High_level_equipment": {"kind": "guidance"},
     "New Varrock achievements": {"kind": "achievement"},
-    "Nexus Mod": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_NEXUS_MOD"},
+    "Nexus Mod": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_NEXUS_MOD",
+      "flag": "ARCH_RELIC_NEXUS_MOD_UNLOCKED"
+    },
     "On the Threshold of the Mind": {"kind": "achievement"},
     "Optimised hide tanner": {"kind": "unlock"},
     "Out of the Crucible": {"kind": "achievement"},
-    "Penance": {"kind": "spell", "sprite": "SPELL_ICON_STANDARD_COMBAT_PENANCE"},
-    "Pharm Ecology": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_PHARM_ECOLOGY"},
+    "Penance": {
+      "kind": "spell",
+      "sprite": "SPELL_ICON_STANDARD_COMBAT_PENANCE",
+      "requires": ["quest:Desert Treasure", "skill:MAGIC:67"]
+    },
+    "Pharm Ecology": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_PHARM_ECOLOGY",
+      "flag": "ARCH_RELIC_PHARM_ECOLOGY_UNLOCKED"
+    },
     "Pickaxes": {"kind": "guidance"},
     "Plank maker (machine)": {"kind": "unlock"},
     "Planted Feet": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_WEAPONS_PLANTED_FEET"},
     "Polishing": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_POLISHING"},
-    "Pouch Protector": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_POUCH_PROTECTOR"},
+    "Pouch Protector": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_POUCH_PROTECTOR",
+      "flag": "ARCH_RELIC_POUCH_PROTECTOR_UNLOCKED"
+    },
     "Preservationist": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_PRESERVATIONIST"},
     "Prifddinas lodestone": {"kind": "place"},
     "Qualification - Associate": {"kind": "unlock"},
@@ -195,7 +252,7 @@
     "Ranged weapons": {"kind": "guidance"},
     "Ranged_armour#High-level_equipment_(61+)": {"kind": "guidance"},
     "Ranged_armour#High_level_equipment_(61+)": {"kind": "guidance"},
-    "Ranger's Workroom": {"kind": "place"},
+    "Ranger's Workroom": {"kind": "place", "flag": "PLAYER_FORT_BUILDING_RANGERS_WORKROOM"},
     "Reaper's choice": {"kind": "other"},
     "Recommended equipment for PvM": {"kind": "guidance"},
     "Recommended equipment for PvM/Magic": {"kind": "guidance"},
@@ -205,7 +262,7 @@
     "Repair Rune Pouch": {"kind": "unlock"},
     "Reputation (Mazcab)": {"kind": "unlock"},
     "Reputation (Menaphos)": {"kind": "unlock"},
-    "Restocking Cannon": {"kind": "unlock"},
+    "Restocking Cannon": {"kind": "unlock", "flag": "ARTISAN_UNLOCK_CANNON_RESTOCK"},
     "Runecrafting pouches": {"kind": "item"},
     "Ruthless": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_COMBAT_RUTHLESS"},
     "Saradomin items": {"kind": "item"},
@@ -215,14 +272,22 @@
     "Seers' Village lodestone": {"kind": "place"},
     "Server": {"kind": "other"},
     "Shadow Realm shield": {"kind": "item"},
-    "Shadow's Grace": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_SHADOWS_GRACE"},
+    "Shadow's Grace": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_SHADOWS_GRACE",
+      "flag": "ARCH_RELIC_SHADOWS_GRACE_UNLOCKED"
+    },
     "Shield": {"kind": "guidance"},
     "Simple generator": {"kind": "unlock"},
     "Skeletal horror Teleport": {"kind": "spell"},
     "Slayer points": {"kind": "unlock"},
-    "Soul Split": {"kind": "prayer"},
+    "Soul Split": {"kind": "prayer", "requires": ["quest:The Temple at Senntisten", "skill:PRAYER:92"]},
     "Spear": {"kind": "guidance"},
-    "Sticky Fingers": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_STICKY_FINGERS"},
+    "Sticky Fingers": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_STICKY_FINGERS",
+      "flag": "ARCH_RELIC_STICKY_FINGERS_UNLOCKED"
+    },
     "Sunken Pyramid": {"kind": "place"},
     "Sunshine": {"kind": "ability", "sprite": "COMBAT_ABILITY_ICON_MAGIC_SUNSHINE"},
     "Surge": {"kind": "ability"},
@@ -232,17 +297,21 @@
     "Tier 4 luck": {"kind": "other"},
     "Tier 80 equipment": {"kind": "guidance"},
     "TokKul-Zo": {"kind": "item"},
-    "Torment": {"kind": "prayer"},
+    "Torment": {"kind": "prayer", "requires": ["quest:The Temple at Senntisten", "skill:PRAYER:95"]},
     "Trapper outfit": {"kind": "outfit"},
     "Trollheim Teleport": {"kind": "spell"},
     "Uncapped Potential": {"kind": "other"},
     "Undead Slayer": {"kind": "ability"},
     "Undead Slayer (ability)": {"kind": "ability"},
     "Underworld achievements": {"kind": "achievement"},
-    "Upgraded bonecrusher": {"kind": "unlock"},
+    "Upgraded bonecrusher": {"kind": "unlock", "flag": "ELR2_BONECRUSHER_UPGRADE_UNLOCKED"},
     "Vala": {"kind": "other"},
     "Vambraces": {"kind": "guidance"},
-    "Vampyrism": {"kind": "spell", "sprite": "SPELL_ANCIENT_MAGICKS_ICON_VAMPYRISM"},
+    "Vampyrism": {
+      "kind": "spell",
+      "sprite": "SPELL_ANCIENT_MAGICKS_ICON_VAMPYRISM",
+      "requires": ["quest:Desert Treasure", "skill:MAGIC:69"]
+    },
     "Varrock Set Tasks - Elite": {"kind": "achievement"},
     "Venomblood": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_ARMOUR_VENOMBLOOD"},
     "Vestments of havoc": {"kind": "outfit"},

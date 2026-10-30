@@ -300,6 +300,17 @@ def validate_requirement(check, items, equipment=None):
         if "skill_" + name.lower() not in ICON_NAMES:
             raise ValueError("Unresolved skill icon name")
 
+    elif kind == "flag":
+        # A game variable verified in the client (e.g. ARCH_RELIC_DEATH_NOTE_UNLOCKED).
+        if not isinstance(check.get("var"), str) or not re.fullmatch(r"[A-Z][A-Z0-9_]*", check["var"]):
+            raise ValueError("Unlock flag needs a game variable name")
+
+    elif kind == "achievement":
+        ids = check.get("ids")
+
+        if not isinstance(ids, list) or not ids or not all(positive_integer(value) or value == 0 for value in ids):
+            raise ValueError("Achievement requirement needs in-game achievement IDs")
+
     elif kind == "combat_level":
         # Worked out in game from nine combat skills; 152 is the highest possible.
         if not positive_integer(check.get("level")) or check["level"] > 152:
@@ -994,6 +1005,18 @@ def validate_methods(source, monsters, recipes=None):
 
         # Wiki advice pages for the method: shown as notes, never checked.
         require_text_list(requirements.get("advice", []), "Requirement advice")
+
+        # Tips: recommended things that can't be checked, with optional icons.
+        tips = requirements.get("tips", [])
+
+        if not isinstance(tips, list):
+            raise ValueError("Requirement tips must be a list")
+
+        for tip in tips:
+            require_text(require_record(tip, "Requirement tip").get("text"), "Tip text")
+
+            if any(icon not in ICON_NAMES for icon in tip.get("icons", [])):
+                raise ValueError("Unresolved tip icon name")
 
         # Every method records which Wiki revision it came from.
         revision = require_record(method.get("source"), "Method source").get("revision")

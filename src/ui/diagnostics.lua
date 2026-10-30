@@ -1,6 +1,82 @@
 -- Temporary development probes. The parent view owns all components; this module
 -- only retains labels while mounted. Remove these probes before release packaging.
 local ToolbeltProbe = require("src/game/toolbelt_probe")
+
+-- Temporary: names that may hold the unlocks Wiki guides still need (lodestones,
+-- Invention machines, upgrades...). Relics, War's Retreat, the Ranger's Workroom
+-- and dinosaur pens are already mapped, so they're left out. Matching variable
+-- names and their current values are printed, to be mapped and verified by hand.
+local UNLOCK_WORDS = {
+    -- Lodestones and transport
+    "LODESTONE", "LODE_", "BALLOON_TRANSPORT",
+
+    -- Invention machines (plank maker, hide tanner, generator, disassembler...)
+    "PLANK_MAKER", "PLANKMAKER", "TANNER", "GENERATOR", "DISASSEMBL", "POTION_PRODUCER", "CAPACITOR",
+    "MECHANISED", "MECHANIZED",
+
+    -- Upgrades and shops
+    "BONECRUSHER", "RUNE_POUCH", "SYDEKIX", "QUICK_CENSE", "QUICKCENSE", "RESTOCK", "LEGENDARY_PET",
+
+    -- Places and areas
+    "GIELINOR_HEART", "HEART_OF_GIELINOR", "SUNKEN_PYRAMID", "WELL_OF_SOULS", "HUNTER_LODGE", "BARBARIAN_TRAIN",
+
+    -- Points
+    "SLAYER_POINTS",
+}
+
+-- Families that matched a word above but only track tasks, kill counts or
+-- cosmetics. Skipping them keeps the console output short enough to paste.
+local UNLOCK_SKIP = {
+    "LEAGUE_", "CHEEVO_", "BSLAY_", "ITEMLOG_", "COLLECTION_", "MTX", "DINO_", "COMBATV2_", "COMBAT_MASTERY",
+    "BOSS_INSTANCE", "TRH", "XMAS", "LOGIN_MESSAGE", "QUEST_", "ARCH_RESTORATION", "MAKEX",
+}
+
+local function unlockName(kind, name)
+    for _, prefix in ipairs(UNLOCK_SKIP) do
+        if name:find(prefix, 1, true) then
+            return false
+        end
+    end
+
+    for _, word in ipairs(UNLOCK_WORDS) do
+        if name:find(word, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+-- Account variables only: varbits (negative IDs) and plain VarPlayers.
+local UNLOCK_RANGES = {
+    { kind = "VarPlayer", first = -1, last = -70001, step = -1 },
+    { kind = "VarPlayer", first = 0, last = 20000, step = 1 },
+}
+
+-- Temporary: everything the client says about one achievement, to check how its
+-- completion should be read before trusting it for requirements.
+local function describeAchievement(achievementId)
+    local lines = {}
+    local achievement = config.Achievement.FromID(achievementId)
+
+    if not achievement then
+        return { "No achievement with ID " .. tostring(achievementId) .. "." }
+    end
+
+    lines[1] = achievement.name .. " (" .. achievement.configName .. ", ID " .. achievement.id .. "): progress "
+        .. tostring(achievement.progress) .. ", tally " .. tostring(achievement.tallyProgress) .. "/"
+        .. tostring(achievement.tallyTarget) .. ", subcategory " .. tostring(achievement.subCategory)
+        .. ", sprite " .. tostring(achievement.spriteID)
+
+    for kind, tests in pairs(achievement.achievements or {}) do
+        for _, test in ipairs(tests) do
+            lines[#lines + 1] = "  " .. kind .. " group " .. tostring(test.group) .. ": complete "
+                .. tostring(test.isComplete) .. (test.description and (" - " .. test.description) or "")
+        end
+    end
+
+    return lines
+end
 local Diagnostics = {}
 
 function Diagnostics.new(account, inspectQuote, inspectQuest)
@@ -155,6 +231,40 @@ function Diagnostics.new(account, inspectQuote, inspectQuest)
             if result.status ~= "available" then
                 labels.quest.content = result.message or result.status
             end
+        end))
+
+        -- Temporary: discovery for unlocks that Wiki requirements mention.
+        view:AddTitle("Unlock discovery")
+        view:AddText("Lists account variables whose names mention lodestones, farm machines, War's Retreat and similar, "
+            .. "with their values (console). Keep Diagnostics open while it runs.")
+        local unlockStatus = view:AddText("Not scanned yet.")
+        view:AddSimpleButton("Scan lodestone and farm variables", guarded(function()
+            self:cancelScan()
+            unlockStatus.content = "Scanning account variables in small batches..."
+
+            self.cancelProbe = ToolbeltProbe.start(guarded(function(line)
+                print("[Profit Path unlocks] " .. line)
+            end), guarded(function(scanned, matched)
+                unlockStatus.content = "Inspected " .. scanned .. " IDs; found " .. matched .. " candidates."
+            end), guarded(function(result)
+                unlockStatus.content = result.message .. " Inspected " .. result.scanned .. "; candidates "
+                    .. result.matched .. "; read failures " .. result.failures .. "."
+                print("[Profit Path unlocks] " .. unlockStatus.content)
+            end), { ranges = UNLOCK_RANGES, matches = unlockName, limit = 2000 })
+        end))
+
+        view:AddText("Achievement ID to inspect (compare with your achievement journal):")
+        local achievementField = view:AddTextField({ text = "2871", maxLength = 8 })
+        local achievementStatus = view:AddText("")
+        view:AddSimpleButton("Inspect achievement", guarded(function()
+            local ok, lines = pcall(describeAchievement, tonumber(achievementField:GetText()))
+            lines = ok and lines or { "Inspect failed: " .. tostring(lines) }
+
+            for _, line in ipairs(lines) do
+                print("[Profit Path achievement] " .. line)
+            end
+
+            achievementStatus.content = table.concat(lines, "\n")
         end))
 
         view:AddTitle("GE Price Library")

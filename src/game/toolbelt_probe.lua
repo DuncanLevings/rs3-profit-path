@@ -35,13 +35,14 @@ end
 
 -- Read one config through the documented FromID boundary. Native holes/errors
 -- are expected during discovery. Read current values only AFTER the name matches;
--- unrelated account variables aren't collected or printed.
-local function read(kind, index)
+-- unrelated account variables aren't collected or printed. `matches` decides which
+-- names are relevant (the tool-belt test unless a scan supplies its own).
+local function read(kind, index, matches)
     local namespace = kind == "VarPlayer" and var.VarPlayer or config[kind]
     local found = namespace.FromID(index)
     local name = found and found.configName
 
-    if not relevant(kind, name) then
+    if type(name) ~= "string" or not matches(kind, name) then
         return nil
     end
 
@@ -85,7 +86,15 @@ end
 
 -- Starts only after an explicit click. The caller owns the returned cancellation
 -- function; callbacks must belong to the same screen lifetime as the scan.
-function Probe.start(onLine, onProgress, onDone)
+--
+-- `options` is optional, for other discovery scans: { ranges = {...}, matches =
+-- function(kind, name), limit = candidates per range }. Without it, this is the
+-- tool-belt scan exactly as before.
+function Probe.start(onLine, onProgress, onDone, options)
+    options = options or {}
+    local ranges = options.ranges or ranges
+    local matches = options.matches or relevant
+    local limit = options.limit or 128
     local active = true
     local rangeIndex, nextId = 1, ranges[1].first
     local scanned, matched, failures = 0, 0, 0
@@ -139,7 +148,7 @@ function Probe.start(onLine, onProgress, onDone)
 
         for _ = 1, PER_TICK do
             local range = ranges[rangeIndex]
-            local ok, record = pcall(read, range.kind, nextId)
+            local ok, record = pcall(read, range.kind, nextId, matches)
             scanned = scanned + 1
 
             if not ok then
@@ -158,7 +167,7 @@ function Probe.start(onLine, onProgress, onDone)
             nextId = nextId + range.step
             local exhausted = (range.step > 0 and nextId > range.last)
                 or (range.step < 0 and nextId < range.last)
-            local limited = rangeMatches >= 128 and not exhausted
+            local limited = rangeMatches >= limit and not exhausted
 
             if exhausted or limited then
                 if not advanceRange(limited) then
