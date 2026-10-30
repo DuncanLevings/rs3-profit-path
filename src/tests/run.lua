@@ -537,6 +537,42 @@ local function pretty()
             return labels
         end
 
+        -- Same idea for text boxes and buttons: tests find "the rate box" or the
+        -- "Save rate" button wherever the layout nests it.
+        function view:allFields()
+            local fields = {}
+
+            for _, field in ipairs(self.fields) do
+                fields[#fields + 1] = field
+            end
+
+            for _, child in ipairs(self.children) do
+                if not child.destroyed then
+                    for _, field in ipairs(child:allFields()) do
+                        fields[#fields + 1] = field
+                    end
+                end
+            end
+
+            return fields
+        end
+
+        -- Destroyed panels are searched too: tests press buttons on a closed
+        -- screen to prove its old callbacks do nothing.
+        function view:button(name)
+            if self.buttons[name] then
+                return self.buttons[name]
+            end
+
+            for _, child in ipairs(self.children) do
+                local found = child:button(name)
+
+                if found then
+                    return found
+                end
+            end
+        end
+
         function view:SetScrollPosition(y)
             self.scrollY = y
         end
@@ -1150,7 +1186,8 @@ test("nested alternatives retain individual evidence and empty groups stay expli
 end)
 
 -- GE quotes (income.lua) ------------------------------------------------------
--- Each `library` table below is a fake GEPL with just isReady and getLatest.
+-- Each `library` table below is a fake GEPL. Most have just isReady and getLatest
+-- (no hourly averages), so they exercise the latest-trade fallback.
 
 test("missing and loading GE dependency do not invent a price", function()
     equal(Income.inspectQuote(nil, 49430).status, "unavailable")
@@ -1214,6 +1251,107 @@ test("missing and non-finite trade sides remain partial/unavailable", function()
 
     quote = { high = 0 / 0, highTime = 100 }
     equal(Income.inspectQuote(library, 49430).status, "unavailable")
+end)
+
+-- A fake GEPL with hourly averages too. `latest` and `hour` are keyed by item ID.
+local function averagingLibrary(latest, hour)
+    return {
+        isReady = function()
+            return true
+        end,
+        getLatest = function(itemId)
+            return latest[itemId]
+        end,
+        getOneHourAverage = function(itemId)
+            return assert(hour[itemId], "Price not found for itemId: " .. itemId)
+        end,
+    }
+end
+
+-- The real case from 29 October: someone dumped steel bars at 15 GP, so the latest
+-- sell was 15 while the hour's sells averaged about 1,051.
+test("hourly averages win over a dumped latest trade", function()
+    local library = averagingLibrary({
+        [2353] = { high = 1139, highTime = 100, low = 15, lowTime = 90 },
+    }, {
+        [2353] = { avgHighPrice = 1139, highPriceVolume = 32032, avgLowPrice = 1051.43, lowPriceVolume = 46162 },
+    })
+
+    local quote = Income.inspectQuote(library, 2353)
+
+    equal(quote.status, "available")
+    equal(quote.low, 1051.43)
+    equal(quote.lowSource, "hour")
+    equal(quote.lowTime, 90)
+    equal(quote.high, 1139)
+
+    -- Through the calculator: 2,000 bars an hour are worth about 2.1m, not 30k.
+    -- Tax is floor(1051.43 / 50) = 21 GP per bar.
+    local steel = require("src/data/method_data").find("smelting-steel-bars.basic")
+    local calculated = Income.calculate(steel.income, 2000, { [2353] = quote })
+    equal(calculated.outputs[1].unitPrice, 1051.43)
+    equal(calculated.outputs[1].value, 2000 * 1051.43 - 2000 * 21)
+end)
+
+test("a side with no trades in the hour falls back to its latest trade", function()
+    local library = averagingLibrary({
+        [1] = { high = 120, highTime = 100, low = 90, lowTime = 80 },
+    }, {
+        [1] = { avgHighPrice = 118, highPriceVolume = 10, avgLowPrice = nil, lowPriceVolume = 0 },
+    })
+
+    local quote = Income.inspectQuote(library, 1)
+
+    equal(quote.high, 118)
+    equal(quote.highSource, "hour")
+    equal(quote.low, 90)
+    equal(quote.lowSource, "latest")
+    equal(quote.status, "available")
+end)
+
+-- With no sells in the hour, a single 15 GP sell next to a 1,139 GP hourly buy
+-- average is a dump. Refuse it rather than show a fake loss.
+test("a fallback trade far from the other side's average is refused", function()
+    local library = averagingLibrary({
+        [2353] = { high = 1139, highTime = 100, low = 15, lowTime = 90 },
+    }, {
+        [2353] = { avgHighPrice = 1139, highPriceVolume = 50, lowPriceVolume = 0 },
+    })
+
+    local quote = Income.inspectQuote(library, 2353)
+
+    equal(quote.status, "partial")
+    equal(quote.low, nil)
+    assert(quote.lowMessage:find("one-off", 1, true), quote.lowMessage)
+
+    -- The row says why, and there's no total rather than a misleading one.
+    local steel = require("src/data/method_data").find("smelting-steel-bars.basic")
+    local calculated = Income.calculate(steel.income, 2000, { [2353] = quote })
+    equal(calculated.revenue, nil)
+    equal(calculated.outputs[1].message, quote.lowMessage)
+
+    -- A real spread within 3x is still trusted.
+    library = averagingLibrary({
+        [2353] = { high = 1139, highTime = 100, low = 500, lowTime = 90 },
+    }, {
+        [2353] = { avgHighPrice = 1139, highPriceVolume = 50, lowPriceVolume = 0 },
+    })
+    equal(Income.inspectQuote(library, 2353).low, 500)
+end)
+
+test("missing or broken hourly averages leave the latest trades in use", function()
+    local latest = { [7] = { high = 120, highTime = 100, low = 90, lowTime = 80 } }
+
+    -- GEPL throws for an item with no hourly entry; hourly data may not be loaded.
+    local quote = Income.inspectQuote(averagingLibrary(latest, {}), 7)
+    equal(quote.high, 120)
+    equal(quote.highSource, "latest")
+
+    local notReady = averagingLibrary(latest, { [7] = { avgHighPrice = 1, highPriceVolume = 1 } })
+    notReady.isReady = function(endpoint)
+        return endpoint == "latest"
+    end
+    equal(Income.inspectQuote(notReady, 7).high, 120)
 end)
 
 test("GE item errors preserve a useful diagnostic", function()

@@ -21,6 +21,11 @@ local COINS_ITEM_ID = 995
 local BODY_FONT = "MUSEO_SANS_15PT_REGULAR"
 local TITLE_FONT = "CINZEL_13PT_BOLD"
 
+-- Bigger, bolder client fonts for headline numbers (the profit per hour and ROI).
+-- Both are used by other RS3 plugins, but Style.setFont still checks they exist.
+Style.HEADLINE_FONT = "MUSEO_SANS_19PT_BOLD"
+Style.SUBHEADLINE_FONT = "MUSEO_SANS_17PT_BOLD"
+
 -- Gap between a coin and the number it belongs to, in interface units.
 local COIN_GAP = 4
 
@@ -63,9 +68,13 @@ function Style.panelFitter(host, padding, gap)
     local panels = {}
     local fitter = {}
 
-    -- `half` = true for one of two side-by-side panels. Returns the panel.
-    function fitter:add(panel, height, half)
-        panels[#panels + 1] = { panel = panel, height = height, half = half }
+    -- `size` says how wide the panel is. Returns the panel.
+    --   nil         the full page width
+    --   true        half the page, for one of two side-by-side panels
+    --   { fixed = n } always n wide, for a small panel at the start of a row
+    --   { rest = n }  whatever's left of the row beside an n-wide fixed panel
+    function fitter:add(panel, height, size)
+        panels[#panels + 1] = { panel = panel, height = height, size = size }
 
         return panel
     end
@@ -82,7 +91,18 @@ function Style.panelFitter(host, padding, gap)
         local half = math.floor(width / 2) - padding - math.floor((gap or 0) / 2)
 
         for _, entry in ipairs(panels) do
-            entry.panel:SetSize(entry.half and half or full, entry.height)
+            local size = entry.size
+            local panelWidth = full
+
+            if size == true then
+                panelWidth = half
+            elseif type(size) == "table" and size.fixed then
+                panelWidth = size.fixed
+            elseif type(size) == "table" and size.rest then
+                panelWidth = full - size.rest - (gap or 0)
+            end
+
+            entry.panel:SetSize(panelWidth, entry.height)
         end
     end
 
@@ -105,16 +125,27 @@ end
 -- A small boxed button showing a native sprite, like the Save and Reset buttons by
 -- the rate box. If the sprite is missing in this client build we show a plain text
 -- button instead, so the action never disappears.
-function Style.iconButton(parent, name, fallbackText, tooltip, action)
-    local sprite = rsprite.Get(iconNames[name])
+--
+-- Without `place` the button flows inline after the previous item. With it, the
+-- button goes at place.y, `place.right` in from the right edge of its parent.
+function Style.iconButtonWidth(name)
+    return rsprite.Get(iconNames[name]) and 28 or 64
+end
 
-    return parent:AddSimpleButton(sprite or fallbackText, action, {
-        inline = true,
-        width = sprite and 28 or 64,
-        height = 28,
-        iconSize = 20,
-        tooltip = tooltip,
-    })
+function Style.iconButton(parent, name, fallbackText, tooltip, action, place)
+    local sprite = rsprite.Get(iconNames[name])
+    local width = Style.iconButtonWidth(name)
+    local options = { width = width, height = 28, iconSize = 20, tooltip = tooltip }
+
+    if place then
+        options.x = -(place.right + width)
+        options.xAnchor = 1
+        options.y = place.y
+    else
+        options.inline = true
+    end
+
+    return parent:AddSimpleButton(sprite or fallbackText, action, options)
 end
 
 -- The y that vertically centres an icon of `size` on a text box starting at `textY`
@@ -232,6 +263,21 @@ function Style.coins(parent, options)
     local drawOptions = { x = x, y = y, xAnchor = xAnchor, size = size, placeholder = false }
 
     return (rsprite.Draw(parent.content, iconNames.coins, drawOptions))
+end
+
+-- Switches a text label to a named client font (e.g. Style.HEADLINE_FONT). If this
+-- client build doesn't have that font, the label just keeps PrettyUI's default,
+-- so the number still shows, only smaller.
+function Style.setFont(label, name)
+    local ok, font = pcall(function()
+        return id.Font[name]
+    end)
+
+    if ok and font ~= nil then
+        label.font = font
+    end
+
+    return label
 end
 
 -- How wide `text` is on screen, from the client's own font measurement

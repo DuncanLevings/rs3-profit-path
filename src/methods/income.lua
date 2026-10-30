@@ -1,9 +1,15 @@
 -- Money maths for a method, plus the one place we talk to GE Prices Library (GEPL).
 --
--- Quick primer on GE prices: GEPL gives two numbers per item.
---   high = the latest instant-buy price  -> what you'd pay for supplies
---   low  = the latest instant-sell price -> what you'd get for your outputs
--- Each side comes with its own timestamp, which can be old for rarely traded items.
+-- Quick primer on GE prices: we use two numbers per item.
+--   high = the instant-buy price  -> what you'd pay for supplies
+--   low  = the instant-sell price -> what you'd get for your outputs
+--
+-- Each side is the average over the last hour of trades when there were any.
+-- The latest single trade is too easy to throw off: one player dumping steel bars
+-- at 15 GP made the "latest sell" 15 while the hour's average was over 1,000.
+-- Only a side with no trades in the hour falls back to its latest trade, and even
+-- then it's dropped if it's wildly out of line with the other side's average.
+-- (Monster Lookup's live drop prices solved the same problem the same way.)
 --
 -- Opening/reopening reads GEPL's cached getter. That getter owns cache expiry
 -- and the in-flight fetch guard; we never force updateDatabase or run HTTP here.
@@ -22,11 +28,48 @@ local function nonNegativeFinite(value)
     return type(value) == "number" and value >= 0 and value < math.huge
 end
 
--- Asks GEPL for one item's latest trade prices and turns the answer into a plain
--- table with a status: "available", "partial" (only one side usable), "loading",
--- "unavailable", "invalid" or "error". Nothing here ever invents a price.
+-- A fallback trade more than this many times away from the other side's hourly
+-- average is treated as a one-off, not a real price. Same limit as Monster Lookup.
+local MAX_DRIFT = 3
+
+-- How many times apart two prices are, whichever is bigger.
+local function drift(price, reference)
+    return math.max(price / reference, reference / price)
+end
+
+-- The last hour's averages for one item, or nil if GEPL can't give them (an older
+-- GEPL without the getter, the hourly data not loaded yet, or no entry for the
+-- item). Missing averages are fine: we just use the latest trades instead.
+local function hourlyAverage(library, itemId)
+    if type(library.getOneHourAverage) ~= "function" or not library.isReady("1h") then
+        return nil
+    end
+
+    local ok, average = pcall(library.getOneHourAverage, itemId)
+
+    return ok and type(average) == "table" and average or nil
+end
+
+-- One side's hourly average, if that side actually traded in the last hour.
+local function averageSide(average, price, volume)
+    local value = average and average[price]
+    local traded = average and average[volume]
+
+    if nonNegativeFinite(value) and value > 0 and type(traded) == "number" and traded > 0 then
+        return value
+    end
+end
+
+-- Asks GEPL for one item's prices and turns the answer into a plain table with a
+-- status: "available", "partial" (only one side usable), "loading", "unavailable",
+-- "invalid" or "error". Nothing here ever invents a price.
+--
+-- Each usable side has a price, a timestamp and a source ("hour" for the hourly
+-- average, "latest" for a single trade). A side we refused says why in its
+-- message (highMessage / lowMessage).
 function Income.inspectQuote(library, itemId)
-    -- GEPL is optional, so it may simply not be loaded.
+    -- GEPL is a required dependency, but guard anyway: a missing or disabled
+    -- library must show "unavailable", never crash or invent a price.
     if not library then
         return { status = "unavailable", message = "GE Price Library is not enabled." }
     end
@@ -48,7 +91,7 @@ function Income.inspectQuote(library, itemId)
             return { status = "unavailable", message = "No quote returned for this item." }
         end
 
-        -- A side only counts if both its price and its timestamp look sane.
+        -- A latest trade only counts if both its price and its timestamp look sane.
         local highValid = nonNegativeFinite(quote.high) and nonNegativeFinite(quote.highTime)
         local lowValid = nonNegativeFinite(quote.low) and nonNegativeFinite(quote.lowTime)
 
@@ -57,14 +100,52 @@ function Income.inspectQuote(library, itemId)
         end
 
         -- Copy the values into our own table rather than keeping GEPL's object.
-        return {
-            status = highValid and lowValid and "available" or "partial",
-            itemId = itemId,
-            high = highValid and quote.high or nil,
-            highTime = highValid and quote.highTime or nil,
-            low = lowValid and quote.low or nil,
-            lowTime = lowValid and quote.lowTime or nil,
-        }
+        local result = { itemId = itemId }
+        local average = hourlyAverage(library, itemId)
+
+        -- Averages have no timestamp of their own, so an average side borrows the
+        -- latest trade's time (its own side's if it has one). That time only says
+        -- "this item is trading", which is what the calculator checks for.
+        local anyTime = highValid and quote.highTime or quote.lowTime
+
+        for _, side in ipairs({
+            { key = "high", valid = highValid, average = averageSide(average, "avgHighPrice", "highPriceVolume") },
+            { key = "low", valid = lowValid, average = averageSide(average, "avgLowPrice", "lowPriceVolume") },
+        }) do
+            local time = side.key .. "Time"
+
+            if side.average then
+                result[side.key] = side.average
+                result[time] = side.valid and quote[time] or anyTime
+                result[side.key .. "Source"] = "hour"
+            elseif side.valid then
+                result[side.key] = quote[side.key]
+                result[time] = quote[time]
+                result[side.key .. "Source"] = "latest"
+            end
+        end
+
+        -- A side that fell back to one trade gets checked against the other side's
+        -- hourly average. If they're more than MAX_DRIFT times apart, that trade
+        -- is almost certainly a dump or a misclick, so we don't use it.
+        for _, pair in ipairs({ { "high", "low", "buy" }, { "low", "high", "sell" } }) do
+            local key, other, name = pair[1], pair[2], pair[3]
+
+            if result[key .. "Source"] == "latest" and result[other .. "Source"] == "hour"
+                and result[key] > 0 and drift(result[key], result[other]) > MAX_DRIFT then
+                result[key], result[key .. "Time"], result[key .. "Source"] = nil, nil, nil
+                result[key .. "Message"] = "The latest " .. name .. " trade looks like a one-off, and there were no "
+                    .. name .. " trades in the last hour."
+            end
+        end
+
+        if result.high == nil and result.low == nil then
+            return { status = "unavailable", message = "No usable trade prices are available." }
+        end
+
+        result.status = result.high ~= nil and result.low ~= nil and "available" or "partial"
+
+        return result
     end)
 
     if not ok then
@@ -208,7 +289,8 @@ function Income.calculate(model, rate, quotes)
             else
                 -- No usable price, so this side can't have a total. Say why.
                 complete = false
-                row.message = recipeProblem or line.valuation or (quote and quote.message) or "Price unavailable."
+                row.message = recipeProblem or line.valuation
+                    or (quote and (quote[side .. "Message"] or quote.message)) or "Price unavailable."
             end
 
             if row.value then

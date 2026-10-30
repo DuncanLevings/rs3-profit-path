@@ -24,6 +24,16 @@ local HEADER_HEIGHT = 48
 local PAGE_PADDING = 14
 local TABLE_GAP = 8
 
+-- The Income tab's top row: the rate panel's fixed width, and the height it
+-- shares with the profit panel beside it.
+local RATE_WIDTH = 220
+local TOP_ROW_HEIGHT = 84
+
+-- Inside the top row: space from the panel edges, and the y of its two lines.
+local TOP_INSET = 16
+local FIRST_LINE_Y = 10
+local SECOND_LINE_Y = 46
+
 local itemDefinitions = require("src/data/method_data").items
 
 -- Which Requirements section each kind of check goes in.
@@ -530,20 +540,96 @@ function MethodView.mount(view, method, calculator, guarded, options)
     -- whole screen is built (see Style.panelFitter).
     local incomeFitter = Style.panelFitter(income, PAGE_PADDING, TABLE_GAP)
 
-    local summary = incomeFitter:add(income:AddPanel({ height = 72, scrollable = false, marginTop = 4, marginBottom = 6 }), 72)
-
-    summary:AddText({ text = "Profit per hour (after tax)", x = 12, y = 4, width = -204, widthAnchor = 1, colour = Style.muted })
-
-    -- Coin first, then the profit figure right after it, both centred on one line.
-    Style.coins(summary, { x = 12, y = Style.middle(30, 30, 20), size = 20 })
-
-    local profit = summary:AddTitle({ text = "", x = 36, y = 30, width = -230, widthAnchor = 1, height = 30 })
-    -- ROI hugs the right edge, 12 in, matching the 12 on the left.
-    local roi = summary:AddText({ text = "", x = -186, xAnchor = 1, y = 30, width = 174, height = 30, colour = Style.gold, alignHorizontal = ui.AlignMode.BOTTOMRIGHT })
-
     -- Filled in further down, but callbacks created before then need to see them.
     local render
     local ready = false
+
+    -- Top row: a small rate panel on the left, the profit panel filling the rest.
+    -- The rate sits beside the number it changes, so editing it and watching the
+    -- profit move happen in one place.
+    local ratePanel = incomeFitter:add(income:AddPanel({
+        height = TOP_ROW_HEIGHT, width = RATE_WIDTH, scrollable = false, marginTop = 4, marginBottom = 6,
+    }), TOP_ROW_HEIGHT, { fixed = RATE_WIDTH })
+
+    -- First line: the label, with Reset at the right end.
+    ratePanel:AddText({ text = "Rate per hour", x = TOP_INSET, y = FIRST_LINE_Y, width = 120, height = 28, colour = Style.muted, tooltip = method.income.rate.unit })
+
+    -- SetText(..., false) puts the default back without firing onChange, so the reset
+    -- doesn't count as the player typing. `rate` is the box made just below.
+    local rate
+
+    Style.iconButton(ratePanel, "reset", "Reset", "Reset to source rate", guarded(function()
+        if calculator:reset() then
+            rate:SetText(tostring(calculator.rate), false)
+        end
+
+        render()
+    end), { right = TOP_INSET, y = FIRST_LINE_Y })
+
+    -- Second line: the box, with Save at the right end. The box takes whatever
+    -- width Save leaves (Save is wider when it falls back to a text button).
+    local saveWidth = Style.iconButtonWidth("save")
+
+    -- Typing previews straight away; Enter saves. The input can report changes while
+    -- the screen is still being built, before render exists, so `ready` holds those off.
+    rate = ratePanel:AddTextField({
+        text = tostring(calculator.rate),
+        maxLength = 24,
+        x = TOP_INSET, y = SECOND_LINE_Y, height = 28,
+        width = -(TOP_INSET + 10 + saveWidth + TOP_INSET), widthAnchor = 1,
+
+        onChange = guarded(function(_, _, text)
+            if ready then
+                calculator:preview(text)
+                render()
+            end
+        end),
+
+        onSubmit = guarded(function(_, text)
+            calculator:save(text)
+            render()
+        end),
+    })
+
+    Style.iconButton(ratePanel, "save", "Save", "Save rate", guarded(function()
+        calculator:save(rate:GetText())
+        render()
+    end), { right = TOP_INSET, y = SECOND_LINE_Y })
+
+    -- The profit panel starts one TABLE_GAP after the rate panel and runs to the
+    -- page's right padding.
+    local summaryX = PAGE_PADDING + RATE_WIDTH + TABLE_GAP
+    local summary = incomeFitter:add(income:AddPanel({
+        height = TOP_ROW_HEIGHT, x = summaryX, width = -(summaryX + PAGE_PADDING), widthAnchor = 1,
+        inline = true, scrollable = false,
+    }), TOP_ROW_HEIGHT, { rest = RATE_WIDTH })
+
+    summary:AddText({ text = "Profit per hour (after tax)", x = TOP_INSET, y = FIRST_LINE_Y, width = 200, colour = Style.muted })
+
+    -- Unsaved changes and errors show at the top right of the profit panel, right
+    -- beside the rate box, so they're hard to miss.
+    local state = summary:AddText({
+        text = "", x = 224, y = FIRST_LINE_Y, width = -(224 + TOP_INSET), widthAnchor = 1, height = 24,
+        colour = Style.muted, alignHorizontal = ui.AlignMode.BOTTOMRIGHT,
+    })
+
+    -- The headline: profit per hour in the biggest bold font, with a matching coin,
+    -- and ROI a step smaller. Both sit on the second line, centred together.
+    local headlineY = SECOND_LINE_Y - 8
+    local headlineHeight = 36
+
+    Style.coins(summary, { x = TOP_INSET, y = Style.middle(headlineY, headlineHeight, 26), size = 26 })
+
+    local profit = Style.setFont(summary:AddText({
+        text = "", x = TOP_INSET + 32, y = headlineY, width = -260, widthAnchor = 1, height = headlineHeight,
+        colour = Style.gold,
+    }), Style.HEADLINE_FONT)
+
+    -- ROI hugs the right edge, TOP_INSET in, matching the left side.
+    local roi = Style.setFont(summary:AddText({
+        text = "", x = -(200 + TOP_INSET), xAnchor = 1, y = headlineY, width = 200, height = headlineHeight,
+        colour = Style.gold, alignHorizontal = ui.AlignMode.BOTTOMRIGHT,
+    }), Style.SUBHEADLINE_FONT)
 
     -- Inputs and Outputs side by side, both sized for the longer of the two lists.
     local outputDefinitions = Loot.outputs(method.income)
@@ -568,55 +654,13 @@ function MethodView.mount(view, method, calculator, guarded, options)
         scrollable = false,
     }), tableHeight, true)
 
-    inputs:AddText({ text = "Inputs", x = 12, y = 6, width = 88, colour = Style.gold, height = 26, tooltip = "Supply costs use instant-buy prices. Actual purchase prices may differ." })
-    outputs:AddText({ text = "Outputs", x = 12, y = 6, width = 88, colour = Style.gold, height = 26, tooltip = "GE outputs use instant-sell prices after tax. Coin drops and alchemy proceeds are untaxed. Your pace and luck affect profit." })
+    inputs:AddText({ text = "Inputs", x = 12, y = 6, width = 88, colour = Style.gold, height = 26, tooltip = "Supply costs use the last hour's average instant-buy price (the latest trade if there were none). Actual purchase prices may differ." })
+    outputs:AddText({ text = "Outputs", x = 12, y = 6, width = 88, colour = Style.gold, height = 26, tooltip = "GE outputs use the last hour's average instant-sell price (the latest trade if there were none), after tax. Coin drops and alchemy proceeds are untaxed. Your pace and luck affect profit." })
 
     -- Costs read red and earnings green, so it's obvious at a glance which way
     -- the money goes. The "Inputs"/"Outputs" headings still say it in words.
     local updateInputs = itemTable(inputs, method.income.inputs, Style.bad)
     local updateOutputs = itemTable(outputs, outputDefinitions, Style.good)
-
-    -- The rate row: label, input box, Save and Reset buttons, then a status line.
-    income:AddText({ text = "Rate per hour", width = 106, height = 28, colour = Style.muted, tooltip = method.income.rate.unit })
-
-    -- Typing previews straight away; Enter saves. The input can report changes while
-    -- the screen is still being built, before render exists, so `ready` holds those off.
-    local rate = income:AddTextField({
-        text = tostring(calculator.rate),
-        maxLength = 24,
-        width = 104,
-        inline = true,
-
-        onChange = guarded(function(_, _, text)
-            if ready then
-                calculator:preview(text)
-                render()
-            end
-        end),
-
-        onSubmit = guarded(function(_, text)
-            calculator:save(text)
-            render()
-        end),
-    })
-
-    Style.iconButton(income, "save", "Save", "Save rate", guarded(function()
-        calculator:save(rate:GetText())
-        render()
-    end))
-
-    -- SetText(..., false) puts the default back without firing onChange, so the reset
-    -- doesn't count as the player typing.
-    Style.iconButton(income, "reset", "Reset", "Reset to source rate", guarded(function()
-        if calculator:reset() then
-            rate:SetText(tostring(calculator.rate), false)
-        end
-
-        render()
-    end))
-
-    -- Unsaved changes and errors show right by the rate, so they're hard to miss.
-    local state = income:AddText({ text = "", inline = true, width = -370, widthAnchor = 1, height = 42, colour = Style.muted })
 
     income:AddTitle("Notes")
 
@@ -683,16 +727,21 @@ function MethodView.mount(view, method, calculator, guarded, options)
         state.content = table.concat(messages, " / ")
         state.rgba = calculator.message and Style.bad or Style.muted
 
-        -- Headline profit (red when it's a loss) and ROI. No ROI means no text at all.
+        -- Headline profit and ROI use the same money colours as the Outputs and
+        -- Browse figures: green for a profit, red for a loss. "Not estimated" stays
+        -- gold. No ROI means no text at all.
+        local headlineColour = Style.gold
+
         if result.profit then
             profit.content = Style.number(result.profit) .. " / h"
+            headlineColour = result.profit < 0 and Style.bad or Style.good
         else
             profit.content = "Not estimated"
         end
 
-        profit.rgba = result.profit and result.profit < 0 and Style.bad or Style.gold
+        profit.rgba = headlineColour
         roi.content = result.roi and Style.number(result.roi, 1) .. "% ROI" or ""
-        roi.rgba = Style.gold
+        roi.rgba = headlineColour
 
         updateOutputs(result.outputs or {}, result.revenue)
         updateInputs(result.inputs or {}, result.cost)

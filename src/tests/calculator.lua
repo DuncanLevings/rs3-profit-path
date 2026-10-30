@@ -594,7 +594,7 @@ return function(test, equal, client, pretty)
 
         -- fields[1] is the rate box; profile controls come after the breakdown.
         local income = tabs.pages[1]
-        local rate = income.fields[1]
+        local rate = income:allFields()[1]
 
         -- Browse fetched 48 prices across the four methods, including the now-valued
         -- PvM loot and its ingredient tree, then the steel method fetched 3 more. Typing a rate must not fetch more.
@@ -631,7 +631,7 @@ return function(test, equal, client, pretty)
 
         -- Junk input can't be saved, and the last good estimate stays on screen.
         rate:SetText("invalid", true)
-        income.buttons["Save rate"]()
+        income:button("Save rate")()
 
         for key, value in pairs(state.db) do
             if key:find("profit-path.rate.v1/", 1, true) == 1 then
@@ -648,7 +648,7 @@ return function(test, equal, client, pretty)
         assert(table.concat(combined):find("19,000 / h", 1, true))
 
         -- Reset puts 2000 back in the box and deletes the saved record.
-        income.buttons["Reset to source rate"]()
+        income:button("Reset to source rate")()
         equal(rate:GetText(), "2000")
 
         for key, value in pairs(state.db) do
@@ -660,7 +660,7 @@ return function(test, equal, client, pretty)
         assert(detail.destroyed and income.destroyed)
 
         rate:SetText("5", true)
-        income.buttons["Save rate"]()
+        income:button("Save rate")()
         equal(calls, 51)
 
         for key, value in pairs(state.db) do
@@ -697,14 +697,14 @@ return function(test, equal, client, pretty)
 
         local detail = prettyui.views[3]
         local income = detail.tabs[1].pages[1]
-        local rate = income.fields[1]
+        local rate = income:allFields()[1]
 
         -- Type a draft, then close (hide) the window. Buttons on a hidden window
         -- must do nothing, so this Save doesn't write.
         rate:SetText("1234.5", true)
         window:Close()
 
-        income.buttons["Save rate"]()
+        income:button("Save rate")()
         assert(state.db["profit-path.characters.v1"])
 
         -- The client remounts the launcher. The old launcher goes; the window stays.

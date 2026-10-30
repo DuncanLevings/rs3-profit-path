@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.3-dev — 2026-10-29
+
+- Price items at the last hour's average trades instead of the single latest trade, the same fix Monster Lookup uses. A player dumping steel bars at 15 GP had made 2,000 bars an hour look worth 30,000 GP; the hour's average sell price was about 1,051. Supplies use the average instant-buy price and outputs the average instant-sell price, and creation costs follow automatically.
+- A side with no trades in the last hour falls back to its latest trade. That trade is refused if it's more than 3× away from the other side's hourly average, so a one-off dump or misclick shows "price unavailable" rather than a fake loss.
+- Move the rate controls to the top of the Income tab: a small framed panel left of the profit panel, with "Rate per hour" and Reset above the rate box and Save. The unsaved/error status line moves into the profit panel's top right. The profit per hour now uses the client's 19pt bold font with a larger coin, and ROI uses 17pt bold; both are green for a profit and red for a loss, like the Outputs values. Browse profit tooltips now show only the assumed rate, with thousands commas (e.g. 2,000 smelts/hour); the row already shows profit and ROI.
+- Diagnostics show whether each side came from the hourly average or the latest trade. The Inputs/Outputs tooltips describe the new pricing.
+- Validate with 115 Lua behaviour tests and 39 Python catalogue tests.
+
 ## 0.7.2-dev — 2026-10-29
 
 - Store methods compactly, ahead of importing the full Wiki catalogue. `catalogue-source/methods.json` (schema 2) has one entry per Wiki page, and each version lists only what differs. Requirements can be short strings such as `skill:SMITHING:20` or `item:31455`; the build fills in their text, group wording, item icons, "(recommended)" endings, income row names and Wiki links. The source is 445 lines instead of 1,204. `catalogue.py format` tidies it into a one-row-per-line layout, which `build` and `verify` require.

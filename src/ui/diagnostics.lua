@@ -163,10 +163,12 @@ function Diagnostics.new(account, inspectQuote, inspectQuest)
         view:AddSimpleButton("Check chronotes quote", guarded(function()
             local quote = inspectQuote()
             if quote.status == "available" or quote.status == "partial" then
-                labels.quote.content = "Latest trade sides - buy: " .. tostring(quote.high or "unavailable")
-                    .. " (timestamp " .. tostring(quote.highTime or "unavailable") .. "); sell: "
-                    .. tostring(quote.low or "unavailable") .. " (timestamp "
-                    .. tostring(quote.lowTime or "unavailable") .. "). Not a guide-price estimate."
+                -- Source is "hour" (last hour's average) or "latest" (one trade).
+                labels.quote.content = "Buy: " .. tostring(quote.high or "unavailable")
+                    .. " (" .. tostring(quote.highSource or "unavailable") .. ", timestamp "
+                    .. tostring(quote.highTime or "unavailable") .. "); sell: "
+                    .. tostring(quote.low or "unavailable") .. " (" .. tostring(quote.lowSource or "unavailable")
+                    .. ", timestamp " .. tostring(quote.lowTime or "unavailable") .. "). Not a guide-price estimate."
             else
                 labels.quote.content = quote.message
             end

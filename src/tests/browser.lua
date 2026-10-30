@@ -282,7 +282,7 @@ return function(test, equal, client, pretty)
         equal(calls, 51)
 
         local detail = prettyui.views[3]
-        detail.tabs[1].pages[1].fields[1]:SetText("1000", true)
+        detail.tabs[1].pages[1]:allFields()[1]:SetText("1000", true)
         detail.buttons["Back to methods"]()
         equal(calls, 51)
 
@@ -297,7 +297,10 @@ return function(test, equal, client, pretty)
             end
         end
 
-        assert(table.concat(text):find("2000 smelts/hour", 1, true))
+        -- The tooltip only adds the rate (with commas); profit and ROI are on the row.
+        local joined = table.concat(text, " / ")
+        assert(joined:find("2,000 smelts/hour", 1, true), joined)
+        assert(not joined:find("GP/hour", 1, true), joined)
 
         PluginShutdown()
     end)
@@ -571,9 +574,12 @@ return function(test, equal, client, pretty)
         local tabs = prettyui.views[#prettyui.views].tabs[1]
         local income = tabs.pages[1]
 
-        equal(income.children[1].size.width, 572, "Summary band is full width")
-        equal(income.children[2].size.width, 282, "Inputs is half width")
-        equal(income.children[3].size.width, 282, "Outputs is half width")
+        -- Top row: the 220-wide rate panel, then the profit panel filling the rest
+        -- of the 572 (less the 8 gap between them).
+        equal(income.children[1].size.width, 220, "Rate panel keeps its fixed width")
+        equal(income.children[2].size.width, 344, "Profit panel fills the rest of the row")
+        equal(income.children[3].size.width, 282, "Inputs is half width")
+        equal(income.children[4].size.width, 282, "Outputs is half width")
 
         -- Elder logs has both required and recommended items, side by side.
         local halves, fulls = 0, 0
@@ -633,7 +639,7 @@ return function(test, equal, client, pretty)
         equal(versions.entries["Without wood spirits"], 0)
         equal(versions.entries["With wood spirits"], 1)
         equal(versions.selectedID, 0)
-        equal(detail.tabs[1].pages[1].fields[1]:GetText(), "320")
+        equal(detail.tabs[1].pages[1]:allFields()[1]:GetText(), "320")
 
         -- On the Requirements tab, switch to the wood spirits version.
         detail.tabs[1].activeIndex = 2
@@ -644,7 +650,7 @@ return function(test, equal, client, pretty)
         assert(switched ~= detail and detail.destroyed, "The page is rebuilt for the other version")
         equal(switched.nativeLists[1].selectedID, 1)
         equal(switched.tabs[1].activeIndex, 2, "Same tab after switching")
-        equal(switched.tabs[1].pages[1].fields[1]:GetText(), "580", "The other version's own rate")
+        equal(switched.tabs[1].pages[1]:allFields()[1]:GetText(), "580", "The other version's own rate")
 
         -- Its Income table lists the spirits.
         local names = {}
@@ -685,7 +691,7 @@ return function(test, equal, client, pretty)
         equal(tabs.options.x, 0, "Tabs must not pick up PrettyUI's default left padding")
 
         -- The player types a draft rate and switches to the Requirements tab.
-        tabs.pages[1].fields[1]:SetText("1500", true)
+        tabs.pages[1]:allFields()[1]:SetText("1500", true)
         tabs.activeIndex = 2
 
         window:resize(900, 600)
@@ -697,7 +703,7 @@ return function(test, equal, client, pretty)
         local rebuilt = prettyui.views[#prettyui.views]
         assert(rebuilt ~= detail and detail.destroyed, "The method screen should be rebuilt")
         equal(rebuilt.tabs[1].activeIndex, 2, "Same tab after the rebuild")
-        equal(rebuilt.tabs[1].pages[1].fields[1]:GetText(), "1500", "Draft rate survives")
+        equal(rebuilt.tabs[1].pages[1]:allFields()[1]:GetText(), "1500", "Draft rate survives")
 
         -- Opening a different method starts on Income again.
         rebuilt.buttons["Back to methods"]()
@@ -855,10 +861,10 @@ return function(test, equal, client, pretty)
 
         local detail = prettyui.views[3]
         local income = detail.tabs[1].pages[1]
-        local rate = income.fields[1]
+        local rate = income:allFields()[1]
         rate:SetText("1000", true)
         equal(calls, 51)
-        assert(not income.buttons["Refresh prices"])
+        assert(not income:button("Refresh prices"))
 
         prettyui.windows[1]:Close()
         price = 50
@@ -896,7 +902,7 @@ return function(test, equal, client, pretty)
 
         local detail = prettyui.views[3]
         local income = detail.tabs[1].pages[1]
-        equal(#income.fields, 1, "No manual character/profile field in the method")
+        equal(#income:allFields(), 1, "No manual character/profile field in the method")
 
         -- The potion is shown as an icon in the table, never as a text row. Its
         -- name only appears in the Notes, explaining how it's priced and which
@@ -1067,9 +1073,11 @@ return function(test, equal, client, pretty)
         prettyui:findMethod("Cutting elder logs")()
         local detail = prettyui.views[3]
         local income = detail.tabs[1].pages[1]
-        local save = income.buttons["Save rate"]
-        assert(type(income.buttonControls["Save rate"].sprite) == "number")
-        income.fields[1]:SetText("100", true)
+        local save = income:button("Save rate")
+        -- The Save and Reset buttons live in the rate panel at the top of Income.
+        local ratePanel = income.children[1]
+        assert(type(ratePanel.buttonControls["Save rate"].sprite) == "number")
+        income:allFields()[1]:SetText("100", true)
         save()
 
         local preferences = Preferences.new(PersistentDB)
@@ -1087,9 +1095,9 @@ return function(test, equal, client, pretty)
 
         -- Reset is a boxed sprite button like Save, not a bare sprite.
         assert(state.spriteLookups.RS3_ICON_STOPWATCH_RESET_0)
-        assert(type(income.buttonControls["Reset to source rate"].sprite) == "number")
+        assert(type(ratePanel.buttonControls["Reset to source rate"].sprite) == "number")
 
-        income.fields[1]:SetText("200", true)
+        income:allFields()[1]:SetText("200", true)
         detail.buttons["Back to methods"]()
         save()
         equal(preferences:loadRate(method), 100)
@@ -1112,7 +1120,7 @@ return function(test, equal, client, pretty)
         prettyui:findButton("Open Profit Path")()
         prettyui:findMethod("Killing abyssal demons")()
         local income = prettyui.views[#prettyui.views].tabs[1].pages[1]
-        local outputs = income.children[3]
+        local outputs = income.children[4]
         equal(#outputs.items, 16)
 
         for _, label in ipairs(income:allTexts()) do
@@ -1121,7 +1129,7 @@ return function(test, equal, client, pretty)
         end
 
         local capturedCalls = calls
-        income.fields[1]:SetText("450", true)
+        income:allFields()[1]:SetText("450", true)
         equal(calls, capturedCalls)
         equal(#outputs.items, 16)
         PluginShutdown()
@@ -1139,8 +1147,8 @@ return function(test, equal, client, pretty)
 
         local detail = prettyui.views[3]
         local income = detail.tabs[1].pages[1]
-        income.fields[1]:SetText("1000", true)
-        income.buttons["Save"]()
+        income:allFields()[1]:SetText("1000", true)
+        income:button("Save")()
         local preferences = Preferences.new(PersistentDB)
         assert(preferences:bindCharacter("Fixture"))
         equal(preferences:loadRate(require("src/data/method_data").find("smelting-steel-bars.basic")), 1000)
@@ -1169,8 +1177,8 @@ return function(test, equal, client, pretty)
         prettyui:findMethod("Smelting steel bars")()
 
         local income = prettyui.views[3].tabs[1].pages[1]
-        local inputs = income.children[2]
-        local outputs = income.children[3]
+        local inputs = income.children[3]
+        local outputs = income.children[4]
 
         -- The Coins item at a huge quantity, so the client draws the full pile,
         -- with the quantity number hidden.

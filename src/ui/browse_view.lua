@@ -93,9 +93,9 @@ local function estimateText(method, estimate)
         return "Prices or costs unavailable - open Income for details"
     end
 
-    local roi = estimate.roi and string.format(" | %.1f%% ROI", estimate.roi) or ""
-
-    return string.format("%.0f GP/hour%s | %.0f %s", estimate.profit, roi, estimate.rate, method.income.rate.unit)
+    -- The row already shows the profit and ROI, so the tooltip only adds the rate
+    -- the estimate assumes, e.g. "580 logs/hour" or "2,000 smelts/hour".
+    return Style.number(estimate.rate) .. " " .. method.income.rate.unit
 end
 
 -- `guarded` checks the screen's lifetime. Row callbacks also check a local
