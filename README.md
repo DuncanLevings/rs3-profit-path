@@ -101,3 +101,12 @@ The browser has a full-height shaded sidebar and divider. Unclassified difficult
 `src/methods/loot.lua` owns the shared-drop expansion and its weak-key cache. Methods keep monster/section/item references and valuation overrides, not copied drop tables. Missing sell prices leave individual rows visible but prevent total revenue/profit. Tests check all 16 abyssal output quantities against the Wiki expressions, average coin ranges, salvage values, taxation, scaling, snapshot reuse and invalid source definitions.
 
 The temporary Diagnostics page and its variable scans were removed in 0.8.9-dev; the unlock flags they found are recorded in `catalogue-source/research/capabilities.json`. The tool-belt reader itself (`src/game/toolbelt.lua`) is permanent.
+
+
+Guide instructions and travel research (0.8.11-dev)
+
+All 676 bundled variants have a concise source summary and travel text (or an explicit bank/workstation location). PvM entries provide the activity and short practical notes, not complete boss strategies. Guide prose uses the same pinned revision as its income table. Shared area travel/access sections keep their own revision IDs and quest/teleport conditions. A route presented as an option is not a claim that the character has unlocked it.
+
+`src/tools/guide_content.py --cache PATH` collects the pinned guide revisions and related area articles through the identified, paced Wiki API client. It reuses saved responses and resumes missing batches. Choose a cache outside the repository; raw pages are maintainer inputs, never runtime resources. `--build` selects concise prose from that cache without making any network request. `catalogue-source/research/guide-content-overrides.json` contains the targeted summaries, route corrections and article list; `guide-content.json` contains the resulting variant records and shared area text. Source revisions and CC BY-NC-SA attribution are retained. Then run the existing `catalogue.py build` and `test.py` commands. Review extracted wording, especially changed game content, before publishing a catalogue update.
+
+The build rejects duplicate guide identities and mismatched prose/income revisions. It preserves method IDs, income, requirements and saved-rate units. Existing string pooling shares repeated route wording in `data/methods.lua`; neither the source cache nor the Python collection tool ships with the plugin. Runtime only renders the bundled summaries/routes, without calling the Wiki, opening external links, controlling the client or adding live navigation.

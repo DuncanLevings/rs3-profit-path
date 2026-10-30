@@ -395,6 +395,100 @@ def load_snapshot():
     return guides, json.loads(wiki_methods.META.read_text(encoding="utf-8"))
 
 
+def load_guide_content():
+    """Shared prose/area research, kept separate from economic and account data.
+    Reject duplicate guide identities so one variant can never shadow another.
+    """
+    path = catalogue.ROOT / "catalogue-source/research/guide-content.json"
+
+    if not path.exists():
+        return {"guides": {}, "locations": {}}
+
+    document = json.loads(path.read_text(encoding="utf-8"))
+
+    if document.get("schema") != 1:
+        raise ValueError("Unsupported guide-content schema")
+
+    guides = {}
+
+    for title, area in document["locations"].items():
+        catalogue.require_text_list(area["routes"], "Area travel routes")
+
+        if not isinstance(area.get("revision"), int) or area["revision"] <= 0:
+            raise ValueError("Missing area revision: " + title)
+
+    for entry in document["guides"]:
+        catalogue.require_text_list(entry["instructions"], "Guide instructions")
+        catalogue.require_text_list(entry.get("travel", []), "Guide travel routes")
+        catalogue.require_text_list(entry["places"], "Guide area references")
+
+        key = (entry["page"], entry["version"].strip().casefold())
+
+        if key in guides:
+            raise ValueError("Duplicate guide content: " + str(key))
+
+        guides[key] = entry
+
+    return {"guides": guides, "locations": document["locations"]}
+
+
+def apply_guide_content(method, content):
+    """Attach pinned summaries and shared area routes without changing income,
+    requirements, saved rates or the source's hand-written curated instructions.
+    """
+    key = (method["source"]["title"], method.get("variant", "").strip().casefold())
+    entry = content["guides"].get(key)
+
+    if not entry:
+        return
+
+    if entry["revision"] != method["source"]["revision"]:
+        raise ValueError("Guide prose and income revisions disagree: " + str(key))
+
+    if not method["instructions"]:
+        method["instructions"] = list(entry["instructions"])
+
+    if entry.get("sources"):
+        method["instruction_sources"] = entry["sources"]
+
+    common_routes = []
+    sections = [{"title": title, "routes": []} for title in entry["places"]]
+    sources = []
+
+    # A note naming one area belongs with that area's routes. A multi-stop
+    # itinerary stays above the area sections instead of being duplicated.
+    for route in entry.get("travel", []):
+        matches = [section for section in sections
+                   if re.search(r"(?<!\w)" + re.escape(section["title"].removeprefix("The ")) + r"(?!\w)", route, re.I)]
+
+        if len(matches) == 1:
+            matches[0]["routes"].append(route)
+        elif len(sections) == 1:
+            sections[0]["routes"].append(route)
+        else:
+            common_routes.append(route)
+
+    for section in sections:
+        title = section["title"]
+        place = content["locations"][title]
+        sources.append({"title": title, "revision": place["revision"]})
+        sources.extend(place.get("sources", []))
+
+        # Arrive in the area first, then show the method's more specific spot.
+        notes = section["routes"]
+        section["routes"] = list(dict.fromkeys(place["routes"] + notes))
+
+    # A named location alone remains partial; only source directions or an
+    # explicitly interchangeable work station/bank count as complete travel info.
+    has_routes = bool(common_routes or sections)
+    text = entry["location"] or ("Follow the travel instructions below." if has_routes else method["location"]["text"])
+    method["location"] = {"text": text, "routes": common_routes, "sections": sections,
+                          "coverage": "complete" if has_routes or entry.get("stationary") else "partial"}
+
+    if sources:
+        method["location"]["sources"] = sources
+
+
 class Context:
     """Shared lookups while converting guides, plus the items table they fill in."""
 
@@ -406,6 +500,7 @@ class Context:
         self.quests = quests or {}
         self.outfits = outfits or {}
         self.achievements = achievements or {}
+        self.guide_content = {"guides": {}, "locations": {}}
 
         # Wiki advice links found while converting the current method. They're
         # dropped (bare page names can't be clicked in game); only the guide's own
@@ -804,6 +899,22 @@ def tidy_wording(text):
     return re.sub(r"\s+([,.)])", r"\1", re.sub(r"\(\s+", "(", text))
 
 
+def wording_is_suggestion(text):
+    """Whether the wording recommends this entry, rather than just an upgrade."""
+    # A suggestion outside brackets applies to the entry itself. Inside brackets,
+    # it can instead describe a better tool or higher level than the required one.
+    outside = re.sub(r"\([^)]*\)", " ", text)
+
+    if re.search(r"\b(?:recommended|optional)\b", outside, re.I):
+        return True
+
+    # A standalone label qualifies the whole entry: "Adamant pickaxe (recommended)".
+    # Don't move "90 Mining (99 recommended)" or a required tool with an optional
+    # upgrade into Recommended just because their extra advice uses the same word.
+    return bool(re.search(r"\(\s*(?:(?:highly|strongly)\s+)?(?:recommended|optional)"
+                          r"(?:\s+(?:when|if|for)\b[^)]*)?\s*\)", text, re.I))
+
+
 def convert_requirements(requirements, ctx):
     access, recommended, tips, notes = [], [], [], []
     ctx.advice = []
@@ -818,13 +929,20 @@ def convert_requirements(requirements, ctx):
             worded = check.pop("_worded", False)
             check["text"] = tidy_wording(check["text"])
 
+            # The Wiki sometimes puts suggestions in its required list. Decide
+            # their real importance before routing either checks or plain advice.
+            entry_importance = importance
+
+            if importance == "required" and wording_is_suggestion(check["text"]):
+                entry_importance = "recommended"
+
             # Required plain words nobody has researched ("Tier 90+ weapons", "A team
             # of 1-3 other players") are things only the player can judge. They're
             # listed under "Check yourself", never coloured or counted as unknown.
             free_text = (isinstance(entry, dict) and "req" not in entry and check["kind"] == "capability"
                          and "capability_kind" not in check) or worded
 
-            if importance == "required" and free_text:
+            if entry_importance == "required" and free_text:
                 notes.append(check["text"])
                 continue
 
@@ -833,7 +951,7 @@ def convert_requirements(requirements, ctx):
             # decides whether you can do the method.
             # The Wiki sometimes lists a suggestion under "required" ("Tomes of the
             # Warlock recommended for Darkness"); its own wording says what it is.
-            suggested = importance != "required" or re.search(r"\brecommended\b|\boptional\b", check["text"], re.I)
+            suggested = entry_importance != "required"
 
             if suggested and unknown_only(check):
                 tip = {"text": check["text"]}
@@ -845,13 +963,13 @@ def convert_requirements(requirements, ctx):
                 tips.append(tip)
                 continue
 
-            suffix = SUFFIX[importance]
+            suffix = SUFFIX[entry_importance]
 
             # Don't say "recommended" twice when the Wiki's own wording already does.
             if suffix and suffix.strip(" ()") not in check["text"].lower():
                 check["text"] += suffix
 
-            (access if importance == "required" else recommended).append(check)
+            (access if entry_importance == "required" else recommended).append(check)
 
     return {
         # The Wiki's list is a good start, but nobody has checked it against the
@@ -964,7 +1082,8 @@ def convert_guide(guide, ctx, category):
     method["requirements"] = convert_requirements(guide.get("requirements", {}), ctx)
     method["income"] = convert_income(guide, ctx, category == "pvm")
     method["instructions"] = []
-    method["location"] = {"text": "See the Wiki guide for where to go.", "coverage": "partial", "routes": []}
+    method["location"] = {"text": "Travel details have not been recorded for this method.", "coverage": "partial", "routes": []}
+    apply_guide_content(method, ctx.guide_content)
 
     return method
 
@@ -1122,6 +1241,7 @@ def merge(recipe_source=None, monsters=None):
     items = dict(curated["items"])
     ctx = Context(items, meta or {"items": {}, "retrieved": None}, catalogue.load_capabilities(), recipes,
                   catalogue.load_quests(), load_outfits(), load_achievements())
+    ctx.guide_content = load_guide_content()
 
     # Tool tiers, so "Crystal pickaxe or better" knows what "better" is.
     pickaxes = load_pickaxes()
@@ -1160,6 +1280,10 @@ def merge(recipe_source=None, monsters=None):
                "research": {}, "wiki_profit": {}, "retrieved": ctx.meta.get("retrieved")}
 
     for method in curated["methods"]:
+        # Keep curated instructions; only fill their unfinished travel section.
+        if method["location"]["coverage"] == "partial":
+            apply_guide_content(method, ctx.guide_content)
+
         method["research"] = research_status(method, True)
         methods.append(method)
         details["research"][method["id"]] = method["research"]

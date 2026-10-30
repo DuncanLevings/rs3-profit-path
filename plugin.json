@@ -1,14 +1,13 @@
 {
   "name": "Profit Path",
-  "version": "0.8.10-dev",
+  "version": "0.8.11-dev",
   "hasRibbonIcon": true,
   "requiredDependencies": {
     "prettyui": 6398181,
     "rsprite": "rsprite",
     "gepl": "gepl"
   },
-  "optionalDependencies": {
-  },
+  "optionalDependencies": {},
   "requiredPermissions": [],
   "optionalPermissions": [],
   "urls": {}

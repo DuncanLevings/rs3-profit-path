@@ -85,6 +85,30 @@ class RequirementTests(unittest.TestCase):
 
         return method["requirements"], ctx.items
 
+    def test_recommendations_in_the_required_source_list_are_not_access_checks(self):
+        requirements, _ = self.convert({"required": [
+            {"req": "item:Aggroverload", "text": "Aggroverload strongly recommended"},
+            {"req": "skill:PRAYER:99", "text": "99 Prayer (recommended)"},
+            {"text": "A team recommended"},
+        ]})
+
+        self.assertEqual(requirements["access"]["children"], [])
+        self.assertEqual(requirements["notes"], [])
+        self.assertEqual(len(requirements["recommended"]["children"]), 2)
+        self.assertEqual(requirements["tips"], [{"text": "A team recommended"}])
+
+    def test_recommended_upgrades_do_not_remove_the_required_minimum(self):
+        requirements, _ = self.convert({"required": [
+            {"req": "skill:MINING:90", "text": "90 Mining (99 recommended for Mining cape)"},
+        ]})
+
+        self.assertEqual(len(requirements["access"]["children"]), 1)
+        self.assertEqual(requirements["recommended"]["children"], [])
+        self.assertFalse(merge_methods.wording_is_suggestion(
+            "Tier 80+ pickaxe (Augmentable pickaxe highly recommended)"))
+        self.assertTrue(merge_methods.wording_is_suggestion(
+            "Diviner's outfit (Optional when making Sign of the Porters)"))
+
     def test_checkable_requirements_become_skill_and_item_checks(self):
         requirements, items = self.convert({
             "required": ["skill:SLAYER:85", ["any", "item:Gem bag (upgraded)", "item:Artificer's measure"],

@@ -1,0 +1,582 @@
+{
+ "schema": 1,
+ "note": "Targeted prose reviewed against the listed Wiki revisions; aliases repair guide spelling, not client metadata. Raw article responses remain in the external maintainer cache.",
+ "articles": [
+  "Regular ritual candle",
+  "Greater ritual candle",
+  "Infernal magic incense sticks",
+  "Acadia tree",
+  "Gate of Elidinis",
+  "Temple of Aminishi",
+  "Dragonkin Laboratory",
+  "The Shadow Reef",
+  "Edimmu",
+  "Gladii",
+  "Ravenous ghoul",
+  "Corporeal Beast",
+  "Giant mole",
+  "Gelatinous abomination",
+  "Elite profane scabarite",
+  "Spellwisp",
+  "Crystal Shapeshifter",
+  "Rasial's Citadel",
+  "Rex Matriarchs",
+  "Orthen Oubliette",
+  "Mount Firewake",
+  "Player-owned farm",
+  "Artisans' Workshop",
+  "Invention Guild",
+  "Lumbridge",
+  "Edimmu resource dungeon",
+  "Wilderness Crater",
+  "Throne of the Giants",
+  "Ungael ritual site",
+  "Herb patch",
+  "Farming/Patch locations",
+  "Construction training",
+  "Portable skilling stations",
+  "Slayer Tower Mausoleum",
+  "Falador Mole Lair",
+  "Burthorpe Slayer Cave",
+  "Temple of Isolation",
+  "XP capacitor 5000",
+  "Empty divine charge",
+  "Mechanised chinchompa",
+  "The Gate of Elidinis",
+  "Legends' Guild",
+  "Tsutsaroth remains",
+  "Everlight Dig Site",
+  "XP capacitor 5000 (empty)",
+  "Glorious bar",
+  "Primal extract",
+  "Torstol incense sticks",
+  "Senntisten Asylum",
+  "The Lost Grove",
+  "Nodon Front",
+  "Asgarnian Ice Dungeon",
+  "Mourner Tunnels",
+  "Lumbridge Church",
+  "Tree Gnome Stronghold Hunter area",
+  "archaeology professor",
+  "Pirates' Hideout mine",
+  "Wilderness (level 54) Pirates' Hideout mine",
+  "Fight Arena south-east mine",
+  "Trahaearn mine",
+  "Trahaearn Clan",
+  "soft porcelain clay",
+  "Lumbridge Catacombs",
+  "Player-owned house",
+  "House Teleport",
+  "Ungael Teleport",
+  "Herb patch",
+  "Compost bin",
+  "Slayer Tower",
+  "Elder tree",
+  "Abyssal demon",
+  "Green dragon",
+  "XP Capacitor 5000",
+  "XP Capacitor 5000 (empty)",
+  "Senntisten Dig Site",
+  "Stormguard Citadel Dig Site",
+  "Wizards' Tower",
+  "Asgarnian Ice Dungeon resource dungeon",
+  "Invention Guild",
+  "Trahaearn runite mine",
+  "Trahaearn district"
+ ],
+ "aliases": {
+  "Heart of Gielenor": "Heart of Gielinor",
+  "[Heart of Gielenor": "Heart of Gielinor",
+  "Matriarch Lair": "Rex Matriarchs",
+  "Rex Matriarch lair": "Rex Matriarchs",
+  "Rasial%27s_Citadel": "Rasial's Citadel",
+  "Polypore Dungeon (floors 1-3)": "Polypore Dungeon",
+  "Player Owned Dungeon": "Sunken Pyramid",
+  "Sunken Pyramid small room": "Sunken Pyramid",
+  "W84 Fort Forinthry": "Fort Forinthry",
+  "Sophanem Slayer dungeon": "Sophanem Slayer Dungeon",
+  "Sophanem slayer dungeon": "Sophanem Slayer Dungeon",
+  "Armadyl's Eyrie in God Wars Dungeon": "God Wars Dungeon",
+  "Ithell district of Prifddinas": "Prifddinas",
+  "Ungael ritual site ritual site": "Ungael ritual site",
+  "Lumbridge Castle": "Lumbridge",
+  "floor 2 (ground floor is 0) of Lumbridge Castle": "Lumbridge",
+  "Artisan workshop": "Artisans' Workshop",
+  "Artisans’ Workshop": "Artisans' Workshop",
+  "Player-owned farm": "Manor Farm",
+  "Ascension dungeon": "Monastery of Ascension",
+  "Grotworm Lair, through the Summoning portal": "Grotworm Lair",
+  "Player-owned house's kitchen": "Player-owned house"
+ },
+ "guides": {
+  "Money making guide/Making ritual candles": {
+   "versions": {
+    "Regular": {
+     "instructions": [
+      "Withdraw basic ritual candles and lesser necroplasm at a bank. Combine them in your backpack to make regular ritual candles.",
+      "Repeat with the listed supplies; the finished candles are stackable."
+     ],
+     "sources": [
+      {
+       "title": "Regular ritual candle",
+       "revision": 36759044
+      }
+     ]
+    },
+    "Greater": {
+     "instructions": [
+      "Withdraw regular ritual candles and greater necroplasm at a bank. Combine them in your backpack to make greater ritual candles.",
+      "Repeat with the listed supplies; the finished candles are stackable."
+     ],
+     "sources": [
+      {
+       "title": "Greater ritual candle",
+       "revision": 36759042
+      }
+     ]
+    }
+   }
+  },
+  "Money making guide/Making infernal magic incense sticks": {
+   "location": "Any bank",
+   "instructions": [
+    "Withdraw magic incense sticks and infernal ashes. Combine one stick with two infernal ashes to make one infernal magic incense stick.",
+    "Bank the finished sticks, refill the supplies and repeat. Quick-cense increases production speed if unlocked."
+   ],
+   "sources": [
+    {
+     "title": "Infernal magic incense sticks",
+     "revision": 37044093
+    }
+   ]
+  },
+  "Money making guide/Cutting acadia logs": {
+   "versions": {
+    "Variant 2": {
+     "instructions": [
+      "Equip a usable hatchet and cut the acadia trees west of Het's Oasis. Bank the logs when you need more backpack space, then return to the trees."
+     ],
+     "sources": [
+      {
+       "title": "Acadia tree",
+       "revision": 37166118
+      }
+     ]
+    }
+   }
+  },
+  "Money making guide/Completing ED1 - Temple of Aminishi (Solo)": {
+   "location": "Temple of Aminishi",
+   "places": [
+    "Temple of Aminishi"
+   ]
+  },
+  "Money making guide/Completing ED2 - Dragonkin Laboratory": {
+   "location": "Dragonkin Laboratory",
+   "places": [
+    "Dragonkin Laboratory"
+   ]
+  },
+  "Money making guide/Completing ED3 - Shadow Reef": {
+   "location": "The Shadow Reef",
+   "places": [
+    "The Shadow Reef"
+   ]
+  },
+  "Money making guide/Killing the Corporeal Beast": {
+   "location": "Corporeal Beast",
+   "places": [
+    "Corporeal Beast"
+   ]
+  },
+  "Money making guide/Killing ravenous ghouls": {
+   "location": "Slayer Tower Mausoleum",
+   "places": [
+    "Slayer Tower Mausoleum"
+   ]
+  },
+  "Money making guide/Killing gladii": {
+   "location": "Monastery of Ascension",
+   "places": [
+    "Monastery of Ascension"
+   ]
+  },
+  "Money making guide/Killing the Giant Mole (Free-to-play, Hard Mode)": {
+   "location": "Falador Mole Lair",
+   "places": [
+    "Falador Mole Lair"
+   ]
+  },
+  "Money making guide/Killing gelatinous abominations": {
+   "location": "Burthorpe Slayer Cave",
+   "places": [
+    "Burthorpe Slayer Cave"
+   ]
+  },
+  "Money making guide/Killing elite profane scabarites (AFK)": {
+   "location": "Temple of Isolation",
+   "places": [
+    "Temple of Isolation"
+   ]
+  },
+  "Money making guide/Killing frost dragons": {
+   "location": "Asgarnian Ice Dungeon resource dungeon (85 Dungeoneering)",
+   "places": [
+    "Asgarnian Ice Dungeon"
+   ]
+  },
+  "Money making guide/Creating empty divine charges": {
+   "location": "Inventor's workbench, Invention Guild",
+   "places": [
+    "Invention Guild"
+   ]
+  },
+  "Money making guide/Creating mechanised chinchompas": {
+   "location": "Inventor's workbench, Invention Guild",
+   "places": [
+    "Invention Guild"
+   ]
+  },
+  "Money making guide/Blessing extra fine sand": {
+   "location": "Any Saradomin altar; the guide suggests Lumbridge Church",
+   "places": [
+    "Lumbridge"
+   ]
+  },
+  "Money making guide/Buying mithril seeds": {
+   "location": "Legends' Guild Shop of Useful Items",
+   "places": [
+    "Legends' Guild"
+   ]
+  },
+  "Money making guide/Cleansing the Gate of Elidinis": {
+   "location": "The Gate of Elidinis, above the Sanctum of Rebirth",
+   "places": [
+    "The Gate of Elidinis"
+   ]
+  },
+  "Money making guide/Collecting memory shards": {
+   "location": "Anywhere",
+   "places": []
+  },
+  "Money making guide/Crafting ruby jewellery": {
+   "location": "Lumbridge furnace, across from the Lumbridge Market bank chest",
+   "places": [
+    "Lumbridge"
+   ]
+  },
+  "Money making guide/Excavating Tsutsaroth remains": {
+   "location": "Tsutsaroth remains, Infernal Source Dig Site",
+   "places": [
+    "Infernal Source Dig Site"
+   ]
+  },
+  "Money making guide/Excavating material cache (cadmium red)": {
+   "location": "Star Lodge cellar, Infernal Source Dig Site",
+   "places": [
+    "Infernal Source Dig Site"
+   ]
+  },
+  "Money making guide/Excavating material cache (cobalt blue)": {
+   "location": "Everlight Dig Site",
+   "places": [
+    "Everlight Dig Site"
+   ]
+  },
+  "Money making guide/Folding glorious bars": {
+   "location": "Any anvil; Artisans' Workshop is one option",
+   "places": [
+    "Artisans' Workshop"
+   ]
+  },
+  "Money making guide/Killing Iorwerth scouts": {
+   "location": "Iorwerth district of Prifddinas, near Morvran",
+   "places": [
+    "Prifddinas"
+   ]
+  },
+  "Money making guide/Killing Kerapac, the bound (Solo normal mode using Necromancy)": {
+   "location": "Nodon Front, Senntisten",
+   "places": [
+    "Nodon Front"
+   ]
+  },
+  "Money making guide/Killing abyssal demons": {
+   "location": "Slayer Tower is one option for abyssal demons",
+   "places": [
+    "Slayer Tower"
+   ]
+  },
+  "Money making guide/Killing abyssal savages": {
+   "location": "Senntisten Asylum; the guide recommends the asylum over other spawns",
+   "places": [
+    "Senntisten Asylum"
+   ]
+  },
+  "Money making guide/Killing chickens": {
+   "location": "Fred the Farmer's farm, north of Lumbridge Market",
+   "places": [
+    "Lumbridge"
+   ]
+  },
+  "Money making guide/Killing corrupted scorpions": {
+   "location": "Sophanem Slayer Dungeon",
+   "places": [
+    "Sophanem Slayer Dungeon"
+   ]
+  },
+  "Money making guide/Killing dark beasts": {
+   "location": "Mourner Tunnels, beneath the Mourner Headquarters in north-east West Ardougne",
+   "places": [
+    "Mourner Tunnels"
+   ]
+  },
+  "Money making guide/Killing green dragons": {
+   "location": "Green dragon spawns; Forinthry Dungeon is one option",
+   "places": [
+    "Forinthry Dungeon"
+   ]
+  },
+  "Money making guide/Killing moss golems": {
+   "location": "The Lost Grove",
+   "places": [
+    "The Lost Grove"
+   ]
+  },
+  "Money making guide/Killing moss golems (On Task)": {
+   "location": "The Lost Grove",
+   "places": [
+    "The Lost Grove"
+   ]
+  },
+  "Money making guide/Killing spellwisps": {
+   "location": "Wizards' Tower",
+   "places": [
+    "Wizards' Tower"
+   ]
+  },
+  "Money making guide/Killing spiritual mages": {
+   "location": "God Wars Dungeon is one option for these monsters",
+   "places": [
+    "God Wars Dungeon"
+   ]
+  },
+  "Money making guide/Killing spiritual warriors": {
+   "location": "God Wars Dungeon is one option for these monsters",
+   "places": [
+    "God Wars Dungeon"
+   ]
+  },
+  "Money making guide/Killing wyverns": {
+   "location": "Asgarnian Ice Dungeon",
+   "places": [
+    "Asgarnian Ice Dungeon"
+   ]
+  },
+  "Money making guide/Making primal extracts": {
+   "location": "Any bank",
+   "places": []
+  },
+  "Money making guide/Making torstol incense sticks": {
+   "location": "Any bank",
+   "places": []
+  },
+  "Money making guide/Making ultracompost": {
+   "location": "Compost bins; Manor Farm is one option",
+   "places": [
+    "Manor Farm"
+   ]
+  },
+  "Money making guide/Making ultracompost (infernus pyroclasts)": {
+   "location": "Compost bins; Manor Farm is one option",
+   "places": [
+    "Manor Farm"
+   ]
+  },
+  "Money making guide/Mining banite": {
+   "location": "Pirates' Hideout mine (level 54 Wilderness)",
+   "places": [
+    "Pirates' Hideout mine"
+   ]
+  },
+  "Money making guide/Mining iron ore": {
+   "location": "Dwarven mines; use the iron rock area described in the guide",
+   "places": [
+    "Dwarven mine"
+   ]
+  },
+  "Money making guide/Mining runite ore": {
+   "location": "Runite rocks; the Fight Arena south-east mine is one option",
+   "places": [
+    "Fight Arena south-east mine"
+   ]
+  },
+  "Money making guide/Mining soft porcelain clay": {
+   "location": "Everlight porcelain clay mine, at the Everlight Dig Site",
+   "places": [
+    "Everlight Dig Site"
+   ]
+  },
+  "Money making guide/Performing Powerful essence rituals": {
+   "location": "Ungael ritual site",
+   "places": [
+    "Ungael ritual site"
+   ]
+  },
+  "Money making guide/Pickpocketing Gnomes": {
+   "location": "Tree Gnome Stronghold",
+   "places": [
+    "Tree Gnome Stronghold"
+   ]
+  },
+  "Money making guide/Scavenging": {
+   "location": "The guide suggests low-life-point enemies in Lumbridge Catacombs",
+   "places": [
+    "Lumbridge Catacombs"
+   ]
+  },
+  "Money making guide/Smithing cannonballs": {
+   "location": "Port Phasmatys furnace; Morytania legs 2 apply the speed bonus here",
+   "places": [
+    "Port Phasmatys"
+   ]
+  },
+  "Money making guide/Spinning starbloom flowers into cloth": {
+   "location": "Ranger's Workroom spinning wheel, Fort Forinthry",
+   "places": [
+    "Fort Forinthry"
+   ]
+  },
+  "Money making guide/Pickpocketing Archaeology professors": {
+   "versions": {
+    "Senntisten": {
+     "location": "Senntisten Dig Site; the professor requires Crossing that Bridge research",
+     "places": [
+      "Senntisten Dig Site"
+     ]
+    },
+    "Stormguard Citadel": {
+     "location": "Stormguard Citadel Dig Site; bring wingsuit v1",
+     "places": [
+      "Stormguard Citadel Dig Site"
+     ]
+    }
+   }
+  },
+  "Money making guide/Creating XP capacitor 5000s": {
+   "location": "Inventor's workbench, Invention Guild",
+   "places": [
+    "Invention Guild"
+   ]
+  },
+  "Money making guide/Cutting elder logs": {
+   "location": "Rotate between elder trees in Yanille, Varrock and Edgeville, or Varrock and the two Draynor-area trees.",
+   "travel": [
+    "The guide suggests starting at the Yanille elder tree, then cutting at Varrock, then teleporting to Edgeville to cut and bank. Repeat that rotation.",
+    "Another source route uses Varrock and the elder trees north and south of Draynor Village, banking at Draynor. Tree depletion and regrowth times determine when you move."
+   ]
+  },
+  "Money making guide/Hunting grenwalls": {
+   "location": "Anachronia: north-east of the pavosaurus rex clearing, or south-east of the scimitops clearing.",
+   "places": [
+    "Anachronia"
+   ]
+  },
+  "Money making guide/Mining animica": {
+   "versions": {
+    "During Trahaearn Voice of Seren": {
+     "location": "Trahaearn runite mine, Prifddinas, during Trahaearn Voice of Seren",
+     "places": [
+      "Prifddinas"
+     ]
+    }
+   }
+  },
+  "Money making guide/Crafting ganodermic leggings": {
+   "location": "Any bank",
+   "places": []
+  },
+  "Money making guide/Crafting ganodermic ponchos": {
+   "location": "Any bank",
+   "places": []
+  },
+  "Money making guide/Crafting ganodermic visors": {
+   "location": "Any bank",
+   "places": []
+  },
+  "Money making guide/Making ghostly ink": {
+   "location": "Any bank",
+   "places": []
+  },
+  "Money making guide/Mucking dragon manure": {
+   "location": "Dragon pens at Manor Farm, then a compost bin",
+   "places": [
+    "Manor Farm"
+   ]
+  }
+ },
+ "locations": {
+  "Anachronia": [
+   "For a first visit, board The Stormbreaker on the river east of the Varrock Dig Site and complete the arrival tutorial.",
+   "After the tutorial, build and activate the Anachronia lodestone at Base Camp for future visits."
+  ],
+  "Elder Halls": [
+   "After completing Fate of the Gods, use the World Gate set to Freneskae to reach the Elder Halls. The elder divination outfit can also teleport to the elder wisp colony."
+  ],
+  "Grotworm Lair": [
+   "Use the Port Sarim lodestone, then go north-west and enter the eastern cave entrance. The Queen Black Dragon is at the bottom of the lair, behind a portal requiring 60 Summoning."
+  ],
+  "Cooks' Guild": [
+   "The Cooks' Guild is just west of Varrock; a skills necklace can teleport to its entrance. Entry requires 32 Cooking and a chef's hat or sous chef's toque; members can use a Cooking cape or max cape instead. Completing hard Varrock achievements also removes the headgear requirement."
+  ],
+  "Mount Firewake": [
+   "Use the World Gate after completing Ritual of the Mahjarrat and Fate of the Gods to access Mount Firewake on Kethsi."
+  ],
+  "Orthen Oubliette": [
+   "Reach Anachronia first. Raksha's lair is south-west of Laniakea in the south-eastern part of the island, beneath the Anachronia Swamp Fortress."
+  ],
+  "Monastery of Ascension": [
+   "Use the Oo'glog lodestone and head west into the Feldip Hills to the Monastery of Ascension."
+  ],
+  "Slayer Tower Mausoleum": [
+   "The mausoleum is beneath the Slayer Tower in Morytania. It is also accessible from the Myreque memorial north of Canifis."
+  ],
+  "Falador Mole Lair": [
+   "Go to Falador Park in northern Falador and enter the plant roots to descend into the mole lair beneath the city."
+  ],
+  "Temple of Isolation": [
+   "The temple is accessible during and after Beneath Scabaras' Sands. Go into the Scabarite Cavern outside Pollnivneach and use the old boat to reach the temple."
+  ],
+  "Mourner Tunnels": [
+   "The tunnels are under the Mourner Headquarters in north-east West Ardougne. Start Mourning's End Part I and wear a Mourner outfit to enter the first part. The dark-beast section requires starting Mourning's End Part II and obtaining the new key."
+  ],
+  "Fight Arena south-east mine": [
+   "The mine is between Port Khazard and Yanille. Use the Yanille lodestone and run north-east, or take a charter ship to Port Khazard and run south."
+  ],
+  "Ungael ritual site": [
+   "After completing Rune Mythos and Requiem for a Dragon, use Ungael Teleport to reach the ritual site. To use the site after the quest, speak to the Archivist while wearing Zorgoth's ring."
+  ],
+  "Lumbridge Catacombs": [
+   "Use the Lumbridge lodestone, then go to the catacombs entrance in Lumbridge cemetery. Complete The Blood Pact to access the lower level."
+  ],
+  "The Gate of Elidinis": [
+   "Complete Ode of the Devourer to access the boss. Go to the northern docks in the City of Um and take the gondola next to the Suspicious Stranger's former position; the Gate is above the Sanctum of Rebirth."
+  ],
+  "Player-owned house": [
+   "Use a house portal you can access, the House Teleport spell at 40 Magic, or a teleport-to-house tablet. The current housing system starts with There's No Place Like Home... in Rimmington. This method also needs a usable larder setup in the house."
+  ]
+ },
+ "location_sources": {
+  "Orthen Oubliette": [
+   "Anachronia",
+   "Orthen Oubliette"
+  ],
+  "Monastery of Ascension": [
+   "Gladii"
+  ],
+  "Ungael ritual site": [
+   "Ungael ritual site",
+   "Ungael Teleport"
+  ]
+ }
+}

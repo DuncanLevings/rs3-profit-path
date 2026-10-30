@@ -80,7 +80,7 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
-    test("wiki imports are labelled and open with their pace, steps note and sprites", function()
+    test("wiki imports open with their pace bundled instructions and sprites", function()
         client()
         prettyui = pretty()
         gepl = countingLibrary()
@@ -122,7 +122,7 @@ return function(test, equal, client, pretty)
         local pages = detail.tabs[1].pages
         local texts = {}
 
-        for index = 1, 3 do
+        for index = 1, 4 do
             for _, label in ipairs(pages[index]:allTexts()) do
                 texts[#texts + 1] = tostring(label.content)
             end
@@ -132,9 +132,43 @@ return function(test, equal, client, pretty)
         assert(all:find("Pace (% of guide)", 1, true), "Pace label")
         assert(not all:find("Partly researched", 1, true), "Method omits research-status note")
         assert(not all:find("not yet reviewed", 1, true), "Method omits review-status note")
-        assert(all:find("Steps haven't been written", 1, true), "Steps note")
+        assert(not all:find("Steps haven't been written", 1, true), "Bundled instructions replace the placeholder")
+        assert(#imported.instructions > 0, "Imported guide has instructions")
+        assert(#imported.location.routes > 0, "Imported guide has travel text")
+        assert(all:find(imported.location.routes[1], 1, true), "Getting there renders its bundled route")
         equal(pages[1]:allFields()[1]:GetText(), "100")
 
+        PluginShutdown()
+    end)
+
+    test("Getting there separates locations and keeps their directions beneath each heading", function()
+        client()
+        prettyui = pretty()
+        gepl = countingLibrary()
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
+        prettyui:findButton("Open Profit Path")()
+        prettyui.views[#prettyui.views].children[2].fields[1]:SetText("Hunting igneous jadinkos", true)
+        settleSearch()
+        prettyui:findMethod("Hunting igneous jadinkos")()
+        local detail = prettyui.views[#prettyui.views]
+        settleMethod()
+        local labels = detail.tabs[1].pages[4]:allTexts()
+        local habitat, anachronia, habitatRoute, anachroniaSpot
+
+        for index, label in ipairs(labels) do
+            local text = tostring(label.content)
+            if text == "Herblore Habitat" then habitat = index end
+            if text == "Anachronia" then anachronia = index end
+            if text:find("Witchdoctor mask", 1, true) then habitatRoute = index end
+            if text:find("north-west of the Anachronia base camp", 1, true) then anachroniaSpot = index end
+            assert(not text:find("Herblore HabitatAnachronia", 1, true))
+            assert(not text:find("value is estimated", 1, true))
+        end
+
+        assert(habitat and habitatRoute and anachronia and anachroniaSpot)
+        assert(habitat < habitatRoute and habitatRoute < anachronia)
+        assert(anachronia < anachroniaSpot)
         PluginShutdown()
     end)
 

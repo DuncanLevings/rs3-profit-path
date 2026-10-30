@@ -918,8 +918,27 @@ function MethodView.mount(view, method, calculator, guarded, options)
         buildTab[4] = nil
 
         local travel = tabs:GetPage(4)
-        travel:AddTitle("Getting there")
-        travel:AddText(method.location.text)
+        local sections = method.location.sections or {}
+
+        -- Area headings replace the condensed location line when several places
+        -- are offered. Keep standalone/generic locations' normal description.
+        if #sections < 2 and (#sections == 0 or sections[1].title ~= method.location.text) then
+            travel:AddText(method.location.text)
+        end
+
+        -- Shared itineraries remain above the individual locations. These are
+        -- reading-only directions, never live navigation or game actions.
+        for _, route in ipairs(method.location.routes or {}) do
+            travel:AddText({ text = route, colour = Style.muted })
+        end
+
+        for _, section in ipairs(sections) do
+            travel:AddTitle(section.title)
+
+            for _, route in ipairs(section.routes) do
+                travel:AddText({ text = "- " .. route, colour = Style.muted })
+            end
+        end
 
         if method.location.coverage ~= "complete" then
             travel:AddText({ text = "Travel details are still being prepared for this method.", colour = Style.muted })

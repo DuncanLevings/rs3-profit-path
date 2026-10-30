@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.11-dev - 2026-10-30
+
+- Requirements explicitly described as recommended or optional now appear in Recommended even when the source groups them as required. Genuine minimum requirements with advice about better levels or tools stay Required.
+
+- Getting there separates each area into a named section with its own directions, instead of joining names and repeating the area prefix on every line. Shared itineraries stay above the area sections; pricing commentary is excluded from travel notes.
+- Text cleanup removes empty list introductions and extraction fragments, improves route wording, and preserves numeric levels from Wiki scm/scp templates. Access prerequisites and route conditions remain intact.
+
+- All 676 method variants now have bundled How to do it summaries and Getting there text. Guide prose uses the same pinned revisions as income. Area routes retain their own revisions, quest/item conditions and source attribution; generic bank/workstation methods state their interchangeable location.
+- Added a maintainer-only, cached Wiki API collection tool and targeted research inputs. Shared area text and the existing string pool avoid per-method copies of the same route wording. No runtime Wiki requests, external links, new dependencies or live navigation.
+- PvM summaries keep the activity and brief notes rather than full boss strategies. The larder/egg collection steps need checking against the current housing interface; source wording and layout still require in-game review.
+- Validation: 122 Lua and 109 Python tests, including recommendation classification and minimum-level preservation, plus full packed-data round trips. The content pass also passed a decoded comparison of income, requirements, method IDs, equipment and pricing references before this requirement reclassification.
+
 ## 0.8.10-dev – 2026-10-30
 
 - A method screen that fails to draw one of its later pieces stops drawing and reports the error once. Before, a failing Income row was retried every game tick: 50 errors a second, each leaving another half-made row behind.

@@ -82,3 +82,14 @@ Quest config names in catalogue-source/research/quests.json are client identifie
 Abyssal demon output reconciliation, 2026-10-29
 Expected quantities checked against Money making guide/Killing abyssal demons revision 37017140. The method keeps references to the shared drop snapshot. Item source revisions are recorded in catalogue-source/methods.json. Salvage valuation is modified to actual high-alchemy proceeds rather than the source table's GE values (6,000 / 8,000 / 8,000 / 32,000 GP); spring inputs are retained.
 https://runescape.wiki/w/Abyssal_demon
+
+Guide summaries and area travel text (2026-10-30):
+RuneScape Wiki contributors, CC BY-NC-SA 3.0 (licence and URL above).
+Collected via api.php using ProfitPath-development (Discord: Tatsuya).
+Guide prose is pinned to the income snapshot's per-page revisions; area travel
+and access sections retain separate article revision IDs. Complete sentences
+were selected, shortened and normalised; targeted candle/area descriptions were
+summarised separately. No full boss strategy guides or article images copied.
+Source records and transformations are in catalogue-source/research/guide-content.json
+and guide-content-overrides.json. Repeated route strings are shared by the runtime
+packer. Raw cached article responses remain in the external maintainer workspace.
