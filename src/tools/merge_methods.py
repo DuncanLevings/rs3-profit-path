@@ -88,7 +88,7 @@ def tidy_name(name):
 
 # ---- Tiered gear ("Tier 90+ magic weapon", "Magic armour#High level equipment (61+)")
 #
-# research/equipment.json lists every tier 60+ weapon, shield and body piece with
+# research/equipment.json lists combat weapons, shields and body pieces with
 # its tier, style and slot. A tiered line becomes a gear check on that group: owning
 # any piece of a high enough tier, in the right style and slot, meets it. Perks
 # ("perked") can't be checked, so only the tier counts.
@@ -100,7 +100,7 @@ COMBAT_GEAR = "combat_equipment"
 GEAR_SLOTS = {"main hand weapon": "weapon", "2h weapon": "weapon", "torso": "body", "off-hand": "shield"}
 GEAR_STYLES = {"melee": "melee", "ranged": "ranged", "range": "ranged", "magic": "magic", "mage": "magic",
                "necromancy": "necromancy"}
-GEAR_PIECE = re.compile(r"\b(weapons?|armou?r|shields?|equipment)\b", re.I)
+GEAR_PIECE = re.compile(r"\b(weapon(?:s|ry)?|armou?r|shields?|equipment)\b", re.I)
 GEAR_STYLE = re.compile(r"\b(melee|ranged?|magic|mage|necromancy)\b", re.I)
 GEAR_TIER = re.compile(r"\b(?:tier|t)\s*(\d{2,3})\b|\((\d{2,3})\+\)", re.I)
 
@@ -254,9 +254,9 @@ def combat_gear_group(pieces, ctx):
     for candidate in sorted(candidates, key=lambda candidate: candidate["tier"]):
         unique.setdefault(candidate["item_id"], candidate)
 
-    return {"complete": True, "candidates": list(unique.values()),
-            "note": "Checks Wiki equipment of tier 60 and above (weapons, shields and body armour) carried, worn "
-                    "or banked. Perks aren't checked.",
+    return {"complete": True, "minimum_complete_tier": 60, "candidates": list(unique.values()),
+            "note": "Checks Wiki-listed weapons, shields and body armour carried, worn or banked. "
+                    "Unresolved low-tier items prevent proving absence below tier 60. Perks aren't checked.",
             "source": "RuneScape Wiki infobox_bonuses and infobox_item buckets"}
 
 
@@ -489,6 +489,45 @@ def apply_guide_content(method, content):
         method["location"]["sources"] = sources
 
 
+def load_access_research():
+    """Pinned requirement repairs and the outcome of the recommendation-only audit."""
+    path = catalogue.ROOT / "catalogue-source" / "research" / "access-requirements.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+
+    if document.get("schema") != 1 or not isinstance(document.get("guides"), list):
+        raise ValueError("Unsupported access requirement research")
+
+    records = {}
+
+    for entry in document["guides"]:
+        key = entry["id"]
+
+        if key in records:
+            raise ValueError("Duplicate access research: " + key)
+
+        if not isinstance(entry.get("additional_required"), list):
+            raise ValueError("Access research needs a list of additional requirements")
+
+        catalogue.require_text_list(entry.get("notes"), "Researched required notes")
+        catalogue.require_text(entry.get("review"), "Access research review")
+
+        if "required" in entry and not isinstance(entry["required"], list):
+            raise ValueError("Researched replacement requirements must be a list")
+
+        if "requirement_free" in entry and not isinstance(entry["requirement_free"], bool):
+            raise ValueError("Requirement-free research must be a boolean")
+
+        for source in entry["sources"]:
+            catalogue.require_text(source.get("title"), "Requirement source title")
+
+            if not catalogue.positive_integer(source.get("revision")):
+                raise ValueError("Requirement sources need revision IDs")
+
+        records[key] = entry
+
+    return records
+
+
 class Context:
     """Shared lookups while converting guides, plus the items table they fill in."""
 
@@ -501,6 +540,7 @@ class Context:
         self.outfits = outfits or {}
         self.achievements = achievements or {}
         self.guide_content = {"guides": {}, "locations": {}}
+        self.access_research = {}
 
         # Wiki advice links found while converting the current method. They're
         # dropped (bare page names can't be clicked in game); only the guide's own
@@ -701,6 +741,12 @@ def convert_requirement(entry, ctx):
         # A joined line's own words can be more exact than its gear link: "T70+
         # magic armour with Scavenging" links the 61+ armour page. The line wins.
         gear = tiered_gear(text) if text else None
+
+        # A choice between advice-page links may have no checkable children,
+        # while its visible label still supplies a real tier/style requirement.
+        if gear and not children:
+            ctx.uses_gear = True
+            return gear
 
         if gear and gear["kind"] == "gear":
             ctx.uses_gear = True
@@ -1079,7 +1125,39 @@ def convert_guide(guide, ctx, category):
     if guide.get("version"):
         method["variant"] = guide["version"]
 
-    method["requirements"] = convert_requirements(guide.get("requirements", {}), ctx)
+    raw_requirements = guide.get("requirements", {})
+    research = ctx.access_research.get(method["id"])
+
+    if research:
+        # Refuse stale repairs when the guide snapshot changes. Requirements from
+        # another version of a method must never leak into this one's filter.
+        if (research["page"] != guide["page"] or research["revision"] != guide["revision"]
+                or research["version"].casefold() != guide.get("version", "").casefold()):
+            raise ValueError("Access research does not match the pinned guide: " + method["id"])
+
+        raw_requirements = dict(raw_requirements)
+        # A reviewed replacement can resolve an imprecise label such as Rune +3
+        # armour into its sourced tier, without keeping a duplicate unchecked note.
+        required = research.get("required", raw_requirements.get("required", []))
+        raw_requirements["required"] = list(required) + research["additional_required"]
+
+    method["requirements"] = convert_requirements(raw_requirements, ctx)
+
+    if research:
+        requirements = method["requirements"]
+        requirements["notes"] = list(dict.fromkeys(requirements["notes"] + research["notes"]))
+
+        # Only an explicitly reviewed requirement-free method can turn an empty
+        # source list into a pass. This is not a general "research is complete" flag.
+        if research.get("requirement_free"):
+            if requirements["access"]["children"] or requirements["notes"]:
+                raise ValueError("Requirement-free review conflicts with access checks")
+
+            requirements["coverage"] = "complete"
+
+        if research["sources"]:
+            method["requirement_sources"] = research["sources"]
+
     method["income"] = convert_income(guide, ctx, category == "pvm")
     method["instructions"] = []
     method["location"] = {"text": "Travel details have not been recorded for this method.", "coverage": "partial", "routes": []}
@@ -1242,6 +1320,7 @@ def merge(recipe_source=None, monsters=None):
     ctx = Context(items, meta or {"items": {}, "retrieved": None}, catalogue.load_capabilities(), recipes,
                   catalogue.load_quests(), load_outfits(), load_achievements())
     ctx.guide_content = load_guide_content()
+    ctx.access_research = load_access_research()
 
     # Tool tiers, so "Crystal pickaxe or better" knows what "better" is.
     pickaxes = load_pickaxes()

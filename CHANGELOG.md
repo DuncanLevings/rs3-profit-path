@@ -2,6 +2,14 @@
 
 ## 0.8.11-dev - 2026-10-30
 
+- Tool requirement ownership hints stay inline; the native label previously rendered their newline as a square character.
+
+- Audited all 15 recommendation-only variants. Restored custom gear labels lost behind generic Wiki advice links, added sourced method/setup checks and retained manual conditions where no verified client check exists. Reviewed spinning wool as requirement-free. Added low-tier gear data; unresolved low-tier items cannot establish absence. Recommendations remain separate. Validation: 127 Lua and 113 Python tests.
+
+- An empty Required list in incomplete source data no longer passes Met (including Telos 200 Killstreak). Required notes or unresolved entries also keep otherwise passing access unknown; an explicitly complete requirement-free method can still pass. Browse and method details share this decision. Validation: 125 Lua and 109 Python tests.
+
+- Browse Met now follows the actual listed requirement verdicts instead of rejecting otherwise passing methods because their source research is marked partial. Missing evidence still stays unknown; recommendations do not gate access. Regression coverage includes passing, missing and unavailable levels. Validation: 123 Lua and 109 Python tests.
+
 - Requirements explicitly described as recommended or optional now appear in Recommended even when the source groups them as required. Genuine minimum requirements with advice about better levels or tools stay Required.
 
 - Getting there separates each area into a named section with its own directions, instead of joining names and repeating the area prefix on every line. Shared itineraries stay above the area sections; pricing commentary is excluded from travel notes.

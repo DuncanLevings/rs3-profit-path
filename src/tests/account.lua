@@ -480,6 +480,7 @@ return function(test, equal, client, pretty)
         for _, label in ipairs(page:allTexts()) do
             if label.content:find("On your tool belt", 1, true) then
                 foundLabel = true
+                assert(not label.content:find("\n", 1, true), "Native tool labels keep ownership hints inline")
                 equal(label.x, 62, "Tool wording sits beside its box")
                 local textCentre = label.y + label.options.height / 2
                 assert(math.abs(textCentre - (original.options.y + 20)) <= 0.5, "Tool wording and box share a vertical centre")
@@ -621,6 +622,20 @@ return function(test, equal, client, pretty)
         equal(Requirements.evaluate(check, evidence).status, "unknown")
     end)
 
+    test("an incomplete low-tier equipment range cannot prove absence", function()
+        local check, evidence = equipmentFixture()
+        check.minimum_tier = 20
+        evidence.equipment.test.minimum_complete_tier = 60
+
+        for _, owned in pairs(evidence.items) do
+            owned.quantity = 0
+        end
+
+        equal(Requirements.evaluate(check, evidence).status, "unknown")
+        evidence.items[2].quantity = 1
+        equal(Requirements.evaluate(check, evidence).status, "met")
+    end)
+
     test("saved equipment and unknown levels cannot prove readiness", function()
         local check, evidence = equipmentFixture()
         evidence.items[2] = { status = "unknown", savedQuantity = 1, complete = false }
@@ -647,6 +662,85 @@ return function(test, equal, client, pretty)
             required, { kind = "item", text = "B", itemId = 43, quantity = 1 },
         } }
         equal(Requirements.evaluate(alternatives, evidence).status, "met")
+    end)
+
+    test("incomplete empty access lists and unchecked required notes cannot prove access", function()
+        local requirements = {
+            coverage = "partial",
+            access = { kind = "all", children = {} },
+            recommended = { kind = "all", children = {
+                { kind = "skill", skill = "MAGIC", level = 90, text = "90 Magic" },
+            } },
+        }
+
+        equal(Requirements.evaluateAccess(requirements, {}).status, "unknown")
+        requirements.coverage = "complete"
+        equal(Requirements.evaluateAccess(requirements, {}).status, "met")
+        requirements.notes = { "A required setup only the player can check" }
+        equal(Requirements.evaluateAccess(requirements, {}).status, "unknown")
+        requirements.access.children = {
+            { kind = "skill", skill = "MAGIC", level = 90, text = "90 Magic" },
+        }
+        local evidence = { skills = { MAGIC = { status = "available", level = 21 } } }
+        equal(Requirements.evaluateAccess(requirements, evidence).status, "unmet")
+    end)
+
+    test("Met filters listed checks independently of catalogue research coverage", function()
+        client()
+        prettyui = pretty()
+        gepl = nil
+
+        local catalogue = require("src/data/method_data")
+        local method
+
+        for _, candidate in ipairs(catalogue.methods) do
+            if candidate.title == "Smelting steel bars" then
+                method = candidate
+                break
+            end
+        end
+
+        assert(method)
+        local original = method.requirements
+        local level = 50
+        SkillType.SMITHING = 13
+        Player.GetLevelUncapped = function()
+            return level
+        end
+
+        -- This source hasn't had a complete research review. Its known minimum
+        -- still passes, and an unmet recommendation mustn't exclude the method.
+        method.requirements = {
+            coverage = "partial",
+            access = { kind = "all", text = "Required", children = {
+                { kind = "skill", skill = "SMITHING", level = 30, text = "30 Smithing" },
+            } },
+            recommended = { kind = "all", text = "Recommended", children = {
+                { kind = "skill", skill = "SMITHING", level = 99, text = "99 Smithing" },
+            } },
+        }
+
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 1000, height = 740 } })
+        prettyui:findButton("Open Profit Path")()
+        local filter = prettyui.views[2].children[2].nativeLists[5]
+        filter:SetEntrySelected(1, true)
+        Event.Logic.emit({})
+        assert(prettyui:findMethod("Smelting steel bars"))
+
+        -- A genuinely low level, or unavailable live level, still cannot pass.
+        level = 10
+        Event.SkillTransmit.emit({})
+        assert(not prettyui:findMethod("Smelting steel bars"))
+        level = nil
+        Event.SkillTransmit.emit({})
+        assert(not prettyui:findMethod("Smelting steel bars"))
+        level = 50
+        Event.SkillTransmit.emit({})
+        assert(prettyui:findMethod("Smelting steel bars"))
+
+        PluginShutdown()
+        method.requirements = original
     end)
 
     -- Integration: use the actual entry point so evidence refresh and Browse

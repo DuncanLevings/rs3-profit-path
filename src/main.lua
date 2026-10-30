@@ -353,15 +353,11 @@ function App.start()
         self.evidence = evidence
         self.accessChanged = false
 
-        -- Browse consumes these same verdicts. Source coverage is separate from
-        -- account evidence: passing known checks cannot fill an unmapped setup.
+        -- Browse filters the listed requirements, using the same verdicts as
+        -- the method page. A source's research status isn't a failed player check;
+        -- individual checks with missing evidence still stay unknown on their own.
         for _, method in ipairs(catalogue.methods) do
-            local checked = Requirements.evaluate(method.requirements.access, evidence)
-
-            if checked.status == "met" and method.requirements.coverage ~= "complete" then
-                checked.status = "unknown"
-                checked.reason = "Some access requirements still need verification."
-            end
+            local checked = Requirements.evaluateAccess(method.requirements, evidence)
 
             local previous = browser.readiness[method.id]
             self.accessChanged = self.accessChanged or not previous or previous.status ~= checked.status
@@ -378,7 +374,7 @@ function App.start()
     end
 
     function calculator:requirements()
-        return Requirements.evaluate(self.method.requirements.access, self.evidence or {}),
+        return Requirements.evaluateAccess(self.method.requirements, self.evidence or {}),
             Requirements.evaluate(self.method.requirements.recommended, self.evidence or {})
     end
 

@@ -52,6 +52,17 @@ class RequirementTests(unittest.TestCase):
         self.assertEqual(requirements["recommended"], ["skill:COMBAT_LEVEL:90", "quest:Priest in Peril"])
         self.assertNotIn("optional", requirements)
 
+    def test_custom_item_labels_preserve_tiers_instead_of_becoming_advice_links(self):
+        labelled = item("Armoury").replace("[[Armoury|Armoury]]", "[[Armoury|Tier 90+ weapon]]")
+        requirements = wiki_methods.parse_requirements([labelled])
+        self.assertEqual(requirements["required"], [
+            {"req": "item:Armoury", "text": "Tier 90+ weapon"},
+        ])
+
+        group = '<span class="mmg-req mmg-req-or">' + labelled + ' or ' + item("Logs") + '</span>'
+        requirements = wiki_methods.parse_requirements([group])
+        self.assertEqual(requirements["required"][0]["text"], "Tier 90+ weapon or Logs")
+
     def test_wording_the_spans_dont_cover_is_kept_beside_the_requirement(self):
         requirements = wiki_methods.parse_requirements([f"* {item('Spring cleaner 2000')} or above"])
 

@@ -109,6 +109,38 @@ class RequirementTests(unittest.TestCase):
         self.assertTrue(merge_methods.wording_is_suggestion(
             "Diviner's outfit (Optional when making Sign of the Porters)"))
 
+    def test_access_research_is_variant_pinned_and_keeps_recommendations(self):
+        ctx = context()
+        ctx.access_research["fixture.standard"] = {
+            "page": "Money making guide/Fixture", "version": "", "revision": 123,
+            "additional_required": ["skill:MINING:16"], "notes": [], "sources": [],
+        }
+        result = merge_methods.convert_guide(guide(requirements={"recommended": ["skill:MINING:40"]}), ctx, "skilling")
+        self.assertEqual(result["requirements"]["access"]["children"][0]["level"], 16)
+        self.assertEqual(result["requirements"]["recommended"]["children"][0]["level"], 40)
+        ctx.access_research["fixture.standard"]["revision"] = 124
+
+        with self.assertRaisesRegex(ValueError, "pinned guide"):
+            merge_methods.convert_guide(guide(), ctx, "skilling")
+
+    def test_choice_labels_keep_tier_checks_when_all_links_are_advice_pages(self):
+        requirements, _ = self.convert({"required": [{
+            "req": ["any", "item:Magic weapon", "item:Ranged weapon"],
+            "text": "Tier 20+ Magic or Ranged weapon",
+        }]}, capabilities={"Magic weapon": {"kind": "guidance"}, "Ranged weapon": {"kind": "guidance"}})
+        check = requirements["access"]["children"][0]
+        self.assertEqual(check["kind"], "any")
+        self.assertEqual({child["style"] for child in check["children"]}, {"magic", "ranged"})
+        self.assertEqual({child["minimum_tier"] for child in check["children"]}, {20})
+
+    def test_weaponry_labels_are_real_gear_requirements(self):
+        for text, tier in [("Tier 10+ melee weaponry", 10), ("Tier 70+ magic weaponry", 70)]:
+            requirements, _ = self.convert({"required": [{"text": text}]})
+            check = requirements["access"]["children"][0]
+            self.assertEqual(check["kind"], "gear")
+            self.assertEqual(check["minimum_tier"], tier)
+            self.assertEqual(check["slot"], "weapon")
+
     def test_checkable_requirements_become_skill_and_item_checks(self):
         requirements, items = self.convert({
             "required": ["skill:SLAYER:85", ["any", "item:Gem bag (upgraded)", "item:Artificer's measure"],

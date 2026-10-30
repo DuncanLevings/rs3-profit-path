@@ -93,3 +93,11 @@ summarised separately. No full boss strategy guides or article images copied.
 Source records and transformations are in catalogue-source/research/guide-content.json
 and guide-content-overrides.json. Repeated route strings are shared by the runtime
 packer. Raw cached article responses remain in the external maintainer workspace.
+
+Access/setup requirement audit (2026-10-30):
+RuneScape Wiki contributors, CC BY-NC-SA 3.0. Restored displayed item requirement
+labels for 15 pinned guide variants. Supporting article revisions and review
+reasons are retained in catalogue-source/research/access-requirements.json.
+Tier 1-59 weapon, shield and body-armour records were added from the Wiki
+infobox_bonuses and infobox_item buckets using the identified, paced API client.
+Unresolved Mindspike/Tower mindspike IDs do not establish negative ownership.

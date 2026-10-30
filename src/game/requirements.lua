@@ -248,7 +248,11 @@ function Requirements.evaluate(requirement, account)
 
         local checked
 
-        if uncertain or not group.complete then
+        -- Some low-tier item IDs couldn't be resolved in the source. An owned
+        -- match still passes above; their absence cannot prove a low-tier failure.
+        local belowCoverage = (requirement.minimum_tier or 0) < (group.minimum_complete_tier or 0)
+
+        if uncertain or not group.complete or belowCoverage then
             checked = result(requirement, "unknown", group.note or "Equipment coverage is incomplete.")
         else
             checked = result(requirement, "unmet", "No usable matching equipment was found in checked storage.")
@@ -291,6 +295,27 @@ function Requirements.evaluate(requirement, account)
     -- Unmapped gear or unlocks like prayers need verified client mappings first,
     -- so for now we're honest and say "unknown".
     return result(requirement, "unknown", "This requirement is not supported yet.")
+end
+
+-- Checks listed access requirements without treating an incomplete empty list
+-- as proof that a method has no requirements. Plain required notes also need the
+-- player's judgement; they aren't passes just because we can't evaluate them.
+function Requirements.evaluateAccess(requirements, account)
+    local checked = Requirements.evaluate(requirements.access, account)
+
+    if checked.status ~= "met" then
+        return checked
+    end
+
+    local emptyIncomplete = #requirements.access.children == 0 and requirements.coverage ~= "complete"
+    local unchecked = #(requirements.notes or {}) > 0 or #(requirements.unresolved or {}) > 0
+
+    if emptyIncomplete or unchecked then
+        checked.status = "unknown"
+        checked.reason = "Required information is incomplete or needs your judgement."
+    end
+
+    return checked
 end
 
 return Requirements

@@ -281,14 +281,14 @@ class RequirementLine(html.parser.HTMLParser):
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.root = {"attrs": {}, "children": []}
+        self.root = {"attrs": {}, "children": [], "text": []}
         self.stack = [self.root]
         self.text = []
         self.loose = []
 
     def handle_starttag(self, tag, attrs):
         if tag == "span":
-            node = {"attrs": dict(attrs), "children": []}
+            node = {"attrs": dict(attrs), "children": [], "text": []}
             self.stack[-1]["children"].append(node)
             self.stack.append(node)
 
@@ -298,6 +298,11 @@ class RequirementLine(html.parser.HTMLParser):
 
     def handle_data(self, data):
         self.text.append(data)
+
+        # Keep each span's visible label as well as its structured identity. A
+        # link to Armoury can actually say "Tier 90+ weapon" on the guide page.
+        for node in self.stack:
+            node["text"].append(data)
 
         # Text sitting outside every requirement span: wording the spans don't cover.
         if len(self.stack) == 1:
@@ -361,6 +366,19 @@ FILLER = re.compile(r"\b(or|and|recommended|optional|required)\b|[\s,;:()*.+/&-]
 EMPTY_WORDS = {"none", "n/a", "na", "nothing", "-", "no requirements"}
 
 
+def has_item_label(node):
+    """Whether an item span says more than its canonical Wiki page name."""
+    name = node["attrs"].get("data-mmg-item")
+
+    if name:
+        label = plain("".join(node["text"]))
+
+        if label.casefold() != name.strip().casefold():
+            return True
+
+    return any(has_item_label(child) for child in node["children"])
+
+
 def parse_requirements(fields):
     """All four requirement fields as {"required": [...], "recommended": [...], ...}."""
     groups = {"required": [], "recommended": [], "optional": []}
@@ -374,7 +392,7 @@ def parse_requirements(fields):
             text = plain("".join(parser.text))
             found = [requirement(node) for node in parser.root["children"]]
             found = [entry for entry in found if entry]
-            extra = FILLER.sub("", plain("".join(parser.loose)))
+            extra = FILLER.sub("", plain("".join(parser.loose))) or has_item_label(parser.root)
 
             if not found:
                 # Plain words with no structured requirement at all. Skip "None",
@@ -801,8 +819,8 @@ def import_achievements():
 # version gives its item IDs (degraded and charged versions have their own). The
 # plugin then counts any owned item of a high enough tier, style and slot.
 
-# Lowest tier any guide asks for ("High level equipment (61+)").
-EQUIPMENT_MIN_TIER = 60
+# Includes basic equipment too: some guides ask for tier 10 or tier 20 gear.
+EQUIPMENT_MIN_TIER = 1
 
 
 def fetch_equipment():
@@ -998,7 +1016,7 @@ def main():
     parser.add_argument("--bucket-file", type=Path,
                         help="reuse a saved money_making_guide download ({'retrieved', 'rows'}) instead of fetching it")
     parser.add_argument("--equipment", action="store_true",
-                        help="instead of the guides, import every tier 60+ equipment piece for tiered gear requirements")
+                        help="instead of the guides, import every tier 1+ equipment piece for tiered gear requirements")
     parser.add_argument("--achievements", action="store_true",
                         help="instead of the guides, import the in-game IDs of every achievement requirement")
     parser.add_argument("--outfits", action="store_true",

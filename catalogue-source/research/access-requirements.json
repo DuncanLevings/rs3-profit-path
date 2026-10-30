@@ -1,0 +1,237 @@
+{
+ "schema": 1,
+ "reviewed": "2026-10-30",
+ "source": "RuneScape Wiki contributors, CC BY-NC-SA 3.0. Pinned guide requirement-label repair and supporting access/setup research.",
+ "guides": [
+  {
+   "id": "buying-construction-materials-from-bandit-duty-free.standard",
+   "page": "Money making guide/Buying construction materials from Bandit Duty Free",
+   "version": "",
+   "revision": 37109233,
+   "additional_required": [],
+   "notes": [
+    "Be skulled to trade with Noterazzo at Bandit Duty Free."
+   ],
+   "sources": [
+    {
+     "title": "Bandit Duty Free",
+     "revision": 37120703
+    }
+   ],
+   "review": "Shop access requires a skull. The plugin cannot verify this state, so it stays a required manual check. Teleports remain optional; coins are cost inputs."
+  },
+  {
+   "id": "killing-telos-the-warden.200-killstreak",
+   "page": "Money making guide/Killing Telos, the Warden",
+   "version": "200 Killstreak",
+   "revision": 36932978,
+   "additional_required": [],
+   "notes": [
+    "Permanent access to Telos's chamber using an ancient sigil."
+   ],
+   "sources": [
+    {
+     "title": "Telos, the Warden",
+     "revision": 37182354
+    }
+   ],
+   "review": "The pinned guide requires tier 90+ weapon and armour. Initial chamber access needs an ancient sigil assembled through the four Heart generals; this is not a consumable item-ownership check after unlocking the door. No verified client unlock flag is available here, so access stays a manual check."
+  },
+  {
+   "id": "killing-adolescent-white-wolves.standard",
+   "page": "Money making guide/Killing adolescent white wolves",
+   "version": "",
+   "revision": 36806655,
+   "additional_required": [],
+   "notes": [],
+   "sources": [],
+   "review": "The guide requires combat equipment but states no minimum tier. Keep this as an unchecked setup requirement rather than promoting the recommended level 30 skills to a hard minimum."
+  },
+  {
+   "id": "killing-black-dragons.standard",
+   "page": "Money making guide/Killing black dragons",
+   "version": "",
+   "revision": 36523840,
+   "additional_required": [],
+   "notes": [
+    "Combat equipment and a dragonfire protection plan for the listed setup.",
+    "Access to Evil Chicken's Lair when using the guide's suggested location."
+   ],
+   "sources": [
+    {
+     "title": "Black dragon",
+     "revision": 37160029
+    }
+   ],
+   "review": "The guide offers several protection choices and recommends rather than requires its levels. Preserve those recommendations; the setup and conditional location access need manual checks."
+  },
+  {
+   "id": "killing-black-unicorns.standard",
+   "page": "Money making guide/Killing black unicorns",
+   "version": "",
+   "revision": 36948870,
+   "additional_required": [],
+   "notes": [],
+   "sources": [],
+   "review": "The original item label specifies a tier 60+ melee weapon. PvP state is a separate manual preparation check."
+  },
+  {
+   "id": "killing-cows.standard",
+   "page": "Money making guide/Killing cows",
+   "version": "",
+   "revision": 36948868,
+   "additional_required": [],
+   "notes": [],
+   "sources": [],
+   "review": "Restored the guide's displayed requirement labels from its pinned source revision."
+  },
+  {
+   "id": "killing-fungal-magi.standard",
+   "page": "Money making guide/Killing fungal magi",
+   "version": "",
+   "revision": 36806822,
+   "additional_required": [
+    {
+     "text": "Tier 70+ magic weaponry"
+    },
+    {
+     "text": "Tier 70+ magic armour"
+    }
+   ],
+   "notes": [],
+   "sources": [],
+   "review": "The pinned guide Item field explicitly labels its two equipment links Tier 70+ Magic weaponry and Tier 70+ Magic armour. The template positional labels do not survive its current expansion, so preserve them as researched checks."
+  },
+  {
+   "id": "killing-guards.standard",
+   "page": "Money making guide/Killing guards",
+   "version": "",
+   "revision": 37111820,
+   "additional_required": [],
+   "notes": [],
+   "sources": [],
+   "review": "The item row specifies tier 20+ Magic or Ranged weapon. Restored its combined label; recommended Combat 60 remains recommended."
+  },
+  {
+   "id": "killing-spellwisps.standard",
+   "page": "Money making guide/Killing spellwisps",
+   "version": "",
+   "revision": 37111826,
+   "additional_required": [],
+   "notes": [],
+   "sources": [],
+   "review": "Restored the explicit tier 20+ ranged weapon requirement. Recommended Ranged 20 stays recommended."
+  },
+  {
+   "id": "killing-the-giant-mimic.beginner",
+   "page": "Money making guide/Killing the Giant Mimic",
+   "version": "Beginner",
+   "revision": 37216221,
+   "additional_required": [
+    "item:Mimic kill token"
+   ],
+   "notes": [
+    "A combat setup capable of defeating the beginner Giant Mimic within 2 minutes 30 seconds."
+   ],
+   "sources": [
+    {
+     "title": "Giant Mimic",
+     "revision": 37188180
+    }
+   ],
+   "review": "A token is needed to fight and collect loot. The source gives level 30 as a recommendation, not an entry restriction. Keep suitability as a manual setup check rather than inventing a hard combat minimum."
+  },
+  {
+   "id": "killing-the-giant-mole-free-to-play-hard-mode.standard",
+   "page": "Money making guide/Killing the Giant Mole (Free-to-play, Hard Mode)",
+   "version": "",
+   "revision": 37066866,
+   "additional_required": [
+    {
+     "req": "skill:MAGIC:41",
+     "text": "41 Magic to cast Air Blast for this method"
+    }
+   ],
+   "notes": [
+    "A magic weapon and air runes for the described Air Blast setup."
+   ],
+   "sources": [
+    {
+     "title": "Air Blast",
+     "revision": 37043972
+    }
+   ],
+   "review": "This specific method describes using Air Blast. Its spell requires Magic 41. Recommended Magic/Defence 70 and Prayer 43 remain recommended; no general boss-entry level is invented."
+  },
+  {
+   "id": "killing-the-king-black-dragon.free-to-play",
+   "page": "Money making guide/Killing the King Black Dragon",
+   "version": "free-to-play",
+   "revision": 37111827,
+   "additional_required": [],
+   "notes": [],
+   "sources": [],
+   "review": "The pinned Item field requires Rune +3 armour. The collected Rune platebody +3 bonus row confirms tier 53; the shared gear check accepts that tier or better. Recommended prayers and Combat 100 remain recommendations. This replaces the unquantified Rune +3 armour label, rather than adding a second copy of the same requirement. The Prayer 37 line explicitly says recommended and is retained in that section.",
+   "required": [
+    {
+     "text": "Tier 53+ melee armour (Rune +3 setup)"
+    },
+    {
+     "req": "skill:PRAYER:37",
+     "text": "37 for Protect from Magic recommended"
+    }
+   ]
+  },
+  {
+   "id": "mining-common-gem-rocks-in-al-kharid-mine.standard",
+   "page": "Money making guide/Mining common gem rocks in Al Kharid mine",
+   "version": "",
+   "revision": 37056151,
+   "additional_required": [
+    {
+     "text": "Any pickaxe"
+    },
+    {
+     "req": "skill:MINING:16",
+     "text": "16 Mining for all gems included in this income table"
+    }
+   ],
+   "notes": [],
+   "sources": [
+    {
+     "title": "Common gem rock",
+     "revision": 37180734
+    }
+   ],
+   "review": "The guide requires a pickaxe. Rocks can be mined at level 1, but this method values jade and red topaz too, so its full output mix requires Mining 16. Mining 40 for a better pickaxe remains recommended."
+  },
+  {
+   "id": "opening-muddy-chests.free-to-play",
+   "page": "Money making guide/Opening muddy chests",
+   "version": "Free-to-play",
+   "revision": 37175563,
+   "additional_required": [],
+   "notes": [
+    "Armour for travelling through the Lava Maze."
+   ],
+   "sources": [
+    {
+     "title": "Muddy chest",
+     "revision": 37179734
+    }
+   ],
+   "review": "The source requires Armour without a tier; its icon is only an example. Do not turn the pictured rune platebody into a hard tier requirement. Muddy keys remain cost inputs, and the unquantified armour requirement stays manual."
+  },
+  {
+   "id": "spinning-wool.standard",
+   "page": "Money making guide/Spinning wool",
+   "version": "",
+   "revision": 36820869,
+   "additional_required": [],
+   "notes": [],
+   "sources": [],
+   "review": "The pinned guide explicitly states Skill None and Quest None. Wool is the priced input and the spinning wheel is a public workstation; the cash recommendation is not an unlock. This reviewed empty access list may pass.",
+   "requirement_free": true
+  }
+ ]
+}

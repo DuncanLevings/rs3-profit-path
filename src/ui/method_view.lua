@@ -459,8 +459,9 @@ local function mountRequirements(parent, method, calculator, fitter)
 
                 if update.sourceText then
                     -- Keep the source requirement visible even with an empty slot.
-                    -- Both lines sit in one centred text box beside the item box.
-                    text = update.sourceText .. (description ~= "" and ("\n" .. description) or "")
+                    -- This native label renders a newline as a box, so keep the
+                    -- ownership hint inline in the centred text beside the item.
+                    text = update.sourceText .. (description ~= "" and (" - " .. description) or "")
                 end
 
                 update.matchText.content = text

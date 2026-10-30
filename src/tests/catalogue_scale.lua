@@ -8,6 +8,43 @@
 return function(test, equal, client, pretty)
     local catalogue = require("src/data/method_data")
 
+    test("Telos killstreak restores its setup and cannot pass without access evidence", function()
+        local Requirements = require("src/game/requirements")
+        local method = catalogue.find("killing-telos-the-warden.200-killstreak")
+
+        assert(method)
+        equal(#method.requirements.access.children, 2)
+        equal(method.requirements.access.children[1].minimum_tier, 90)
+        equal(method.requirements.access.children[1].slot, "weapon")
+        equal(method.requirements.access.children[2].minimum_tier, 90)
+        equal(method.requirements.access.children[2].slot, "body")
+        equal(Requirements.evaluateAccess(method.requirements, {}).status, "unknown")
+    end)
+
+    test("repaired low-level gear and full gem output requirements survive the bundle", function()
+        local Requirements = require("src/game/requirements")
+        local cows = catalogue.find("killing-cows.standard")
+        local evidence = { equipment = catalogue.equipment, items = {}, skills = {} }
+
+        -- The original guide asks for iron-tier gear, not tier 60 equipment.
+        evidence.items[1115] = { status = "available", quantity = 1 }
+        evidence.items[1309] = { status = "available", quantity = 1 }
+        equal(Requirements.evaluateAccess(cows.requirements, evidence).status, "met")
+
+        local mining = catalogue.find("mining-common-gem-rocks-in-al-kharid-mine.standard")
+        local level
+
+        for _, check in ipairs(mining.requirements.access.children) do
+            if check.kind == "skill" and check.skill == "MINING" then
+                level = check.level
+            end
+        end
+
+        equal(level, 16)
+        local wool = catalogue.find("spinning-wool.standard")
+        equal(Requirements.evaluateAccess(wool.requirements, {}).status, "met")
+    end)
+
     -- A fake GEPL that counts every call and answers with the same prices for any
     -- item, so every method can be estimated.
     local function countingLibrary()
