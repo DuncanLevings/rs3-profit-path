@@ -161,13 +161,14 @@ def fetch_revisions(pages):
 def lookup_items(forms):
     """One round of item lookups for a set of spellings.
 
-    Returns ({spelling: item ID}, {spelling: [every dose's item ID]}). Two lookups,
+    Returns ({spelling: item ID}, {spelling: [every dose's item ID]}, {item ID: the
+    item's own name}). Two lookups,
     like the recipe importer: an exact item_name match first, then the item page.
     A page whose infobox describes one item gives that item. A page whose items are
     all doses of one thing ("Aggroverload (1)" ... "(6)") is a dose family: its ID
     is the biggest dose, and the family lists every dose so owning any of them
     counts. Any other page with several items is too ambiguous to guess from."""
-    found, families = {}, {}
+    found, families, real_names = {}, {}, {}
 
     for field in ("item_name", "page_name"):
         for group in batches(forms - set(found), BATCH):
@@ -180,6 +181,11 @@ def lookup_items(forms):
 
                 if not ids or not isinstance(ids[0], int) or ids[0] <= 0:
                     continue
+
+                # The game checks an item's name before showing its icon, so keep
+                # the Wiki's exact item name ("Aggroverload (6)", not "Aggroverload").
+                if row.get("item_name"):
+                    real_names.setdefault(ids[0], row["item_name"])
 
                 if field == "item_name" and row.get("item_name") in group:
                     found.setdefault(row["item_name"], ids[0])
@@ -212,22 +218,23 @@ def lookup_items(forms):
                     found[page] = doses[max(doses)]
                     families[page] = [doses[dose] for dose in sorted(doses)]
 
-    return found, families
+    return found, families, real_names
 
 
 def fetch_item_ids(names):
-    """{item name: item ID} and {item name: dose family IDs} for every name the
-    Wiki can resolve.
+    """({item name: item ID}, {item name: dose family IDs}, {item ID: its own name})
+    for every name the Wiki can resolve.
 
     Guides don't always use the Wiki's capitals. We try the name with a capital
     first letter ("coins" -> "Coins"), then in sentence case ("Adamant Pickaxe" ->
     "Adamant pickaxe"), and map each answer back to the guide's own spelling."""
-    found, families = {}, {}
+    found, families, real_names = {}, {}, {}
 
     for spell in (lambda name: name[:1].upper() + name[1:],
                   lambda name: name[:1].upper() + name[1:].lower()):
         forms = {name: spell(name) for name in names if name not in found}
-        ids, doses = lookup_items(set(forms.values()))
+        ids, doses, names_by_id = lookup_items(set(forms.values()))
+        real_names.update(names_by_id)
 
         for name, form in forms.items():
             if form in ids:
@@ -236,7 +243,9 @@ def fetch_item_ids(names):
                 if form in doses:
                     families[name] = doses[form]
 
-    return found, families
+    used = set(found.values()) | {item_id for ids in families.values() for item_id in ids}
+
+    return found, families, {item_id: real_names[item_id] for item_id in used if item_id in real_names}
 
 
 # ---- Turning wikitext and HTML into plain data -------------------------------
@@ -521,7 +530,7 @@ def is_obsolete(row):
     return "obsolete" in row
 
 
-def build(rows, revisions, item_ids, retrieved, families=None):
+def build(rows, revisions, item_ids, retrieved, families=None, item_names=None):
     """Parses and checks everything, returning (guides.jsonl text, meta record).
 
     `families` maps a dose-less potion name to every dose's item ID (see lookup_items).
@@ -585,6 +594,8 @@ def build(rows, revisions, item_ids, retrieved, families=None):
         "unresolved_requirement_items": [name for name in required if name not in item_ids],
         "item_families": {name: ids for name, ids in sorted((families or {}).items())
                           if name in names or name in required},
+        # Each item's own name, for the plugin's in-game name check.
+        "item_names": {str(item_id): name for item_id, name in sorted((item_names or {}).items())},
         "unlabelled_versions": sorted(unlabelled),
     }
 
@@ -644,10 +655,10 @@ def main():
     revisions = fetch_revisions({row["page_name"] for row in current})
     parsed = [parse_guide(row, revisions) for row in current]
     names = {income[0] for guide in parsed for income in guide["inputs"] + guide["outputs"]}
-    item_ids, families = fetch_item_ids((names | requirement_names(parsed)) - {""})
+    item_ids, families, item_names = fetch_item_ids((names | requirement_names(parsed)) - {""})
 
     # Build and check everything before writing anything.
-    text, meta = build(rows, revisions, item_ids, retrieved, families)
+    text, meta = build(rows, revisions, item_ids, retrieved, families, item_names)
 
     OUTPUT.mkdir(parents=True, exist_ok=True)
     GUIDES.write_text(text, encoding="utf-8", newline="\n")

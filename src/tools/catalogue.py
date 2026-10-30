@@ -1368,6 +1368,7 @@ def pack_methods(catalogue):
     items = pack(catalogue["items"])
     equipment = pack(catalogue.get("equipment", {}))
     toolbelt = pack(catalogue.get("toolbelt", {}))
+    icons = pack(catalogue.get("icons", {}))
     methods = [pack(method) for method in catalogue["methods"]]
 
     lines = [
@@ -1378,6 +1379,7 @@ def pack_methods(catalogue):
         "items=" + lua_literal(items) + ",",
         "equipment=" + lua_literal(equipment) + ",",
         "toolbelt=" + lua_literal(toolbelt) + ",",
+        "icons=" + lua_literal(icons) + ",",
     ]
 
     # One line per string, shape and method keeps diffs readable.
@@ -1394,6 +1396,11 @@ def pack_methods(catalogue):
 def methods_text(catalogue, monsters, recipes=None):
     """Checks full method records, then packs them for the plugin."""
     validate_methods(catalogue, monsters, recipes)
+
+    # Sprite names for capability icons (e.g. a relic's), keyed by their alias.
+    for alias, sprite in catalogue.get("icons", {}).items():
+        if alias != capability_icon(sprite) or not re.fullmatch(r"[A-Z0-9_]+", sprite):
+            raise ValueError(f"Invalid capability icon: {alias}")
 
     return pack_methods(catalogue)
 
@@ -1447,10 +1454,18 @@ def from_lua(value):
     return {key: from_lua(value[key]) for key in keys}
 
 
+def build_catalogue(recipe_source):
+    """The full catalogue the plugin ships: our curated methods merged with every
+    current Wiki guide (see src/tools/merge_methods.py)."""
+    import merge_methods
+
+    return merge_methods.merge(recipe_source)[0]
+
+
 def verify_methods(monsters, recipe_source):
     # Same idea as verify(): the file on disk must match a fresh build, and every
     # method read back through the plugin's own reader must equal its full record.
-    catalogue = expand_methods(load_method_source())
+    catalogue = build_catalogue(recipe_source)
     recipes = choose_recipes(recipe_source) if recipe_source else None
     expected = methods_text(catalogue, monsters, recipes)
 
@@ -1462,7 +1477,7 @@ def verify_methods(monsters, recipe_source):
     loaded = lua.eval('require("src/data/method_data")')
     decoded = loaded[0] if isinstance(loaded, tuple) else loaded
 
-    for key in ("schema", "items", "equipment", "toolbelt"):
+    for key in ("schema", "items", "equipment", "toolbelt", "icons"):
         if from_lua(decoded[key]) != plain(catalogue.get(key, {})):
             raise ValueError(f"Method data round-trip mismatch: {key}")
 
@@ -1644,7 +1659,7 @@ def main():
             generated_recipes = recipes_text(recipe_source)
 
         if METHOD_SOURCE.exists():
-            methods = expand_methods(load_method_source())
+            methods = build_catalogue(recipe_source)
             recipes = choose_recipes(recipe_source) if recipe_source else None
             generated_methods = methods_text(methods, source, recipes)
 

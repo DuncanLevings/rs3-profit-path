@@ -41,6 +41,9 @@ function Browser.new(methods, preferences, estimateMethod)
         search = "",
         scroll = 0,
 
+        -- Which page of results is showing (Browse shows them a page at a time).
+        page = 1,
+
         -- Difficulty and intensity filters ("any", or one of the levels above).
         -- Like search, these only live for this window and aren't saved.
         difficulty = "any",
@@ -80,6 +83,7 @@ function Browser.new(methods, preferences, estimateMethod)
             self.sort = key
             self.descending = descending
             self.scroll = 0
+            self.page = 1
         end
 
         return ok
@@ -101,11 +105,16 @@ function Browser.new(methods, preferences, estimateMethod)
 
     -- Opening/reopening refreshes the catalogue once. Search, sorting and skill
     -- events only reuse these estimates; there is no repeating price timer.
+    --
+    -- Hundreds of methods share the same items (coins, potions, runes), so one
+    -- price snapshot is shared across the whole refresh: each item is looked up
+    -- once, not once per method that uses it.
     function self:refreshEstimates()
         self.estimates = {}
+        local shared = {}
 
         for _, method in ipairs(methods) do
-            self.estimates[method.id] = estimateMethod(method)
+            self.estimates[method.id] = estimateMethod(method, nil, shared)
         end
     end
 

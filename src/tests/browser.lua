@@ -287,7 +287,7 @@ return function(test, equal, client, pretty)
 
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui:findButton("Open Profit Path")()
-        equal(calls, 48)
+        equal(calls, 30)
 
         local browse = prettyui.views[2]
 
@@ -318,16 +318,16 @@ return function(test, equal, client, pretty)
         header.fields[1]:SetText("steel", true)
         header.nativeLists[1]:SetEntrySelected(1, true)
         Event.Logic.emit({})
-        equal(calls, 48)
+        equal(calls, 30)
 
 
         prettyui:findMethod("Smelting steel bars")()
-        equal(calls, 51)
+        equal(calls, 33)
 
         local detail = prettyui.views[3]
         detail.tabs[1].pages[1]:allFields()[1]:SetText("1000", true)
         detail.buttons["Back to methods"]()
-        equal(calls, 51)
+        equal(calls, 33)
 
         -- An unsaved draft must not leak into saved-rate list comparisons.
         local text = {}
@@ -906,13 +906,13 @@ return function(test, equal, client, pretty)
         local income = detail.tabs[1].pages[1]
         local rate = income:allFields()[1]
         rate:SetText("1000", true)
-        equal(calls, 51)
+        equal(calls, 33)
         assert(not income:button("Refresh prices"))
 
         prettyui.windows[1]:Close()
         price = 50
         prettyui:findButton("Open Profit Path")()
-        equal(calls, 54)
+        equal(calls, 36)
         equal(rate:GetText(), "1000")
 
         local lines = {}

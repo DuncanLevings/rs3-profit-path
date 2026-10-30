@@ -48,13 +48,14 @@ function App.start()
 
     -- List estimates use saved rates, not the unsaved draft in an open method.
     -- Partial recipes aren't priceable yet, so don't make needless quote requests.
-    local function estimateMethod(method, quotes)
+    -- `shared` is Browse's price snapshot for the whole refresh (see Browser).
+    local function estimateMethod(method, quotes, shared)
         if method.income.coverage ~= "complete" then
             return { status = "partial" }
         end
 
         local rate, _, warning = preferences:loadRate(method)
-        local captured = quotes or Income.captureQuotes(gepl, method.income)
+        local captured = quotes or Income.captureQuotes(gepl, method.income, shared)
         local result = Income.calculate(method.income, rate, captured)
         result.rate = rate
         result.message = warning or result.message
@@ -229,6 +230,29 @@ function App.start()
         collect(method.requirements.recommended)
     end
 
+    -- Whether each catalogue item's ID really is that item in this client, by name.
+    -- Names never change, so a successful check is kept for the session: with the
+    -- full catalogue there are hundreds of items, and inventory changes are frequent.
+    -- A failed read (e.g. config not loaded yet) isn't kept, so it's tried again.
+    local nameChecks = {}
+
+    local function nameMatches(itemId, expected)
+        if nameChecks[itemId] == nil then
+            local ok, name = pcall(function()
+                local object = config.Obj.FromID(itemId)
+                return object and object.name
+            end)
+
+            if not ok or type(name) ~= "string" then
+                return false
+            end
+
+            nameChecks[itemId] = name:lower() == expected:lower()
+        end
+
+        return nameChecks[itemId]
+    end
+
     -- Refresh only the evidence that changed. Inventory activity never re-reads
     -- skills/quests, and no persistence or native scans run in the resize watcher.
     function calculator:refreshEvidence(reason)
@@ -270,12 +294,7 @@ function App.start()
 
                     -- Native name verification prevents a wrong catalogue ID from
                     -- qualifying an item or a supposedly higher-tier tool.
-                    local ok, name = pcall(function()
-                        local object = config.Obj.FromID(itemId)
-                        return object and object.name
-                    end)
-
-                    local verified = ok and type(name) == "string" and name:lower() == item.name:lower()
+                    local verified = nameMatches(itemId, item.name)
 
                     evidence.items[itemId] = {
                         status = verified and (quantity > 0 or self.ownershipEvidence.complete) and "available" or "unknown",

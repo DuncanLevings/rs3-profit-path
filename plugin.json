@@ -1,6 +1,6 @@
 {
   "name": "Profit Path",
-  "version": "0.7.4-dev",
+  "version": "0.8.0-dev",
   "hasRibbonIcon": true,
   "requiredDependencies": {
     "prettyui": 6398181,

@@ -1540,4 +1540,15 @@ dofile("src/tests/browser.lua")(test, equal, client, pretty)
 
 dofile("src/tests/account.lua")(test, equal, client, pretty)
 
+-- Last: the full shipped catalogue. test.py gave the tests above just our 4
+-- curated methods; forget every loaded plugin module (and that catalogue) so
+-- they all reload with the real data/methods.lua.
+for name in pairs(package.loaded) do
+    if name == "data/methods" or name:find("^src/") then
+        package.loaded[name] = nil
+    end
+end
+
+dofile("src/tests/catalogue_scale.lua")(test, equal, client, pretty)
+
 print(string.format("%d behavior tests passed.", passed))

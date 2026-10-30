@@ -1,6 +1,15 @@
 # Changelog
 
-## Unreleased — 2026-10-29
+## 0.8.0-dev — 2026-10-29
+
+- Ship the full catalogue: 582 methods (our 4 curated ones plus 578 current Wiki guides; recurring daily/weekly guides come later). `data/methods.lua` is 747 KB and decodes in about 30 ms on desktop Lua.
+- Browse shows 25 methods a page, with Previous/Next page controls. Filters, search and sorting go back to page 1; returning from a method keeps the page.
+- Opening the window prices every method once (sorting by profit needs them all), but each distinct item is looked up only once per refresh: 5,524 price-library calls for 1,381 items instead of one set per method, and Browse opened in 27 ms in the desktop test. Native item-name checks are cached for the session instead of repeated on every inventory change.
+- Wiki imports say "Partly researched" in Browse. The method page's Notes list what hasn't been checked (unknown requirements, Wiki drop figures, unpriced items), and How to do it points to the Wiki guide until steps are written. Per-hour guides show "Pace (% of guide)" (100 is the guide's pace).
+- Capability requirements show their sprite (relics, abilities, spells, perks; quests use the quest marker), from icons shipped with the catalogue. Item definitions use each item's own Wiki name, so dose-family potions pass the in-game name check. Rows without an item show their own name as the tooltip.
+- Behaviour tests use the 4 curated methods; new full-catalogue tests check paging, per-item pricing, research labels and icons. Validate with 119 Lua behaviour tests and 59 Python tests.
+
+## Catalogue import tools — 2026-10-29
 
 - Add `src/tools/wiki_methods.py`, which snapshots every current RuneScape Wiki money making guide into `catalogue-source/wiki/guides.jsonl` (676 guides on 466 pages; the 200 the Wiki marks obsolete are skipped) and `meta.json` (1,667 of 1,695 income item names resolved to IDs). Each guide records its page revision, version, kills per hour or recurring cycle, income rows and parsed requirements. No plugin change yet: a later step merges the snapshot with our research.
 - `test.py` now checks the snapshot is consistent.

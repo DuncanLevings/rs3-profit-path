@@ -56,12 +56,19 @@ for relative in files:
     if relative.suffix == ".lua":
         lua.execute("assert(load(...))", (ROOT / relative).read_text(encoding="utf-8"))
 
+sys.path.insert(0, str(ROOT / "src" / "tools"))
+import catalogue
+
+# The behaviour tests check what the plugin does with our 4 curated methods, whose
+# numbers they know by heart. So they get a catalogue of just those, packed exactly
+# like the shipped one. At the end, run.lua reloads everything with the real
+# data/methods.lua for the full-catalogue tests (src/tests/catalogue_scale.lua).
+curated = catalogue.pack_methods(catalogue.expand_methods(catalogue.load_method_source()))
+lua.execute("package.loaded['data/methods'] = ...", lua.execute(curated))
+
 lua.execute((ROOT / "src" / "tests" / "run.lua").read_text(encoding="utf-8"))
 
 print("Lua 5.4 syntax, manifest, and repository Markdown policy passed.")
-
-sys.path.insert(0, str(ROOT / "src" / "tools"))
-import catalogue
 
 # monsters.json is about 12 MB, so read it once and share it between both checks.
 monsters = json.loads(catalogue.SOURCE.read_text(encoding="utf-8"))

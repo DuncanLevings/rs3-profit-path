@@ -164,12 +164,16 @@ class ItemLookupTests(unittest.TestCase):
                     {"page_name": "Super defence", "item_name": "Super defence (3)", "item_id": [163]}]
 
         with patch.object(wiki_methods, "bucket", bucket):
-            found, families = wiki_methods.fetch_item_ids({"coins", "bucket of sand", "Super defence"})
+            found, families, names = wiki_methods.fetch_item_ids({"coins", "bucket of sand", "Super defence"})
 
         # Super defence is a dose family: its ID is the biggest dose, and owning any
         # dose counts.
         self.assertEqual(found, {"coins": 995, "bucket of sand": 1783, "Super defence": 2442})
         self.assertEqual(families, {"Super defence": [163, 2442]})
+
+        # Each item keeps its own name for the in-game check, whatever the guide wrote.
+        self.assertEqual(names[995], "Coins")
+        self.assertEqual(names[2442], "Super defence (4)")
         self.assertIn("'Coins'", asked[0])
 
     def test_a_page_with_unrelated_items_is_too_ambiguous_to_guess(self):
@@ -181,7 +185,7 @@ class ItemLookupTests(unittest.TestCase):
                     {"page_name": "Armour", "item_name": "Iron helm", "item_id": [2]}]
 
         with patch.object(wiki_methods, "bucket", bucket):
-            self.assertEqual(wiki_methods.fetch_item_ids({"Armour"}), ({}, {}))
+            self.assertEqual(wiki_methods.fetch_item_ids({"Armour"})[:2], ({}, {}))
 
     def test_odd_capitals_are_retried_in_sentence_case(self):
         def bucket(query):
@@ -191,7 +195,8 @@ class ItemLookupTests(unittest.TestCase):
             return []
 
         with patch.object(wiki_methods, "bucket", bucket):
-            self.assertEqual(wiki_methods.fetch_item_ids({"Adamant Pickaxe"}), ({"Adamant Pickaxe": 1271}, {}))
+            self.assertEqual(wiki_methods.fetch_item_ids({"Adamant Pickaxe"}),
+                             ({"Adamant Pickaxe": 1271}, {}, {1271: "Adamant pickaxe"}))
 
 
 if __name__ == "__main__":

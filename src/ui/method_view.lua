@@ -404,7 +404,7 @@ local function itemTable(panel, definitions, moneyColour)
         local background = index % 2 == 0 and 0x292A25FF or 0x24251FFF
 
         Style.rectangle(panel, { x = 12, y = y, width = -24, widthAnchor = 1, height = 44, colour = background })
-        ItemIcon.add(panel, definition.display_item_id or definition.item_id, { x = 12, y = y + 2 })
+        ItemIcon.add(panel, definition.display_item_id or definition.item_id, { x = 12, y = y + 2 }, definition.name)
 
         local quantity = panel:AddText({ text = "", x = 66, y = y + 10, width = 90, height = 24 })
         -- Untradeable supplies are priced by what they cost to make; the tooltip
@@ -514,6 +514,33 @@ end
 -- Returns three functions: refresh(reason), which the workbench calls when the
 -- account changes; activeTab(), which says which tab is open right now; and
 -- release(), which cancels pending dropdown callbacks when the screen goes away.
+-- What hasn't been researched for a method, as short phrases for the Notes and
+-- for Browse. Curated methods (and any method without research data) have none.
+function MethodView.researchGaps(method)
+    local research = method.research
+
+    if not research or research.income ~= "wiki" then
+        return {}
+    end
+
+    local gaps = { "imported from the Wiki guide and not yet reviewed here" }
+
+    if research.unknown_checks > 0 then
+        gaps[#gaps + 1] = research.unknown_checks .. " requirement" .. (research.unknown_checks == 1 and "" or "s")
+            .. " can't be checked yet"
+    end
+
+    if research.pvm == "wiki drops" then
+        gaps[#gaps + 1] = "drops use the Wiki's own figures"
+    end
+
+    if research.unpriced > 0 then
+        gaps[#gaps + 1] = research.unpriced .. " item" .. (research.unpriced == 1 and "" or "s") .. " can't be priced"
+    end
+
+    return gaps
+end
+
 function MethodView.mount(view, method, calculator, guarded, options)
     options = options or {}
 
@@ -552,7 +579,9 @@ function MethodView.mount(view, method, calculator, guarded, options)
     }), TOP_ROW_HEIGHT, { fixed = RATE_WIDTH })
 
     -- First line: the label, with Reset at the right end.
-    ratePanel:AddText({ text = "Rate per hour", x = TOP_INSET, y = FIRST_LINE_Y, width = 120, height = 28, colour = Style.muted, tooltip = method.income.rate.unit })
+    -- Wiki guides given only per hour use a pace instead: 100 is the guide's own.
+    local rateLabel = method.income.rate.unit == "% of guide pace" and "Pace (% of guide)" or "Rate per hour"
+    ratePanel:AddText({ text = rateLabel, x = TOP_INSET, y = FIRST_LINE_Y, width = 150, height = 28, colour = Style.muted, tooltip = method.income.rate.unit })
 
     -- SetText(..., false) puts the default back without firing onChange, so the reset
     -- doesn't count as the player typing. `rate` is the box made just below.
@@ -664,6 +693,14 @@ function MethodView.mount(view, method, calculator, guarded, options)
 
     income:AddTitle("Notes")
 
+    -- A method imported from the Wiki says so, and says what nobody has checked
+    -- yet, so a Wiki estimate never looks like a verified one.
+    local gaps = MethodView.researchGaps(method)
+
+    if #gaps > 0 then
+        income:AddText({ text = "Partly researched: " .. table.concat(gaps, "; ") .. ".", colour = Style.gold })
+    end
+
     for _, assumption in ipairs(method.income.assumptions) do
         income:AddText({ text = assumption, colour = Style.muted })
     end
@@ -694,6 +731,12 @@ function MethodView.mount(view, method, calculator, guarded, options)
 
     for index, step in ipairs(method.instructions) do
         instructions:AddText({ text = index .. ". " .. step, marginTop = 10, marginBottom = 12 })
+    end
+
+    -- Imported methods don't have our own steps yet; point at the Wiki guide.
+    if #method.instructions == 0 then
+        instructions:AddText({ text = "Steps haven't been written for this method yet. The Wiki guide \""
+            .. method.source.title .. "\" explains how to do it.", colour = Style.muted })
     end
 
     local travel = tabs:GetPage(4)

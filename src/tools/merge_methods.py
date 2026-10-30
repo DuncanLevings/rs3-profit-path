@@ -101,7 +101,10 @@ class Context:
             return None
 
         if str(item_id) not in self.items:
-            definition = {"name": name, "source": f"RuneScape Wiki infobox_item, retrieved {self.meta['retrieved']}"}
+            # The item's own name, not the guide's spelling: the plugin checks it
+            # against the game before trusting the ID ("Aggroverload (6)", "Coins").
+            real_name = self.meta.get("item_names", {}).get(str(item_id), name)
+            definition = {"name": real_name, "source": f"RuneScape Wiki infobox_item, retrieved {self.meta['retrieved']}"}
 
             # A dose-less potion name stands for every dose: owning any one counts.
             if name in self.meta.get("item_families", {}):
@@ -381,8 +384,9 @@ def merge(recipe_source=None):
                "research": {}, "wiki_profit": {}, "retrieved": ctx.meta.get("retrieved")}
 
     for method in curated["methods"]:
+        method["research"] = research_status(method, True)
         methods.append(method)
-        details["research"][method["id"]] = research_status(method, True)
+        details["research"][method["id"]] = method["research"]
 
     pages = collections.defaultdict(list)
 
@@ -399,9 +403,10 @@ def merge(recipe_source=None):
             continue
 
         method = convert_guide(guide, ctx, page_categories[guide["page"]].most_common(1)[0][0])
+        method["research"] = research_status(method, False)
         pages[guide["page"]].append(method)
         methods.append(method)
-        details["research"][method["id"]] = research_status(method, False)
+        details["research"][method["id"]] = method["research"]
         details["wiki_profit"][method["id"]] = guide["wiki_profit"]
 
     # A page with several versions needs every version labelled, including one the
@@ -417,7 +422,15 @@ def merge(recipe_source=None):
     if duplicates:
         raise ValueError(f"Merged method IDs collide: {duplicates[:5]}")
 
-    merged = {"schema": 1, "items": items, "methods": methods}
+    # The plugin's own icon list only knows hand-picked names. Capability sprites
+    # travel with the catalogue: only the ones some method actually uses.
+    sprites = {catalogue.capability_icon(entry["sprite"]): entry["sprite"]
+               for entry in ctx.capabilities.values() if entry.get("sprite")}
+    used = {check.get("display_icon") for method in methods for group in ("access", "recommended")
+            for check in walk_checks(method["requirements"][group])}
+
+    merged = {"schema": 1, "items": items, "methods": methods,
+              "icons": {alias: sprite for alias, sprite in sorted(sprites.items()) if alias in used}}
 
     for key in ("equipment", "toolbelt"):
         if key in curated:

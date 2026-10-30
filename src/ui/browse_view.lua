@@ -78,6 +78,11 @@ local ROW_FILL = 0x2B2923FF
 local ROW_ACCENT_WIDTH = 4
 local ROW_INSET = 16
 
+-- Browse shows results a page at a time. Each row is a panel with several native
+-- parts, and the full catalogue has hundreds of methods: drawing them all at once
+-- would be thousands of native components on every search keystroke.
+local PAGE_SIZE = 25
+
 -- A missing estimate is not zero GP/hour. Keep the reason next to the method so
 -- nobody mistakes a partial source model for an unprofitable activity.
 local function estimateText(method, estimate)
@@ -192,6 +197,13 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
 
         local rows = browser:rows()
 
+        -- Keep the page in range (a search may have shrunk the list), then show
+        -- only that page's slice of the sorted results.
+        local pages = math.max(1, math.ceil(#rows / PAGE_SIZE))
+        browser.page = math.min(math.max(browser.page or 1, 1), pages)
+        local first = (browser.page - 1) * PAGE_SIZE + 1
+        local last = math.min(#rows, browser.page * PAGE_SIZE)
+
         -- Rows are sized to the list's final width once they're all added (see
         -- Style.panelFitter: a scrollbar may appear partway through). The list's
         -- side padding is 10.
@@ -210,7 +222,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         end
 
         results:AddText({
-            text = #rows .. " matching methods",
+            text = #rows .. " matching methods" .. (pages > 1 and ("  /  showing " .. first .. "-" .. last) or ""),
             colour = Style.muted, height = 26,
         })
 
@@ -223,7 +235,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
             results:AddText("Try another activity or search. Add favourites from Browse to keep them here.")
         end
 
-        for _, method in ipairs(rows) do
+        for index = first, last do
+            local method = rows[index]
             local estimate = browser.estimates[method.id]
             local available = estimate and estimate.status == "available"
             local name = method.title .. (method.variant and " - " .. method.variant or "")
@@ -298,6 +311,11 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
                 activity = activity .. "  /  Difficulty: " .. method.difficulty
             end
 
+            -- Wiki imports are marked, so nobody mistakes them for checked methods.
+            if method.research and method.research.income == "wiki" then
+                activity = activity .. "  /  Partly researched"
+            end
+
             row:AddText({
                 text = activity,
                 x = ROW_INSET, y = 62, width = -108, widthAnchor = 1, height = 24, colour = Style.muted,
@@ -318,6 +336,30 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
                 browser:toggleFavourite(method)
                 renderResults()
             end), { x = ROW_INSET, y = 8, size = 24, tooltip = favouriteText, toggleable = true, disabled = not isFavourite })
+        end
+
+        -- Page controls under the list. A new page starts at its top.
+        if pages > 1 then
+            local function turn(step)
+                return rowAction(function()
+                    browser.page = browser.page + step
+                    browser.scroll = 0
+                    renderResults()
+                end)
+            end
+
+            if browser.page > 1 then
+                results:AddSimpleButton("Previous page", turn(-1), { width = 130, height = 30 })
+            end
+
+            results:AddText({
+                text = "Page " .. browser.page .. " of " .. pages, inline = browser.page > 1,
+                width = 120, height = 30, colour = Style.muted, alignHorizontal = ui.AlignMode.CENTRE,
+            })
+
+            if browser.page < pages then
+                results:AddSimpleButton("Next page", turn(1), { width = 130, height = 30, inline = true })
+            end
         end
 
         results:AddText({ text = "RuneScape Wiki contributors / CC BY-NC-SA 3.0. GEPL trade estimates may use old trades.", colour = Style.muted })
@@ -341,6 +383,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
     -- Filter changes start at the top. Opening a method does not reset this state.
     local function filterChanged()
         browser.scroll = 0
+        browser.page = 1
         renderResults()
     end
 

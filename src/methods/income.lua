@@ -170,14 +170,22 @@ end
 -- Fetches one quote per distinct item in the method. If an item is both an input
 -- and an output we only ask once, so both sides use the exact same snapshot.
 --
+-- `shared` is optional: a table of quotes already fetched for other methods in the
+-- same refresh (Browse prices every method at once). Items found there are reused
+-- instead of asking GEPL again, and new ones are added for the next method.
+--
 -- A recipe-priced row doesn't need its own item's price (it can't be traded);
 -- instead we fetch every GE ingredient in its recipe, all the way down.
-function Income.captureQuotes(library, model)
+function Income.captureQuotes(library, model, shared)
     local quotes = {}
 
     local function fetch(itemId)
         if not quotes[itemId] then
-            quotes[itemId] = Income.inspectQuote(library, itemId)
+            quotes[itemId] = shared and shared[itemId] or Income.inspectQuote(library, itemId)
+
+            if shared then
+                shared[itemId] = quotes[itemId]
+            end
         end
     end
 

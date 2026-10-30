@@ -23,9 +23,11 @@ end
 
 -- Fixed source icons and the changing owned-match slot share the same native
 -- identity check, so a stale/bad ID never displays another item's picture.
-function ItemIcon.add(parent, itemId, options)
+-- `name` is optional: what to call a row that has no item at all (the Wiki's
+-- "Rare drop table", say), instead of "Unknown item".
+function ItemIcon.add(parent, itemId, options, name)
     local object, expected = ItemIcon.resolve(itemId)
-    options.tooltip = expected
+    options.tooltip = itemId == nil and name or expected
 
     if not object then
         return parent:AddSpriteButton("INFO", function() end, options), expected, false

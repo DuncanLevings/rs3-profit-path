@@ -4,7 +4,18 @@
 -- Ownership: every control made here is a child of the `parent` passed in, so it
 -- gets cleaned up when that parent view is destroyed. Nothing here keeps state
 -- between calls.
-local iconNames = require("data/icons")
+-- Icon aliases -> native sprite names: our hand-picked list first, then the
+-- capability sprites (relics, abilities, perks...) that ship with the catalogue.
+-- Copied into a new table so neither source is changed.
+local iconNames = {}
+
+for alias, sprite in pairs(require("src/data/method_data").icons or {}) do
+    iconNames[alias] = sprite
+end
+
+for alias, sprite in pairs(require("data/icons")) do
+    iconNames[alias] = sprite
+end
 
 local Style = {
     text = 0xEEE9DAFF,

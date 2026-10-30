@@ -8,7 +8,7 @@
 -- A shape key starting with "$" means that value is a text number, not a number.
 --
 -- The result has the same fields everyone used before: items, methods, equipment
--- and toolbelt, plus find(id). The catalogue `verify` command reads every method
+-- and toolbelt, plus icons and find(id). The catalogue `verify` command reads every method
 -- back through this file and compares it with the source, so the two can't drift.
 local data = require("data/methods")
 assert(data.schema == 1 and data.packing == 1, "Unsupported Profit Path method data")
@@ -82,6 +82,10 @@ local catalogue = {
     items = decode(data.items),
     equipment = decode(data.equipment),
     toolbelt = decode(data.toolbelt),
+
+    -- Sprite names for capability icons (relics, abilities...), keyed by the alias
+    -- a requirement's display_icon uses. Style.icon looks here after data/icons.lua.
+    icons = decode(data.icons or { 0 }),
     methods = {},
 }
 

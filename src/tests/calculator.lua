@@ -596,12 +596,12 @@ return function(test, equal, client, pretty)
         local income = tabs.pages[1]
         local rate = income:allFields()[1]
 
-        -- Browse fetched 48 prices across the four methods, including the now-valued
-        -- PvM loot and its ingredient tree, then the steel method fetched 3 more. Typing a rate must not fetch more.
-        equal(calls, 51)
+        -- Browse fetched 30 prices for the four methods (each distinct item once, shared
+        -- across methods), then the steel method fetched its own 3. Typing a rate must not fetch more.
+        equal(calls, 33)
 
         rate:SetText("1000", true)
-        equal(calls, 51)
+        equal(calls, 33)
 
         -- Save 1000, then type away and back. Being back on the saved value should
         -- show "Saved personal rate" again, not "not saved".
@@ -661,7 +661,7 @@ return function(test, equal, client, pretty)
 
         rate:SetText("5", true)
         income:button("Save rate")()
-        equal(calls, 51)
+        equal(calls, 33)
 
         for key, value in pairs(state.db) do
             assert(key:find("profit-path.rate.v1/", 1, true) ~= 1)
