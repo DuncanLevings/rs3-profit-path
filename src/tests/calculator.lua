@@ -765,6 +765,7 @@ return function(test, equal, client, pretty)
         prettyui.views[1].buttons["Open Profit Path"]()
         prettyui:findMethod("Smelting steel bars")()
 
+        settleMethod()
         local requirements = prettyui.views[3].tabs[1].pages[2]
         local skillLabel = requirements.children[1].texts[2]
         equal(skillLabel.content, "20 Smithing")
@@ -815,7 +816,7 @@ return function(test, equal, client, pretty)
 
     -- A typo'd screen name must error loudly and clean up, not quietly fall back
     -- to some other screen.
-    test("unknown navigation fails visibly and cleans up instead of opening diagnostics", function()
+    test("unknown navigation fails visibly and cleans up instead of opening another screen", function()
         client()
 
         local account = require("src/game/account").new(function() end)
@@ -835,7 +836,7 @@ return function(test, equal, client, pretty)
         screen:destroy()
         account:destroy()
 
-        equal(account:readPlayer().status, "stopped")
+        equal(account:readCombatLevel().status, "unavailable")
     end)
 
     test("game-state transitions discard the native window without reopening it", function()

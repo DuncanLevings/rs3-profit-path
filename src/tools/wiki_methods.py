@@ -62,6 +62,7 @@ CAPABILITIES = ROOT / "catalogue-source" / "research" / "capabilities.json"
 OUTFITS = ROOT / "catalogue-source" / "research" / "outfits.json"
 ACHIEVEMENTS = ROOT / "catalogue-source" / "research" / "achievements.json"
 EQUIPMENT = ROOT / "catalogue-source" / "research" / "equipment.json"
+PICKAXES = ROOT / "catalogue-source" / "research" / "pickaxes.json"
 
 API = "https://runescape.wiki/api.php"
 
@@ -884,6 +885,83 @@ def import_equipment():
     return pieces, missing
 
 
+# ---- Pickaxes (research/pickaxes.json) -----------------------------------------
+#
+# "Any pickaxe" and "Necronium pickaxe or better" lines need every pickaxe with its
+# Mining level. The Wiki's Pickaxes page has them in one table; the equipment
+# buckets don't (their tier is the combat tier, 1 for a dragon pickaxe).
+
+def pickaxe_table(wikitext):
+    """[(Mining level, page name, augmentable)] from the Pickaxes page's main table."""
+    start = wikitext.find("{|")
+    table = wikitext[start:wikitext.find("|}", start)]
+    rows = []
+
+    for row in table.split("|-")[1:]:
+        cells = [line[1:].strip() for line in row.strip().splitlines() if line.startswith("|")]
+
+        # The header row is "!" cells only.
+        if not cells:
+            continue
+
+        link = re.search(r"\[\[([^\]|]+)", cells[2]) if len(cells) >= 10 else None
+
+        if not link or not cells[0].isdecimal():
+            raise ValueError(f"Unexpected row in the Pickaxes table: {cells[:3]}")
+
+        rows.append((int(cells[0]), link.group(1), cells[9] == "Yes"))
+
+    return rows
+
+
+def import_pickaxes():
+    """Writes research/pickaxes.json. Returns (pieces written, pages with no item ID)."""
+    page = get({"action": "parse", "page": "Pickaxes", "prop": "wikitext|revid"})["parse"]
+    table = pickaxe_table(page["wikitext"]["*"])
+
+    # An augmented pickaxe is its own item (and page) with the same Mining level.
+    levels = {}
+
+    for level, name, augmentable in table:
+        levels[name] = level
+
+        if augmentable:
+            levels["Augmented " + name[:1].lower() + name[1:]] = level
+
+    # Every item on each page: charged, uncharged and gilded versions have their
+    # own IDs. Broken ones can't mine, so they don't count.
+    item_ids = {}
+
+    for batch in batches(levels, 50):
+        for item in bucket(f"bucket('infobox_item').select('page_name','item_name','item_id')"
+                           f".where({any_of('page_name', batch)}).limit({PAGE_SIZE}).run()"):
+            if "(broken)" in (item.get("item_name") or ""):
+                continue
+
+            ids = [item_id for item_id in (item.get("item_id") or []) if isinstance(item_id, int) and item_id > 0]
+            item_ids.setdefault(item["page_name"], set()).update(ids)
+
+    pieces = [{"name": name, "item_ids": sorted(item_ids[name]), "level": level}
+              for name, level in levels.items() if item_ids.get(name)]
+
+    # Augmented pages that don't exist aren't missing data, so only report table rows.
+    missing = [name for _, name, _ in table if not item_ids.get(name)]
+
+    document = {
+        "schema": 1,
+        "retrieved": datetime.date.today().isoformat(),
+        "source": f"RuneScape Wiki Pickaxes page (revision {page['revid']}) and infobox_item bucket. "
+                  "RuneScape Wiki contributors, CC BY-NC-SA 3.0.",
+        "url": f"https://runescape.wiki/w/Pickaxes?oldid={page['revid']}",
+        "note": "Every pickaxe in the Pickaxes table, plus augmented versions, with its Mining level.",
+        "pieces": sorted(pieces, key=lambda piece: (piece["level"], piece["name"])),
+        "missing": missing,
+    }
+    PICKAXES.write_text(json.dumps(document, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+
+    return pieces, missing
+
+
 def verify_snapshot():
     """Checks the files on disk: every line a valid guide, sorted, no duplicates,
     and meta.json's counts and item table agreeing with them. Run by test.py, so a
@@ -925,7 +1003,15 @@ def main():
                         help="instead of the guides, import the in-game IDs of every achievement requirement")
     parser.add_argument("--outfits", action="store_true",
                         help="instead of the guides, import the pieces of every outfit in research/capabilities.json")
+    parser.add_argument("--pickaxes", action="store_true",
+                        help="instead of the guides, import every pickaxe and its Mining level")
     args = parser.parse_args()
+
+    if args.pickaxes:
+        pieces, missing = import_pickaxes()
+        print(f"Wrote {len(pieces)} pickaxes to {PICKAXES.relative_to(ROOT)}. "
+              f"No item ID: {', '.join(missing) or 'none'}.")
+        return
 
     if args.equipment:
         pieces, missing = import_equipment()

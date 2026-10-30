@@ -82,9 +82,16 @@ local ROW_ACCENT_WIDTH = 4
 local ROW_INSET = 16
 
 -- Browse shows results a page at a time. Each row is a panel with several native
--- parts, and the full catalogue has hundreds of methods: drawing them all at once
--- would be thousands of native components on every search keystroke.
-local PAGE_SIZE = 25
+-- parts (and PrettyUI builds every tooltip up front), and the full catalogue has
+-- hundreds of methods. 25 rows could take the client past its one-second limit
+-- for a single callback; 10 stays well inside it.
+local PAGE_SIZE = 10
+
+-- Typing in the search box waits for a pause before redrawing the list: one
+-- redraw for "steel", not five. Logic ticks come 50 times a second, so 12 ticks
+-- is about a quarter of a second. Enter searches straight away.
+local SEARCH_SETTLE_TICKS = 12
+local SEARCH_EVENT = "profit-path-search"
 
 -- A missing estimate is not zero GP/hour. Keep the reason next to the method so
 -- nobody mistakes a partial source model for an unprofitable activity.
@@ -116,8 +123,12 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
     local heading
     local sectionButtons, categoryButtons = {}, {}
     local renderResults
-    -- release() functions for the dropdowns' pending change callbacks.
+    -- release() functions for pending callbacks (the dropdowns' and the search
+    -- box's), so nothing fires after the screen is gone.
     local dropdownReleases = {}
+
+    -- Ticks since the last keystroke while a search is waiting; nil when not.
+    local searchQuietTicks
 
     local wrapFilters = view.content.width - 190 < 734
     local headerHeight = wrapFilters and 202 or 144
@@ -426,6 +437,40 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         renderResults()
     end
 
+    -- Stops waiting for a pause in typing.
+    local function stopSearchWait()
+        if searchQuietTicks then
+            searchQuietTicks = nil
+            Event.Logic.Unsubscribe(SEARCH_EVENT)
+        end
+    end
+
+    dropdownReleases[#dropdownReleases + 1] = stopSearchWait
+
+    -- Each keystroke restarts the countdown; the list redraws once it runs out.
+    local function searchTyped()
+        local waiting = searchQuietTicks ~= nil
+        searchQuietTicks = 0
+
+        if waiting then
+            return
+        end
+
+        Event.Logic.Subscribe(SEARCH_EVENT, guarded(function()
+            if closed then
+                stopSearchWait()
+                return
+            end
+
+            searchQuietTicks = searchQuietTicks + 1
+
+            if searchQuietTicks >= SEARCH_SETTLE_TICKS then
+                stopSearchWait()
+                filterChanged()
+            end
+        end))
+    end
+
     local ok, failure = pcall(function()
         -- A continuous backdrop and divider tie navigation to the window edge.
         Style.rectangle(view, { x = 0, y = 0, width = 174, height = 0, heightAnchor = 1, colour = 0x24231FFF })
@@ -466,6 +511,13 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
             x = 10, y = 44, width = -20, widthAnchor = 1, height = 30,
             onChange = guarded(function(_, _, text)
                 browser.search = text
+                searchTyped()
+            end),
+
+            -- Enter doesn't wait for the pause.
+            onSubmit = guarded(function(_, text)
+                browser.search = text
+                stopSearchWait()
                 filterChanged()
             end),
         })

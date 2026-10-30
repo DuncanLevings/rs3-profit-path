@@ -36,6 +36,15 @@ local SECOND_LINE_Y = 46
 
 local itemDefinitions = require("src/data/method_data").items
 
+-- The client stops any single callback that runs past one second, and native
+-- components are slow to make (PrettyUI builds every tooltip up front, about a
+-- dozen parts each). A boss with 60 drops plus a long requirements list is too
+-- much for one click. So opening a method draws only what's on screen, then
+-- the rest a piece per game tick (50 a second): Income rows a batch at a time,
+-- then each other tab. Clicking a tab that isn't drawn yet draws it straight away.
+local ROWS_PER_STEP = 6
+local BUILD_EVENT = "profit-path-method-build"
+
 -- Which Requirements section each kind of check goes in.
 local categories = {
     skill = "Skills", combat_level = "Skills", item = "Items", gear = "Items", quest = "Quests", capability = "Other",
@@ -101,10 +110,12 @@ local function requirementIcons(definition)
     return icons
 end
 
--- "Any one of these" tiered gear (magic, melee, ranged or necromancy armour): drawn
--- as one slot per option instead of one long line of link text.
+-- A group of tiered gear checks, drawn as one slot per piece instead of one long
+-- line of link text: "any one" of several styles (magic, melee, ranged or
+-- necromancy armour), or "all" the pieces of one line ("Tier 90+ magic weapon and
+-- armour" needs both the weapon and the armour).
 local function gearOptions(definition)
-    if definition.kind ~= "any" then
+    if definition.kind ~= "any" and definition.kind ~= "all" then
         return false
     end
 
@@ -136,94 +147,136 @@ local function gearLabel(requirement)
     return table.concat(words, " ")
 end
 
--- Builds the Requirements tab, grouped like the Wiki. Two kinds of live feedback:
---   * text colour on each requirement: met / unmet / unknown (from account evidence)
---   * a border on each item icon: found in backpack, worn or bank / not found / can't tell
--- Returns two refresh functions: one for requirement text, one for item borders.
+-- Panel headings already say whether something is required or recommended.
+-- Only remove standalone labels, keeping useful qualifiers such as "recommended
+-- for faster kills" and the rest of the source wording.
+local function requirementText(text)
+    local cleaned = text:gsub("%s*%([Rr]ecommended%)", ""):gsub("%s*%([Rr]equired%)", "")
+    cleaned = cleaned:gsub("%s+[Rr]ecommended%s*$", ""):gsub("%s+[Rr]equired%s*$", "")
+
+    return cleaned
+end
+
+-- Builds matching Required/Recommended pairs for skills, items, quests and other
+-- checks. Each pair owns its controls; refreshing changes only their verdicts.
 local function mountRequirements(parent, method, calculator, fitter)
-    local groups = { Skills = {}, ["Required items"] = {}, ["Recommended items"] = {}, Quests = {}, Other = {} }
+    local groups = {}
 
-    -- Sort each top-level requirement into its section. Items split further into
-    -- required (access) and recommended, because that difference matters most.
-    for _, entry in ipairs({
-        { definition = method.requirements.access, recommended = false },
-        { definition = method.requirements.recommended, recommended = true },
-    }) do
-        for index, child in ipairs(entry.definition.children) do
-            local category = categoryFor(child)
+    for _, category in ipairs({ "Skills", "Items", "Quests", "Other" }) do
+        groups[category] = { {}, {} }
+    end
 
-            if category == "Items" then
-                category = entry.recommended and "Recommended items" or "Required items"
-            end
-
-            groups[category][#groups[category] + 1] = {
-                definition = child,
-                recommended = entry.recommended,
-                index = index,
-            }
+    -- Keep each check's original index: the calculator still evaluates the source
+    -- groups in order, even though we arrange their display into separate panels.
+    for side, definition in ipairs({ method.requirements.access, method.requirements.recommended }) do
+        for index, child in ipairs(definition.children) do
+            local entries = groups[categoryFor(child)][side]
+            entries[#entries + 1] = { definition = child, recommended = side == 2, index = index }
         end
+    end
+
+    -- Uncheckable advice belongs in the same Required/Recommended layout, but
+    -- stays neutral. Moving it into a panel mustn't turn advice into a verdict.
+    for _, note in ipairs(method.requirements.notes or {}) do
+        local entries = groups.Other[1]
+        entries[#entries + 1] = { definition = { text = note }, displayOnly = true }
+    end
+
+    for _, tip in ipairs(method.requirements.tips or {}) do
+        local entries = groups.Other[2]
+        entries[#entries + 1] = { definition = { text = tip.text }, icons = tip.icons, displayOnly = true }
     end
 
     local updates = {}
     local borders = {}
 
-    -- Work out each section's height up front, since panels have fixed heights.
-    -- Required and recommended items sit side by side when both exist, so they share
-    -- the taller height. An empty item section is left out entirely and the other
-    -- one takes the full width.
+    -- Plan each panel before drawing it. Consecutive item requirements share
+    -- an icon grid instead of wasting a whole line on each separate item. An
+    -- "Any one" group keeps its own grid so alternatives never look mandatory.
     local sections = {}
-    local bothItems = #groups["Required items"] > 0 and #groups["Recommended items"] > 0
-    local itemHeight = 0
 
-    for _, category in ipairs({ "Skills", "Required items", "Recommended items", "Quests", "Other" }) do
-        local entries = groups[category]
-        local isItems = category == "Required items" or category == "Recommended items"
-        local height = 38
+    for _, category in ipairs({ "Skills", "Items", "Quests", "Other" }) do
+        local pair = groups[category]
+        local both = #pair[1] > 0 and #pair[2] > 0
+        local pairHeight = 0
+        local planned = {}
 
-        -- Item rows hold up to five 44px icons per line; text rows are 48px tall.
-        for _, entry in ipairs(entries) do
-            local icons = entry.definition.display_items
-            entry.height = icons and (math.ceil(#icons / 5) * 44 + 8) or (entry.definition.equipment_group and 96 or 48)
+        for side, entries in ipairs(pair) do
+            if #entries > 0 then
+                local y, usedSlots = 34, 0
+                local panelWidth = parent.content.width - PAGE_PADDING * 2
 
-            if icons and entry.definition.kind == "any" then
-                entry.height = entry.height + 24
+                if both then
+                    panelWidth = (panelWidth - TABLE_GAP) / 2
+                end
+
+                for _, entry in ipairs(entries) do
+                    local requirement = entry.definition
+                    local icons = requirement.display_items
+
+                    if icons and requirement.kind ~= "any" then
+                        entry.y, entry.startSlot = y, usedSlots
+                        usedSlots = usedSlots + #icons
+                    else
+                        y = y + math.ceil(usedSlots / 5) * 44
+                        usedSlots = 0
+                        entry.y = y
+                        -- A single text line needs 26 units, not the old 42.
+                        -- Keep the existing two-line allowance for longer wording
+                        -- so compact rows don't squeeze wrapped text out of view.
+                        local iconNames = entry.icons or requirementIcons(requirement)
+                        local textInset = requirement.equipment_group and 62 or (12 + #iconNames * 26)
+                        local textWidth = math.max(1, panelWidth - textInset - 16)
+                        entry.textHeight = Style.textWidth(requirementText(requirement.text)) <= textWidth and 26 or 42
+                        local height = entry.textHeight + 4
+
+                        if requirement.equipment_group then
+                            -- The box and its wording share one row. Leave room for
+                            -- a short ownership hint below the wording when present.
+                            entry.matchHeight = math.max(40, entry.textHeight + 20)
+                            height = entry.matchHeight + 4
+                        end
+
+                        if icons then
+                            height = 24 + math.ceil(#icons / 5) * 44 + 8
+                        elseif gearOptions(requirement) then
+                            -- Only "any one" has a heading; "all" is just its slots.
+                            local heading = requirement.kind == "any" and 24 or 0
+                            height = heading + #requirement.children * 44 + 8
+                        end
+
+                        y = y + height
+                    end
+                end
+
+                local height = y + math.ceil(usedSlots / 5) * 44 + 8
+                pairHeight = math.max(pairHeight, height)
+                planned[#planned + 1] = { category = category, entries = entries,
+                    height = height, recommended = side == 2, half = both }
+            end
+        end
+
+        for _, section in ipairs(planned) do
+            if both then
+                section.height = pairHeight
             end
 
-            if gearOptions(entry.definition) then
-                entry.height = 24 + #entry.definition.children * 44 + 8
-            end
-
-            height = height + entry.height
-        end
-
-        if #entries == 0 then
-            height = height + 28
-        end
-
-        if not isItems or #entries > 0 then
-            sections[#sections + 1] = { category = category, entries = entries, height = height, isItems = isItems }
-        end
-
-        if isItems then
-            itemHeight = math.max(itemHeight, height)
+            sections[#sections + 1] = section
         end
     end
 
     for _, definition in ipairs(sections) do
-        local category = definition.category
         local entries = definition.entries
+        local half = definition.half
         local options = { height = definition.height, scrollable = false, marginBottom = 6 }
 
-        -- Side-by-side item sections: each takes half the width, with the same
-        -- outer padding and middle gap as the Income tables.
-        local half = definition.isItems and bothItems
-
+        -- Like Inputs/Outputs: matching heights and padding, with the right panel
+        -- inline. With just one side present the remaining panel fills the row.
         if half then
-            options.height = itemHeight
             options.width = -(PAGE_PADDING + TABLE_GAP / 2)
             options.widthAnchor = 0.5
 
-            if category == "Recommended items" then
+            if definition.recommended then
                 options.inline = true
                 options.x = TABLE_GAP / 2
                 options.xAnchor = 0.5
@@ -231,27 +284,28 @@ local function mountRequirements(parent, method, calculator, fitter)
         end
 
         local section = fitter:add(parent:AddPanel(options), options.height, half)
-        section:AddText({ text = category, x = 12, y = 4, height = 26, colour = Style.gold })
-
-        if #entries == 0 then
-            local emptyText = method.requirements.coverage == "complete" and "None listed" or "Not listed in this sample"
-            section:AddText({ text = emptyText, x = 12, y = 32, height = 24, colour = Style.muted })
-        end
-
-        local y = 34
+        section:AddText({ text = (definition.recommended and "Recommended " or "Required ") .. definition.category:lower(), x = 12, y = 4, height = 26, colour = Style.gold })
 
         for _, entry in ipairs(entries) do
             local requirement = entry.definition
             local icons = requirement.display_items
+            local y = entry.y
 
             if gearOptions(requirement) then
                 -- One slot per option: an owned match shows its icon, otherwise
                 -- the empty slot's border gives the verdict. The short label sits
                 -- beside it, coloured the same way.
-                section:AddText({ text = "Any one", x = 12, y = y, height = 24, colour = Style.muted })
+                -- "Any one" says the slots are alternatives. Without it ("all"),
+                -- every slot is needed, like any other list of items.
+                local heading = 0
+
+                if requirement.kind == "any" then
+                    section:AddText({ text = "Any one", x = 12, y = y, height = 24, colour = Style.muted })
+                    heading = 24
+                end
 
                 for childIndex, child in ipairs(requirement.children) do
-                    local matchY = y + 24 + (childIndex - 1) * 44
+                    local matchY = y + heading + (childIndex - 1) * 44
 
                     updates[#updates + 1] = {
                         index = entry.index,
@@ -276,8 +330,9 @@ local function mountRequirements(parent, method, calculator, fitter)
                 end
 
                 for index, itemId in ipairs(icons) do
-                    local x = 12 + ((index - 1) % 5) * 44
-                    local iconY = iconStart + math.floor((index - 1) / 5) * 44
+                    local slot = (entry.startSlot or 0) + index - 1
+                    local x = 12 + (slot % 5) * 44
+                    local iconY = iconStart + math.floor(slot / 5) * 44
 
                     local _, _, verified = ItemIcon.add(section, itemId, { x = x, y = iconY })
                     local border = Style.rectangle(section, { x = x, y = iconY, width = 40, height = 40, fill = false, colour = Style.muted })
@@ -290,18 +345,17 @@ local function mountRequirements(parent, method, calculator, fitter)
             else
                 -- Text requirement: its icons, then the source wording, coloured later
                 -- by the refresh below.
-                local iconNames = requirementIcons(requirement)
+                local iconNames = entry.icons or requirementIcons(requirement)
 
-                -- The text is centred in its 42-tall box, so centre the icons on
-                -- that box too; otherwise they sit a few units above the words.
-                local iconY = Style.middle(y, 42, 22)
+                -- Centre the icons on the compact text box (or its wrapped version).
+                local iconY = Style.middle(y, entry.textHeight, 22)
 
                 for index, icon in ipairs(iconNames) do
                     Style.icon(section, icon, { x = 12 + (index - 1) * 26, y = iconY, size = 22 })
                 end
 
-                local x = 12 + #iconNames * 26
-                local label = section:AddText({ text = requirement.text, x = x, y = y, width = -x - 16, widthAnchor = 1, height = 42, colour = Style.text })
+                local x = requirement.equipment_group and 62 or (12 + #iconNames * 26)
+                local label = section:AddText({ text = requirementText(requirement.text), x = x, y = y, width = -x - 16, widthAnchor = 1, height = entry.matchHeight or entry.textHeight, colour = Style.text })
 
                 local update = { label = label, index = entry.index, recommended = entry.recommended }
 
@@ -311,50 +365,18 @@ local function mountRequirements(parent, method, calculator, fitter)
                     -- missing), never a placeholder item.
                     update.matchSection = section
                     update.minimumItemId = requirement.minimum_item_id
-                    update.matchY = y + 44
-                    update.matchText = section:AddText({ text = "", x = 12, y = y + 50, width = -78, widthAnchor = 1, height = 40, colour = Style.muted })
+                    update.matchY = Style.middle(y, entry.matchHeight, 40)
+                    update.matchText = label
+                    update.matchTextY = y
+                    update.sourceText = requirementText(requirement.text)
                 end
 
-                updates[#updates + 1] = update
-            end
-
-            y = y + entry.height
-        end
-    end
-
-    -- Required things only the player can judge (gear tiers, team size, a shop
-    -- upgrade the game doesn't expose): one per line, never coloured or counted.
-    local notes = method.requirements.notes or {}
-
-    if #notes > 0 then
-        parent:AddTitle("Check yourself")
-
-        for _, note in ipairs(notes) do
-            parent:AddText({ text = note, colour = Style.muted })
-        end
-    end
-
-    -- Recommended things the plugin can't check (a relic, an ability, a diary):
-    -- tips with their icons, never coloured, never counted as unknown.
-    local tips = method.requirements.tips or {}
-
-    if #tips > 0 then
-        parent:AddTitle("Also helps")
-
-        -- One tip per line: the first part (icon, or the text if there's no icon)
-        -- starts a new line, and the rest of that tip sits beside it.
-        for _, tip in ipairs(tips) do
-            local started = false
-
-            for _, icon in ipairs(tip.icons or {}) do
-                -- Style.icon returns nil when the sprite is missing; then the next
-                -- part still has to start the line.
-                if Style.icon(parent, icon, { size = 22, inline = started }) then
-                    started = true
+                if entry.displayOnly then
+                    label.rgba = Style.muted
+                else
+                    updates[#updates + 1] = update
                 end
             end
-
-            parent:AddText({ text = tip.text, colour = Style.muted, inline = started })
         end
     end
 
@@ -415,7 +437,7 @@ local function mountRequirements(parent, method, calculator, fitter)
                     update.matchId = itemId
                 end
 
-                update.matchText:SetPos(62, update.matchY + 6)
+                update.matchText:SetPos(62, update.matchTextY or Style.middle(update.matchY, 40, 30))
 
                 -- An empty slot speaks for itself; the group's coverage note was
                 -- just clutter next to it.
@@ -434,7 +456,15 @@ local function mountRequirements(parent, method, calculator, fitter)
                 end
 
                 -- Gear options always show their short name ("T61+ magic armour").
-                update.matchText.content = update.fixedText or description
+                local text = update.fixedText or description
+
+                if update.sourceText then
+                    -- Keep the source requirement visible even with an empty slot.
+                    -- Both lines sit in one centred text box beside the item box.
+                    text = update.sourceText .. (description ~= "" and ("\n" .. description) or "")
+                end
+
+                update.matchText.content = text
                 local colour = match and match.saved and Style.gold or Style.statusColour(checked.status)
 
                 if not match and checked.lastKnownAbsent then
@@ -509,7 +539,10 @@ end
 -- `moneyColour` tints the GP values (rows and total): subtle red for money going
 -- out (Inputs), subtle green for money coming in (Outputs).
 --
--- Returns an update function that fills in the numbers.
+-- Returns an update function that fills in the numbers, and addRows(limit),
+-- which draws up to `limit` more item rows and says how many it drew (0 once
+-- they're all there). The panel's height is set for every row up front, so rows
+-- drawn later don't move anything else on the page.
 local function itemTable(panel, definitions, moneyColour, period)
     -- Recurring (daily/weekly) methods count per run instead of per hour.
     local perRun = period == "run"
@@ -527,7 +560,19 @@ local function itemTable(panel, definitions, moneyColour, period)
     -- Item rows, with alternating background shades.
     local rows = {}
 
-    for index, definition in ipairs(definitions) do
+    -- The last numbers we were given, so a row drawn later shows them straight away.
+    local latest = {}
+
+    local function fill(index)
+        local value = latest[index]
+
+        if value then
+            rows[index].quantity.content = Style.quantity(value.quantity)
+            rows[index].total.content = Style.number(value.value)
+        end
+    end
+
+    local function addRow(index, definition)
         local y = 64 + (index - 1) * 46
         local background = index % 2 == 0 and 0x292A25FF or 0x24251FFF
 
@@ -545,7 +590,20 @@ local function itemTable(panel, definitions, moneyColour, period)
             colour = moneyColour, alignHorizontal = ui.AlignMode.BOTTOMRIGHT, tooltip = creationTip,
         })
 
-        rows[#rows + 1] = { quantity = quantity, total = total }
+        rows[index] = { quantity = quantity, total = total }
+        fill(index)
+    end
+
+    local function addRows(limit)
+        local added = 0
+
+        while added < limit and #rows < #definitions do
+            local index = #rows + 1
+            addRow(index, definitions[index])
+            added = added + 1
+        end
+
+        return added
     end
 
     -- The hourly total shares the heading row, with its coin just to the left.
@@ -553,15 +611,18 @@ local function itemTable(panel, definitions, moneyColour, period)
     local coin = Style.coins(panel, { xAnchor = 1, y = coinY, size = 20 })
     local subtotal = panel:AddText({ text = "", x = valueRight - 130, xAnchor = 1, y = 6, width = 130, height = 26, colour = moneyColour, alignHorizontal = ui.AlignMode.BOTTOMRIGHT })
 
-    return function(values, total)
-        for index, row in ipairs(rows) do
-            row.quantity.content = Style.quantity(values[index].quantity)
-            row.total.content = Style.number(values[index].value)
+    local function update(values, total)
+        latest = values
+
+        for index in ipairs(rows) do
+            fill(index)
         end
 
         subtotal.content = total and Style.number(total) .. (perRun and " / run" or " / h") or "Unavailable"
         Style.placeCoin(coin, subtotal.content, { rightEdge = valueRight, y = coinY, size = 20 })
     end
+
+    return update, addRows
 end
 
 -- The header's title, plus a version dropdown when the method has several
@@ -683,15 +744,27 @@ end
 function MethodView.mount(view, method, calculator, guarded, options)
     options = options or {}
 
-    local activeTab = options.activeTab
+    local activeTab = options.activeTab or 1
     local releaseTitle = mountTitle(view, method, guarded, options.versions, options.onVersion)
+
+    -- buildTab[index] draws that tab's contents; it's set further down and cleared
+    -- once the tab is drawn (see ROWS_PER_STEP at the top for why it waits).
+    local buildTab = {}
 
     -- Tabs fill everything under the header, and stretch with the window.
     local tabs = view:AddTabs({
         { text = "Income" }, { text = "Requirements" },
         { text = "How to do it" }, { text = "Getting there" },
     }, {
-        activeIndex = activeTab or 1,
+        activeIndex = activeTab,
+
+        -- Clicking a tab that isn't drawn yet draws it now, rather than showing an
+        -- empty page until its turn comes.
+        onChange = guarded(function(_, index)
+            if buildTab[index] then
+                buildTab[index]()
+            end
+        end),
 
         -- x = 0 matters: without it PrettyUI starts absolute items at its 14-unit
         -- default padding, which pushed the tabs right while keeping them full
@@ -830,8 +903,10 @@ function MethodView.mount(view, method, calculator, guarded, options)
 
     -- Costs read red and earnings green, so it's obvious at a glance which way
     -- the money goes. The "Inputs"/"Outputs" headings still say it in words.
-    local updateInputs = itemTable(inputs, method.income.inputs, Style.bad, method.income.period)
-    local updateOutputs = itemTable(outputs, outputDefinitions, Style.good, method.income.period)
+    -- Each table's update function, plus addRows to draw its item rows later.
+    local updateInputs, updateOutputs = {}, {}
+    updateInputs.fill, updateInputs.addRows = itemTable(inputs, method.income.inputs, Style.bad, method.income.period)
+    updateOutputs.fill, updateOutputs.addRows = itemTable(outputs, outputDefinitions, Style.good, method.income.period)
 
     income:AddTitle("Notes")
 
@@ -863,30 +938,52 @@ function MethodView.mount(view, method, calculator, guarded, options)
         end
     end
 
-    -- The other three tabs.
-    local requirements = tabs:GetPage(2)
-    local requirementsFitter = Style.panelFitter(requirements, PAGE_PADDING, TABLE_GAP)
-    local refreshRequirements, refreshOwnership = mountRequirements(requirements, method, calculator, requirementsFitter)
+    -- The other three tabs. Each is drawn once, when its turn comes or when it's
+    -- clicked, whichever is first.
+    -- These stay nil until the Requirements tab is drawn.
+    local refreshRequirements, refreshOwnership
 
-    local instructions = tabs:GetPage(3)
-    instructions:AddTitle("Method steps")
+    buildTab[2] = function()
+        buildTab[2] = nil
 
-    for index, step in ipairs(method.instructions) do
-        instructions:AddText({ text = index .. ". " .. step, marginTop = 10, marginBottom = 12 })
+        local requirements = tabs:GetPage(2)
+        local requirementsFitter = Style.panelFitter(requirements, PAGE_PADDING, TABLE_GAP)
+        refreshRequirements, refreshOwnership = mountRequirements(requirements, method, calculator, requirementsFitter)
+
+        -- Every panel exists now, so size them to the page's final width (see
+        -- Style.panelFitter), then colour the checks.
+        requirementsFitter:fit()
+        refreshRequirements()
+        refreshOwnership()
     end
 
-    -- Imported methods don't have our own steps yet; point at the Wiki guide.
-    if #method.instructions == 0 then
-        instructions:AddText({ text = "Steps haven't been written for this method yet. The Wiki guide \""
-            .. method.source.title .. "\" explains how to do it.", colour = Style.muted })
+    buildTab[3] = function()
+        buildTab[3] = nil
+
+        local instructions = tabs:GetPage(3)
+        instructions:AddTitle("Method steps")
+
+        for index, step in ipairs(method.instructions) do
+            instructions:AddText({ text = index .. ". " .. step, marginTop = 10, marginBottom = 12 })
+        end
+
+        -- Imported methods don't have our own steps yet; point at the Wiki guide.
+        if #method.instructions == 0 then
+            instructions:AddText({ text = "Steps haven't been written for this method yet. The Wiki guide \""
+                .. method.source.title .. "\" explains how to do it.", colour = Style.muted })
+        end
     end
 
-    local travel = tabs:GetPage(4)
-    travel:AddTitle("Getting there")
-    travel:AddText(method.location.text)
+    buildTab[4] = function()
+        buildTab[4] = nil
 
-    if method.location.coverage ~= "complete" then
-        travel:AddText({ text = "Travel details are still being prepared for this method.", colour = Style.muted })
+        local travel = tabs:GetPage(4)
+        travel:AddTitle("Getting there")
+        travel:AddText(method.location.text)
+
+        if method.location.coverage ~= "complete" then
+            travel:AddText({ text = "Travel details are still being prepared for this method.", colour = Style.muted })
+        end
     end
 
     -- Copies the calculator's latest numbers into the Income tab. Only text and
@@ -928,21 +1025,57 @@ function MethodView.mount(view, method, calculator, guarded, options)
         roi.content = result.roi and Style.number(result.roi, 1) .. "% ROI" or ""
         roi.rgba = result.roi and (result.roi < 0 and Style.bad or Style.good) or headlineColour
 
-        updateOutputs(result.outputs or {}, result.revenue)
-        updateInputs(result.inputs or {}, result.cost)
+        updateOutputs.fill(result.outputs or {}, result.revenue)
+        updateInputs.fill(result.inputs or {}, result.cost)
     end
 
-    -- Everything exists now, so we know whether each page grew a scrollbar: size
-    -- the panels to their pages' final widths, then allow input handling and fill
-    -- in the first numbers.
+    -- Every Income panel exists now (their heights already allow for every item
+    -- row), so we know whether the page grew a scrollbar: size the panels to its
+    -- final width, then allow input handling and fill in the first numbers.
     incomeFitter:fit()
-    requirementsFitter:fit()
 
     ready = true
 
     render()
-    refreshRequirements()
-    refreshOwnership()
+
+    -- Draws one more piece of the screen. Returns false once it's all drawn.
+    local function buildStep()
+        if updateInputs.addRows(ROWS_PER_STEP) + updateOutputs.addRows(ROWS_PER_STEP) > 0 then
+            return true
+        end
+
+        for index = 2, 4 do
+            if buildTab[index] then
+                buildTab[index]()
+                return true
+            end
+        end
+
+        return false
+    end
+
+    -- Whatever's on screen first: the open tab, and the first Income rows.
+    if buildTab[activeTab] then
+        buildTab[activeTab]()
+    end
+
+    local building = buildStep()
+
+    -- Then the rest, a piece per tick.
+    local function stopBuilding()
+        if building then
+            building = false
+            Event.Logic.Unsubscribe(BUILD_EVENT)
+        end
+    end
+
+    if building then
+        Event.Logic.Subscribe(BUILD_EVENT, guarded(function()
+            if not buildStep() then
+                stopBuilding()
+            end
+        end))
+    end
 
     -- Skill changes can't affect item borders, and inventory changes can't affect
     -- skill levels or prices, so each reason only redoes the work it can change.
@@ -951,15 +1084,24 @@ function MethodView.mount(view, method, calculator, guarded, options)
             render()
         end
 
-        refreshRequirements()
-        refreshOwnership()
+        -- Nothing to recolour until the Requirements tab is drawn.
+        if refreshRequirements then
+            refreshRequirements()
+            refreshOwnership()
+        end
     end
 
     local function currentTab()
         return tabs:GetActiveIndex()
     end
 
-    return refresh, currentTab, releaseTitle
+    -- Leaving the screen stops the drawing, as well as the version dropdown.
+    local function release()
+        stopBuilding()
+        releaseTitle()
+    end
+
+    return refresh, currentTab, release
 end
 
 return MethodView

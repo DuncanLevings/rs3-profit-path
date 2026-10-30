@@ -174,10 +174,11 @@ class ResearchTests(unittest.TestCase):
             "recommended": [{"req": "item:Armoury", "text": "Hybrid armour recommended (suggested warpriest armour)"}],
         })
 
-        # The advice-only requirement is gone, and the group keeps its real option.
+        # The advice-only requirement is gone, and the group's one real option is
+        # left (as itself: "any one of" a single thing is just that thing).
         children = requirements["access"]["children"]
         self.assertEqual(len(children), 1)
-        self.assertEqual(children[0]["children"][0]["itemId"], 995)
+        self.assertEqual(children[0]["itemId"], 995)
         self.assertEqual(requirements["recommended"]["children"], [])
 
         # No "See also" links. The guide's own words survive: required ones for
@@ -453,8 +454,18 @@ class TieredGearTests(unittest.TestCase):
 
     def test_tiered_things_that_are_not_gear_are_left_alone(self):
         for text in ("Tier 4 Luck", "Tier 3 Slayer Lodge recommended", "Tier 80+ pickaxe",
-                     "Tier 7 Reputation for access to the VIP skilling area", "High-level power armour"):
+                     "Tier 7 Reputation for access to the VIP skilling area", "High-level PvM items and unlocks"):
             self.assertIsNone(merge_methods.tiered_gear(text), text)
+
+    def test_plain_high_level_armour_and_shields_are_the_wikis_61_plus(self):
+        armour = merge_methods.tiered_gear("High-level power armour")
+        self.assertEqual((armour["minimum_tier"], armour["slot"], armour["armour_type"]), (61, "body", "Power armour"))
+
+        shield = merge_methods.tiered_gear("Any high level shield required")
+        self.assertEqual((shield["minimum_tier"], shield["slot"]), (61, "shield"))
+
+        # No tier and no "high level": still only the player can judge it.
+        self.assertIsNone(merge_methods.tiered_gear("Any shield required"))
 
     def test_the_group_keeps_weapons_shields_and_bodies_with_their_style(self):
         ctx = context()
@@ -480,3 +491,112 @@ class TieredGearTests(unittest.TestCase):
 
         self.assertEqual((weapon["kind"], weapon["minimum_tier"], weapon["style"]), ("gear", 95, "ranged"))
         self.assertNotIn("advice", method["requirements"])
+
+
+class ToolTests(unittest.TestCase):
+    """Pickaxe and hatchet lines that accept any good enough tool."""
+
+    def ctx(self):
+        ctx = context()
+        ctx.meta["items"].update({"Crystal pickaxe": 32646, "Elder rune pickaxe + 5": 45652,
+                                  "Pickaxe of earth and song": 44834})
+        ctx.tool_tiers = {"pickaxe": {32646: 700, 45652: 905, 44834: 909}, "hatchet": {}}
+
+        return ctx
+
+    def test_any_better_and_tiered_tool_lines_check_the_tool_group(self):
+        ctx = self.ctx()
+        any_pickaxe = merge_methods.tool_check("Any pickaxe", None, ctx)
+        self.assertEqual((any_pickaxe["equipment_group"], any_pickaxe.get("minimum_tier")), ("pickaxe", None))
+
+        better = merge_methods.tool_check("Crystal pickaxe or better", "item:Crystal pickaxe", ctx)
+        self.assertEqual(better["minimum_tier"], 700)
+
+        # "+ 5 or better" means at least the + 5, not any elder rune pickaxe.
+        plus = merge_methods.tool_check("Elder rune pickaxe + 5 or better", "item:Elder rune pickaxe + 5", ctx)
+        self.assertEqual(plus["minimum_tier"], 905)
+
+        self.assertEqual(merge_methods.tool_check("Tier 80+ pickaxe", "item:pickaxe", ctx)["minimum_tier"], 800)
+        self.assertEqual(ctx.uses_tools, {"pickaxe"})
+
+    def test_a_named_tool_without_better_stays_that_item(self):
+        ctx = self.ctx()
+
+        for text in ("Pickaxe of earth and song with Honed 6",
+                     "Mining: Pickaxe of earth and song or Pickaxe of life and death"):
+            self.assertIsNone(merge_methods.tool_check(text, "item:Pickaxe of earth and song", ctx), text)
+
+    def test_pickaxe_tiers_rank_upgrades_and_perked_pickaxes(self):
+        tier = merge_methods.pickaxe_tier
+
+        self.assertLess(tier({"name": "Elder rune pickaxe", "level": 90}),
+                        tier({"name": "Elder rune pickaxe + 5", "level": 90}))
+        self.assertLess(tier({"name": "Elder rune pickaxe + 5", "level": 90}),
+                        tier({"name": "Pickaxe of earth and song", "level": 90}))
+        self.assertLess(tier({"name": "Pickaxe of earth and song", "level": 90}),
+                        tier({"name": "Primal pickaxe", "level": 100}))
+
+
+class SplitLineTests(unittest.TestCase):
+    """One Wiki line with several links is one requirement, not several copies."""
+
+    def joined(self, *entries):
+        return merge_methods.join_split_lines(list(entries))
+
+    def test_links_from_one_line_join_as_all_or_any_by_the_wording(self):
+        text = "Built a plank maker then a high capacity plank maker"
+        both, = self.joined({"req": "item:Plank maker", "text": text}, {"req": "item:High capacity plank maker", "text": text})
+        self.assertEqual(both["req"], ["all", "item:Plank maker", "item:High capacity plank maker"])
+
+        text = "Woodcutting boosts such as Sana's fyrtorch recommended, Ring of Whispers recommended, etc. recommended"
+        either, = self.joined({"req": "item:Sana's fyrtorch", "text": text}, {"req": "item:Ring of Whispers", "text": text})
+        self.assertEqual(either["req"][0], "any")
+
+        # "or their attuned versions" isn't a choice between the listed pieces.
+        text = "Crystal helm, body, gloves, and boots or their attuned versions"
+        armour, = self.joined({"req": "item:Crystal helm", "text": text}, {"req": "item:Crystal body", "text": text})
+        self.assertEqual(armour["req"][0], "all")
+
+    def test_links_only_in_brackets_are_side_notes(self):
+        text = "Tier 80+ pickaxe ( Augmentable pickaxe highly recommended)"
+        line, = self.joined({"req": "item:pickaxe", "text": text}, {"req": "item:Augmentable pickaxe", "text": text})
+        self.assertEqual(line["req"], "item:pickaxe")
+
+        text = "77 (105 for Expansive pouch and max level of Savvy runecrafting)"
+        line, = self.joined({"req": "skill:RUNECRAFTING:77", "text": text}, {"req": "skill:RUNECRAFTING:105", "text": text})
+        self.assertEqual(line["req"], "skill:RUNECRAFTING:77")
+
+    def test_the_same_link_twice_and_a_bare_name_beside_its_qualified_one_are_one(self):
+        text = "Ring of imbuing for 10% more rune output"
+        line, = self.joined({"req": "item:Ring of imbuing", "text": text}, {"req": "item:Ring of imbuing", "text": text})
+        self.assertEqual(line["req"], "item:Ring of imbuing")
+
+        self.assertEqual(self.joined("item:Undead Slayer", "item:Undead Slayer (ability)"), ["item:Undead Slayer (ability)"])
+
+        # Two different qualifiers are two different things.
+        self.assertEqual(len(self.joined("item:Dragon Slayer (perk)", "item:Dragon Slayer (ability)")), 2)
+
+    def test_repeated_recommended_is_said_once(self):
+        tidy = merge_methods.tidy_wording
+
+        self.assertEqual(tidy("Salve amulet (e) recommended recommended for increased damage"),
+                         "Salve amulet (e) recommended for increased damage")
+        self.assertEqual(tidy("Dive or Bladed Dive recommended (highly recommended)"),
+                         "Dive or Bladed Dive (highly recommended)")
+        self.assertEqual(tidy("Sana's fyrtorch recommended, Ring of Whispers recommended, etc. recommended"),
+                         "Sana's fyrtorch, Ring of Whispers, etc. recommended")
+        self.assertEqual(tidy("Tier 80+ pickaxe ( Augmentable pickaxe highly recommended)"),
+                         "Tier 80+ pickaxe (Augmentable pickaxe highly recommended)")
+
+    def test_a_joined_line_keeps_its_own_tier_over_its_gear_link(self):
+        ctx = context(capabilities={"Scavenging": {"kind": "perk"}})
+        text = "T70+ magic armour with Scavenging"
+        method = merge_methods.convert_guide(guide(requirements={"required": [
+            {"req": "item:Magic_armour#High_level_equipment_(61+)", "text": text},
+            {"req": "item:Scavenging", "text": text},
+        ]}), ctx, "pvm")
+        line, = method["requirements"]["access"]["children"]
+
+        self.assertEqual(line["kind"], "all")
+        self.assertEqual(line["children"][0]["minimum_tier"], 70)
+        self.assertEqual(line["text"], text)

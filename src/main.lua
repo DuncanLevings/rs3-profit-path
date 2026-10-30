@@ -387,23 +387,7 @@ function App.start()
         snapshot:flush()
     end
 
-    -- Temporary diagnostics callbacks; remove them with diagnostics.lua.
-    local function inspectChronotesQuote()
-        -- The verified GEPL example identifies chronotes as item 49430.
-        return Income.inspectQuote(gepl, 49430)
-    end
-
-    local function inspectQuestRequirement(name)
-        local quest = account:inspectQuest(name)
-        if quest.status == "available" then
-            quest.requirement = Requirements.evaluate({
-                kind = "quest", quest = name, text = "Complete " .. quest.name,
-            }, { quests = { [name] = quest } })
-        end
-        return quest
-    end
-
-    view = UI.new(prettyui, account, inspectChronotesQuote, inspectQuestRequirement, calculator, browser)
+    view = UI.new(prettyui, account, calculator, browser)
 
     -- The client tells us when our ribbon page is ready; that's where the launcher goes.
     -- This can fire more than once (e.g. after a reload), and mountLauncher handles that.

@@ -72,9 +72,9 @@ return function(test, equal, client, pretty)
             .. "opening Browse took %.0f ms (desktop Lua).", #catalogue.methods, counts.calls, distinct, seconds * 1000))
 
         -- Only one page of rows is drawn.
-        equal(#liveRows(), 25)
+        equal(#liveRows(), 10)
         prettyui:findButton("Next page")()
-        equal(#liveRows(), 25)
+        equal(#liveRows(), 10)
         prettyui:findButton("Previous page")()
 
         PluginShutdown()
@@ -104,6 +104,7 @@ return function(test, equal, client, pretty)
         -- Find it through search, so its row is on the first page.
         local browse = prettyui.views[#prettyui.views]
         browse.children[2].fields[1]:SetText(imported.title, true)
+        settleSearch()
 
         local labels = {}
 
@@ -117,6 +118,7 @@ return function(test, equal, client, pretty)
 
         prettyui:findMethod(imported.title)()
         local detail = prettyui.views[#prettyui.views]
+        settleMethod()
         local pages = detail.tabs[1].pages
         local texts = {}
 
@@ -162,8 +164,10 @@ return function(test, equal, client, pretty)
         Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
         prettyui:findButton("Open Profit Path")()
         prettyui.views[#prettyui.views].children[2].fields[1]:SetText(chosen.title, true)
+        settleSearch()
         prettyui:findMethod(chosen.title)()
 
+        settleMethod()
         local requirements = prettyui.views[#prettyui.views].tabs[1].pages[2]
         local texts = {}
 
@@ -176,8 +180,8 @@ return function(test, equal, client, pretty)
 
         -- Recommended things the plugin can't check show as tips, not grey checks.
         if #(chosen.requirements.tips or {}) > 0 then
-            assert(all:find("Also helps", 1, true), "Tips section")
-            assert(all:find(chosen.requirements.tips[1].text, 1, true), "First tip")
+            assert(all:find("Recommended other", 1, true), "Recommendations panel")
+            assert(all:find(chosen.requirements.tips[1].text:gsub("%s*%([Rr]ecommended%)", ""):gsub("%s+[Rr]ecommended%s*$", ""), 1, true), "First tip")
         end
 
         -- Each tip starts its own line: a tip without icons never sits inline after
@@ -199,7 +203,7 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
-    test("required things only the player can judge are listed under Check yourself", function()
+    test("required things only the player can judge stay neutral in their panel", function()
         client()
         prettyui = pretty()
         gepl = countingLibrary()
@@ -219,8 +223,10 @@ return function(test, equal, client, pretty)
         Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
         prettyui:findButton("Open Profit Path")()
         prettyui.views[#prettyui.views].children[2].fields[1]:SetText(chosen.title, true)
+        settleSearch()
         prettyui:findMethod(chosen.title)()
 
+        settleMethod()
         local requirements = prettyui.views[#prettyui.views].tabs[1].pages[2]
         local found = {}
 
@@ -228,28 +234,36 @@ return function(test, equal, client, pretty)
             found[tostring(label.content)] = label
         end
 
-        assert(found["Check yourself"], "Check yourself section")
+        assert(found["Required other"], "Required advice panel")
 
         -- Each note is its own line.
         for _, note in ipairs(chosen.requirements.notes) do
-            assert(found[note], "Missing note: " .. note)
-            assert(not found[note].options.inline, "Note shares a line: " .. note)
+            local text = note:gsub("%s*%([Rr]equired%)", ""):gsub("%s+[Rr]equired%s*$", "")
+            assert(found[text], "Missing note: " .. note)
+            equal(found[text].rgba, require("src/ui/view_style").muted)
+            assert(not found[text].options.inline, "Note shares a line: " .. note)
         end
 
         PluginShutdown()
     end)
 
-    test("any-one tiered gear shows one slot per option with a short label", function()
+    -- Opens a method whose required items include a group (`kind`: "any" or "all")
+    -- of tiered gear checks, and checks each piece has its own short line.
+    local function checkGearGroup(kind)
         client()
         prettyui = pretty()
         gepl = countingLibrary()
 
-        -- A method whose required items include "any one" of several gear tiers.
         local chosen, group
+        local titles = {}
 
         for _, method in ipairs(catalogue.methods) do
-            for _, child in ipairs(method.requirements.access.children) do
-                local allGear = child.kind == "any" and #child.children > 1
+            -- Opening a title shows its first version, so only first versions count.
+            local first = not titles[method.title]
+            titles[method.title] = true
+
+            for _, child in ipairs(first and method.requirements.access.children or {}) do
+                local allGear = child.kind == kind and #child.children > 1
 
                 for _, option in ipairs(allGear and child.children or {}) do
                     allGear = allGear and option.kind == "gear"
@@ -265,23 +279,27 @@ return function(test, equal, client, pretty)
             end
         end
 
-        assert(chosen, "Expected a method with any-one tiered gear")
+        assert(chosen, "Expected a method with a tiered gear group: " .. kind)
 
         dofile("main.lua")
         Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
         prettyui:findButton("Open Profit Path")()
         prettyui.views[#prettyui.views].children[2].fields[1]:SetText(chosen.title, true)
+        settleSearch()
         prettyui:findMethod(chosen.title)()
 
         local found = {}
 
+        settleMethod()
         for _, label in ipairs(prettyui.views[#prettyui.views].tabs[1].pages[2]:allTexts()) do
             found[tostring(label.content)] = true
         end
 
-        -- The joined link text is gone; each option has its own short line.
+        -- The joined link text is gone; each piece has its own short line, and
+        -- alternatives get the "Any one" heading. (The page may have other "Any
+        -- one" item groups, so an "all" group can't assert it's absent here.)
         assert(not found[group.text], "Long joined text shown")
-        assert(found["Any one"], "Any one heading")
+        assert(kind ~= "any" or found["Any one"], "Any one heading")
 
         for _, option in ipairs(group.children) do
             local short = "T" .. option.minimum_tier .. "+ " .. (option.style and option.style .. " " or "")
@@ -295,6 +313,15 @@ return function(test, equal, client, pretty)
         end
 
         PluginShutdown()
+    end
+
+    test("any-one tiered gear shows one slot per option with a short label", function()
+        checkGearGroup("any")
+    end)
+
+    -- "Tier 90+ magic weapon and armour" needs both: one slot each, no heading.
+    test("all-of tiered gear shows one slot per piece without an Any one heading", function()
+        checkGearGroup("all")
     end)
 
     test("recurring methods show per-run profit with their cycle and sort after hourly ones", function()
@@ -335,6 +362,7 @@ return function(test, equal, client, pretty)
         Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
         prettyui:findButton("Open Profit Path")()
         prettyui.views[#prettyui.views].children[2].fields[1]:SetText(recurring.title, true)
+        settleSearch()
 
         local rowTexts = {}
 
@@ -353,6 +381,7 @@ return function(test, equal, client, pretty)
         -- Production that shows only them.
         equal(recurring.category, "recurring")
         prettyui.views[#prettyui.views].children[2].fields[1]:SetText("", true)
+        settleSearch()
         prettyui:findButton("Recurring")()
         local shown = 0
 
@@ -370,6 +399,7 @@ return function(test, equal, client, pretty)
 
         -- Search for it again so its row is on the first page.
         prettyui.views[#prettyui.views].children[2].fields[1]:SetText(recurring.title, true)
+        settleSearch()
         prettyui:findMethod(recurring.title)()
         local income = prettyui.views[#prettyui.views].tabs[1].pages[1]
         local texts = {}

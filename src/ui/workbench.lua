@@ -5,7 +5,7 @@
 --   * the launcher: a small page in the Plugins ribbon with an "Open" button
 --   * the workbench: our own resizable window floating over the game
 --
--- Inside the window, moving between screens (Browse, a method, Diagnostics) swaps
+-- Inside the window, moving between screens (Browse, a method) swaps
 -- just the content view and keeps the window itself, so it doesn't jump back to its
 -- starting position or size every time you click something.
 --
@@ -14,7 +14,6 @@
 -- in. A click that arrives late (say, after we've moved to another screen) sees the
 -- number has changed and does nothing, instead of poking UI that no longer exists.
 local MethodView = require("src/ui/method_view")
-local Diagnostics = require("src/ui/diagnostics")
 local BrowseView = require("src/ui/browse_view")
 local UI = {}
 
@@ -35,9 +34,8 @@ local RESIZE_SETTLE_TICKS = 15
 
 -- `library` is PrettyUI. `calculator` is main.lua's controller; we just call it and
 -- show its results, with no money logic in here.
-function UI.new(library, account, inspectQuote, inspectQuest, calculator, browser)
+function UI.new(library, account, calculator, browser)
     local self = { active = true, generation = 0, screen = "browse" }
-    local diagnostics = Diagnostics.new(account, inspectQuote, inspectQuest)
 
     -- Re-reads whatever the current screen shows. `reason` says what changed:
     -- "skills", "inventory", "quests", or nil for everything (e.g. on reopen).
@@ -50,8 +48,6 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
 
         if self.methodRefresh then
             self.methodRefresh(reason)
-        elseif self.screen == "diagnostics" then
-            diagnostics:refresh()
         elseif self.browseRefresh and browser.availability ~= "any" and calculator.accessChanged then
             self.browseRefresh()
         end
@@ -81,8 +77,6 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
             self.methodRelease()
             self.methodRelease = nil
         end
-
-        diagnostics:unmount()
 
         if self.browseUnmount then
             self.browseUnmount()
@@ -136,12 +130,12 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
         -- The size we built for, so the resize check knows when it's out of date.
         self.mountedWidth, self.mountedHeight = parent.width, parent.height
 
-        -- The anchors make the view stretch with the window when it's resized. The
-        -- browser and method screens turn scrolling off here because their child
-        -- views scroll themselves; two nested scroll areas would fight each other.
+        -- The anchors make the view stretch with the window when it's resized.
+        -- Scrolling is off here because the screens' child views scroll themselves;
+        -- two nested scroll areas would fight each other.
         local view = library.SimpleView.new(parent, {
             width = 0, height = 0, widthAnchor = 1, heightAnchor = 1,
-            scrollable = self.screen == "diagnostics",
+            scrollable = false,
         })
 
         self.view = view
@@ -179,8 +173,7 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
             else
                 local backOptions = { tooltip = "Back to methods", size = 24 }
 
-                -- Detail navigation shares the title row. Diagnostics keeps its
-                -- normal flow layout so its temporary probe controls don't overlap.
+                -- Back shares the title row with the method's name.
                 if self.screen == "method" then
                     backOptions.absolute = true
                     backOptions.x = 10
@@ -245,8 +238,6 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
                             navigate("method")
                         end,
                     })
-                elseif self.screen == "diagnostics" then
-                    diagnostics:mount(view, guarded)
                 else
                     -- A typo in a screen name should be loud, not a silent blank page.
                     error("Unknown Profit Path screen: " .. tostring(self.screen))
@@ -391,7 +382,6 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
                 onClose = function(window)
                     if self.window == window then
                         calculator:checkpoint()
-                        diagnostics:cancelScan()
                         self.interactive = false
                         self:stopResizeWatch()
                     end
@@ -445,20 +435,6 @@ function UI.new(library, account, inspectQuote, inspectQuest, calculator, browse
                     status.content = opened and "" or problem
                 end
             end, { width = 220 })
-
-            -- Temporary: the development probes live in the launcher, never in
-            -- the player's browsing sidebar. Remove with diagnostics.lua.
-            launcher:AddSimpleButton("Diagnostics", function()
-                if self.active and self.launcher == launcher then
-                    local opened, problem = self:openWindow()
-                    status.content = opened and "" or problem
-
-                    if opened then
-                        self.screen = "diagnostics"
-                        self:mount(self.window.content)
-                    end
-                end
-            end, { width = 120, inline = true })
         end)
 
         if not ok then

@@ -1,0 +1,447 @@
+{
+ "schema": 1,
+ "retrieved": "2026-10-30",
+ "source": "RuneScape Wiki Pickaxes page (revision 36994546) and infobox_item bucket. RuneScape Wiki contributors, CC BY-NC-SA 3.0.",
+ "url": "https://runescape.wiki/w/Pickaxes?oldid=36994546",
+ "note": "Every pickaxe in the Pickaxes table, plus augmented versions, with its Mining level.",
+ "pieces": [
+  {
+   "name": "Bronze pickaxe",
+   "item_ids": [
+    1265
+   ],
+   "level": 1
+  },
+  {
+   "name": "Dwarven army axe",
+   "item_ids": [
+    21340
+   ],
+   "level": 1
+  },
+  {
+   "name": "Gilded bronze pickaxe",
+   "item_ids": [
+    20780
+   ],
+   "level": 1
+  },
+  {
+   "name": "Gilded iron pickaxe",
+   "item_ids": [
+    20781
+   ],
+   "level": 10
+  },
+  {
+   "name": "Iron pickaxe",
+   "item_ids": [
+    1267
+   ],
+   "level": 10
+  },
+  {
+   "name": "Iron pickaxe + 1",
+   "item_ids": [
+    45952
+   ],
+   "level": 10
+  },
+  {
+   "name": "Gilded steel pickaxe",
+   "item_ids": [
+    20782
+   ],
+   "level": 20
+  },
+  {
+   "name": "Steel pickaxe",
+   "item_ids": [
+    45467
+   ],
+   "level": 20
+  },
+  {
+   "name": "Steel pickaxe + 1",
+   "item_ids": [
+    47063
+   ],
+   "level": 20
+  },
+  {
+   "name": "Gilded mithril pickaxe",
+   "item_ids": [
+    20784
+   ],
+   "level": 30
+  },
+  {
+   "name": "Mithril pickaxe",
+   "item_ids": [
+    45494
+   ],
+   "level": 30
+  },
+  {
+   "name": "Mithril pickaxe + 1",
+   "item_ids": [
+    46288
+   ],
+   "level": 30
+  },
+  {
+   "name": "Mithril pickaxe + 2",
+   "item_ids": [
+    46291
+   ],
+   "level": 30
+  },
+  {
+   "name": "Adamant pickaxe",
+   "item_ids": [
+    45521
+   ],
+   "level": 40
+  },
+  {
+   "name": "Adamant pickaxe + 1",
+   "item_ids": [
+    45069
+   ],
+   "level": 40
+  },
+  {
+   "name": "Adamant pickaxe + 2",
+   "item_ids": [
+    45072
+   ],
+   "level": 40
+  },
+  {
+   "name": "Gilded adamant pickaxe",
+   "item_ids": [
+    20783
+   ],
+   "level": 40
+  },
+  {
+   "name": "Gilded rune pickaxe",
+   "item_ids": [
+    20785
+   ],
+   "level": 50
+  },
+  {
+   "name": "Inferno adze",
+   "item_ids": [
+    13661
+   ],
+   "level": 50
+  },
+  {
+   "name": "Rune pickaxe",
+   "item_ids": [
+    45548
+   ],
+   "level": 50
+  },
+  {
+   "name": "Rune pickaxe + 1",
+   "item_ids": [
+    46942
+   ],
+   "level": 50
+  },
+  {
+   "name": "Rune pickaxe + 2",
+   "item_ids": [
+    46945
+   ],
+   "level": 50
+  },
+  {
+   "name": "Rune pickaxe + 3",
+   "item_ids": [
+    46948
+   ],
+   "level": 50
+  },
+  {
+   "name": "Sacred clay pickaxe",
+   "item_ids": [
+    14107,
+    29662
+   ],
+   "level": 50
+  },
+  {
+   "name": "Volatile clay pickaxe",
+   "item_ids": [
+    14099,
+    29654
+   ],
+   "level": 50
+  },
+  {
+   "name": "Augmented dragon pickaxe",
+   "item_ids": [
+    36537,
+    36538,
+    38164,
+    38165
+   ],
+   "level": 60
+  },
+  {
+   "name": "Dragon pickaxe",
+   "item_ids": [
+    15259
+   ],
+   "level": 60
+  },
+  {
+   "name": "Gilded dragon pickaxe",
+   "item_ids": [
+    20786
+   ],
+   "level": 60
+  },
+  {
+   "name": "Orikalkum pickaxe",
+   "item_ids": [
+    46578
+   ],
+   "level": 60
+  },
+  {
+   "name": "Orikalkum pickaxe + 1",
+   "item_ids": [
+    46581
+   ],
+   "level": 60
+  },
+  {
+   "name": "Orikalkum pickaxe + 2",
+   "item_ids": [
+    46584
+   ],
+   "level": 60
+  },
+  {
+   "name": "Orikalkum pickaxe + 3",
+   "item_ids": [
+    46587
+   ],
+   "level": 60
+  },
+  {
+   "name": "Augmented crystal pickaxe",
+   "item_ids": [
+    36539,
+    36540,
+    38166,
+    38167
+   ],
+   "level": 70
+  },
+  {
+   "name": "Crystal pickaxe",
+   "item_ids": [
+    32646
+   ],
+   "level": 70
+  },
+  {
+   "name": "Necronium pickaxe",
+   "item_ids": [
+    46372
+   ],
+   "level": 70
+  },
+  {
+   "name": "Necronium pickaxe + 1",
+   "item_ids": [
+    46374
+   ],
+   "level": 70
+  },
+  {
+   "name": "Necronium pickaxe + 2",
+   "item_ids": [
+    46376
+   ],
+   "level": 70
+  },
+  {
+   "name": "Necronium pickaxe + 3",
+   "item_ids": [
+    46378
+   ],
+   "level": 70
+  },
+  {
+   "name": "Necronium pickaxe + 4",
+   "item_ids": [
+    46380
+   ],
+   "level": 70
+  },
+  {
+   "name": "Bane pickaxe",
+   "item_ids": [
+    45154
+   ],
+   "level": 80
+  },
+  {
+   "name": "Bane pickaxe + 1",
+   "item_ids": [
+    45156
+   ],
+   "level": 80
+  },
+  {
+   "name": "Bane pickaxe + 2",
+   "item_ids": [
+    45158
+   ],
+   "level": 80
+  },
+  {
+   "name": "Bane pickaxe + 3",
+   "item_ids": [
+    45160
+   ],
+   "level": 80
+  },
+  {
+   "name": "Bane pickaxe + 4",
+   "item_ids": [
+    45162
+   ],
+   "level": 80
+  },
+  {
+   "name": "Imcando pickaxe",
+   "item_ids": [
+    29522
+   ],
+   "level": 80
+  },
+  {
+   "name": "Augmented pickaxe of earth and song",
+   "item_ids": [
+    44835,
+    44836
+   ],
+   "level": 90
+  },
+  {
+   "name": "Elder rune pickaxe",
+   "item_ids": [
+    45642
+   ],
+   "level": 90
+  },
+  {
+   "name": "Elder rune pickaxe + 1",
+   "item_ids": [
+    45644
+   ],
+   "level": 90
+  },
+  {
+   "name": "Elder rune pickaxe + 2",
+   "item_ids": [
+    45646
+   ],
+   "level": 90
+  },
+  {
+   "name": "Elder rune pickaxe + 3",
+   "item_ids": [
+    45648
+   ],
+   "level": 90
+  },
+  {
+   "name": "Elder rune pickaxe + 4",
+   "item_ids": [
+    45650
+   ],
+   "level": 90
+  },
+  {
+   "name": "Elder rune pickaxe + 5",
+   "item_ids": [
+    45652
+   ],
+   "level": 90
+  },
+  {
+   "name": "Pickaxe of earth and song",
+   "item_ids": [
+    44834
+   ],
+   "level": 90
+  },
+  {
+   "name": "Augmented pickaxe of life and death",
+   "item_ids": [
+    57196,
+    57197
+   ],
+   "level": 100
+  },
+  {
+   "name": "Pickaxe of life and death",
+   "item_ids": [
+    57195
+   ],
+   "level": 100
+  },
+  {
+   "name": "Primal pickaxe",
+   "item_ids": [
+    57391
+   ],
+   "level": 100
+  },
+  {
+   "name": "Primal pickaxe + 1",
+   "item_ids": [
+    57393
+   ],
+   "level": 100
+  },
+  {
+   "name": "Primal pickaxe + 2",
+   "item_ids": [
+    57395
+   ],
+   "level": 100
+  },
+  {
+   "name": "Primal pickaxe + 3",
+   "item_ids": [
+    57397
+   ],
+   "level": 100
+  },
+  {
+   "name": "Primal pickaxe + 4",
+   "item_ids": [
+    57399
+   ],
+   "level": 100
+  },
+  {
+   "name": "Primal pickaxe + 5",
+   "item_ids": [
+    57401
+   ],
+   "level": 100
+  }
+ ],
+ "missing": []
+}

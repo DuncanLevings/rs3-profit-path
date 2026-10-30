@@ -4,12 +4,83 @@
 local Snapshot = {}
 local containers = { "INV", "WORN", "BANK" }
 
--- An application bound, not a claimed client/database limit. Reject oversized
+-- Application bounds, not claimed client/database limits. Reject oversized
 -- records rather than walking arbitrary persisted data or overwriting it silently.
+-- MAX_ITEMS caps items actually held; MAX_CHECKED caps everything checked, since
+-- the tiered gear checks alone look for about 2,900 pieces.
 local MAX_ITEMS = 4096
+local MAX_CHECKED = 20000
+
+-- Record layout. Schema 1 saved every checked item as its own key, zeros too:
+-- thousands of entries per container once tiered gear arrived. Schema 2 keeps
+-- held items as keys and folds every zero into one "absent" string of IDs
+-- ("1351,1359,..."), so a record stays small. Schema 1 records still load.
+local SCHEMA = 2
 
 local function validCount(value)
     return type(value) == "number" and value >= 0 and value < math.huge and value % 1 == 0
+end
+
+-- A saved item ID. Keys are written as strings, but accept a number too in case
+-- the client's storage hands numeric-looking keys back as numbers.
+local function savedItemId(key)
+    local itemId = tonumber(key)
+
+    if not itemId or itemId <= 0 or itemId % 1 ~= 0 then
+        return nil
+    end
+
+    if type(key) == "string" and tostring(itemId) ~= key then
+        return nil
+    end
+
+    return itemId
+end
+
+-- Reads one saved container into a plain { [itemId] = count } table, zeros
+-- included. Returns nil if anything in it looks wrong.
+local function readContainer(record, schema)
+    if type(record) ~= "table" then
+        return nil
+    end
+
+    local counts, size = {}, 0
+    local held = schema == 1 and record or record.counts
+
+    if type(held) ~= "table" then
+        return nil
+    end
+
+    for key, quantity in pairs(held) do
+        size = size + 1
+        local itemId = savedItemId(key)
+
+        if size > MAX_ITEMS or not itemId or counts[itemId] ~= nil or not validCount(quantity) then
+            return nil
+        end
+
+        counts[itemId] = quantity
+    end
+
+    -- Schema 2: the zeros, as one comma-separated string.
+    if schema == 2 and record.absent ~= nil then
+        if type(record.absent) ~= "string" then
+            return nil
+        end
+
+        for key in record.absent:gmatch("[^,]+") do
+            size = size + 1
+            local itemId = savedItemId(key)
+
+            if size > MAX_CHECKED or not itemId or counts[itemId] ~= nil then
+                return nil
+            end
+
+            counts[itemId] = 0
+        end
+    end
+
+    return counts
 end
 
 function Snapshot.new(db)
@@ -35,7 +106,9 @@ function Snapshot.new(db)
             return
         end
 
-        if not ok or type(stored) ~= "table" or stored.schema ~= 1 or type(stored.containers) ~= "table" then
+        local schema = type(stored) == "table" and stored.schema
+
+        if not ok or (schema ~= 1 and schema ~= SCHEMA) or type(stored.containers) ~= "table" then
             self.writable = false
             self.message = "Saved item evidence could not be read; it will not be overwritten."
             return
@@ -45,25 +118,9 @@ function Snapshot.new(db)
             local record = stored.containers[name]
 
             if record ~= nil then
-                local counts, size = {}, 0
-                local valid = type(record) == "table"
+                local counts = readContainer(record, schema)
 
-                if valid then
-                    for key, quantity in pairs(record) do
-                        size = size + 1
-                        local itemId = type(key) == "string" and tonumber(key) or nil
-
-                        if size > MAX_ITEMS or not itemId or itemId <= 0 or itemId % 1 ~= 0
-                            or tostring(itemId) ~= key or counts[itemId] ~= nil or not validCount(quantity) then
-                            valid = false
-                            break
-                        end
-
-                        counts[itemId] = quantity
-                    end
-                end
-
-                if valid then
+                if counts then
                     self.data[name] = counts
                 else
                     self.writable = false
@@ -80,11 +137,12 @@ function Snapshot.new(db)
         end
 
         local old = self.data[name] or {}
-        local copy, different, size = {}, false, 0
+        local copy, different, size, held = {}, false, 0, 0
 
         for itemId, quantity in pairs(counts) do
             copy[itemId] = quantity
             size = size + 1
+            held = held + (quantity > 0 and 1 or 0)
             different = different or old[itemId] ~= quantity
         end
 
@@ -92,7 +150,7 @@ function Snapshot.new(db)
             different = different or counts[itemId] == nil
         end
 
-        if size > MAX_ITEMS then
+        if held > MAX_ITEMS or size > MAX_CHECKED then
             self.message = "Too many item checks to save this snapshot."
             return
         end
@@ -110,15 +168,23 @@ function Snapshot.new(db)
             return
         end
 
-        local record = { schema = 1, containers = {} }
+        local record = { schema = SCHEMA, containers = {} }
 
         for _, name in ipairs(containers) do
             if self.data[name] then
-                record.containers[name] = {}
+                local held, absent = {}, {}
 
                 for itemId, quantity in pairs(self.data[name]) do
-                    record.containers[name][tostring(itemId)] = quantity
+                    if quantity > 0 then
+                        held[tostring(itemId)] = quantity
+                    else
+                        absent[#absent + 1] = itemId
+                    end
                 end
+
+                -- Sorted so the same contents always save as the same string.
+                table.sort(absent)
+                record.containers[name] = { counts = held, absent = table.concat(absent, ",") }
             end
         end
 

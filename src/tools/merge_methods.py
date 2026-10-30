@@ -196,6 +196,11 @@ def tiered_gear(text):
     if anchor and not GEAR_TIER.search(anchor) and re.search(r"high[- ]level equipment", anchor, re.I):
         plain += " (61+)"
 
+    # Plain words too: "High-level power armour", "Any high level shield required".
+    if not anchor and not GEAR_TIER.search(plain) and re.search(r"high[- ]level", plain, re.I) \
+            and re.search(r"\b(armou?r|shields?|weapons?)\b", plain, re.I):
+        plain += " (61+)"
+
     clauses = [clause for clause in re.split(r"\band\b", plain) if GEAR_TIER.search(clause)]
 
     if len(clauses) == 1 and re.search(r"weapons?\s+and\s+armou?r", plain, re.I):
@@ -253,6 +258,98 @@ def combat_gear_group(pieces, ctx):
             "note": "Checks Wiki equipment of tier 60 and above (weapons, shields and body armour) carried, worn "
                     "or banked. Perks aren't checked.",
             "source": "RuneScape Wiki infobox_bonuses and infobox_item buckets"}
+
+
+# ---- Tools ("Any pickaxe", "Crystal pickaxe or better", "Tier 80+ pickaxe")
+#
+# A line that accepts any good enough pickaxe or hatchet is a check on that tool's
+# group, not on the one item the Wiki happened to link: a better pickaxe (or one on
+# your tool belt) counts. The hatchet group is curated in methods.json; the pickaxe
+# group comes from research/pickaxes.json (the Wiki's Pickaxes table).
+
+PICKAXE_GROUP = "pickaxe"
+
+# The guide's words for "this tool or a better one".
+TOOL_ANY = re.compile(r"^(?:any|a)\s+(pickaxe|hatchet)$|highest[- ]tier", re.I)
+TOOL_BETTER = re.compile(r"\bor better\b|\bor higher\b|\bat minimum\b", re.I)
+TOOL_TIER = re.compile(r"\btier\s*(\d{1,3})\s*\+?\s*(pickaxe|hatchet)", re.I)
+
+
+def load_pickaxes():
+    """[{name, item_ids, level}] from research/pickaxes.json."""
+    if not wiki_methods.PICKAXES.exists():
+        return []
+
+    return json.loads(wiki_methods.PICKAXES.read_text(encoding="utf-8"))["pieces"]
+
+
+def pickaxe_tier(piece):
+    """A pickaxe's rank. Pickaxes share Mining levels ("Elder rune pickaxe + 5" and
+    "+ 0" are both 90), so the tier is the level times ten plus its upgrade number,
+    and the perked pickaxes (augmentable or augmented) rank above every "+ N" at their
+    level. "Elder rune pickaxe + 5 or better" then means exactly that."""
+    plus = re.search(r"\+\s*(\d)$", piece["name"])
+
+    if plus:
+        return piece["level"] * 10 + int(plus.group(1))
+
+    if re.search(r"augmented|imcando|earth and song|life and death", piece["name"], re.I):
+        return piece["level"] * 10 + 9
+
+    return piece["level"] * 10
+
+
+def pickaxe_group(pieces, ctx):
+    """The pickaxe group: every pickaxe the Wiki lists, ranked by pickaxe_tier."""
+    candidates = []
+
+    for piece in pieces:
+        for item_id in piece["item_ids"]:
+            if str(item_id) not in ctx.items:
+                ctx.items[str(item_id)] = {"name": piece["name"], "source": "RuneScape Wiki Pickaxes page and infobox_item"}
+
+            candidates.append({"item_id": item_id, "tier": pickaxe_tier(piece), "skills": {"MINING": piece["level"]}})
+
+    # Not "complete": the tool belt reports a pickaxe by the client's own item ID,
+    # which hasn't been compared with these Wiki IDs in game yet. Until it is, not
+    # finding one is "can't tell", never a red "missing".
+    return {"complete": False, "candidates": candidates,
+            "note": "Checks Wiki-listed pickaxes carried, worn, banked or on the tool belt. Not finding one "
+                    "isn't proof you have none yet.",
+            "source": "RuneScape Wiki Pickaxes table and infobox_item bucket"}
+
+
+def tool_check(text, req, ctx):
+    """A gear check on the pickaxe or hatchet group for a line that accepts any good
+    enough one, or None. `req` is the linked item ("item:Crystal pickaxe") or None."""
+    word = re.search(r"\b(pickaxe|hatchet)\b", text, re.I)
+
+    if not word:
+        return None
+
+    group = PICKAXE_GROUP if word.group(1).lower() == "pickaxe" else "hatchet"
+    tiers = ctx.tool_tiers.get(group, {})
+    check = {"kind": "gear", "equipment_scope": "flexible", "equipment_group": group, "text": text}
+    tier = TOOL_TIER.search(text)
+
+    if tier:
+        # "Tier 80+ pickaxe": the Wiki's tier is the Mining level.
+        level = int(tier.group(1))
+        check["minimum_tier"] = level * 10 if group == PICKAXE_GROUP else level
+    elif TOOL_BETTER.search(text) and req:
+        # "Crystal pickaxe or better": at least the linked pickaxe's own tier.
+        item_id = ctx.item_id(req[len("item:"):]) if req.startswith("item:") else None
+
+        if item_id not in tiers:
+            return None
+
+        check["minimum_tier"] = tiers[item_id]
+    elif not TOOL_ANY.search(text.strip()):
+        return None
+
+    ctx.uses_tools.add(group)
+
+    return check
 
 
 def load_achievements():
@@ -315,6 +412,11 @@ class Context:
         # wording for one survives, as a tip or a "Check yourself" note.
         self.advice = []
 
+        # {group: {item ID: tier}} for the pickaxe and hatchet groups, and which of
+        # them some method checks (merge() adds only those to the catalogue).
+        self.tool_tiers = {}
+        self.uses_tools = set()
+
     def item_id(self, name):
         """The item ID for a Wiki name, adding it to the items table on first use.
         Curated item definitions are never replaced."""
@@ -373,6 +475,11 @@ def capability(name, ctx, quest=False):
     (those are collected into ctx.advice instead)."""
     research = ctx.capabilities.get(name, {})
 
+    # Wiki parsing leftovers with nothing to say ("83", "High", "Comparison of
+    # high-level magic weapons"), even when they look like a gear line.
+    if research.get("kind") == "noise":
+        return None
+
     # "Tier 90+ magic weapon", "Magic armour#High level equipment (61+)".
     gear = None if quest else tiered_gear(name)
 
@@ -386,10 +493,6 @@ def capability(name, ctx, quest=False):
 
     if research.get("kind") == "guidance":
         ctx.advice.append(tidy_name(name))
-        return None
-
-    # Wiki parsing leftovers with nothing to say ("83", "High", "Strategies").
-    if research.get("kind") == "noise":
         return None
 
     # A relic (or other unlock) with a flag verified in game is checked directly.
@@ -452,6 +555,12 @@ def convert_requirement(entry, ctx):
 
     if isinstance(entry, dict):
         if "req" not in entry:
+            # "Any pickaxe": any pickaxe at all, from the pickaxe group.
+            tool = tool_check(entry["text"], None, ctx)
+
+            if tool:
+                return tool
+
             # Plain words we've researched ("Lunar spellbook active") and tiered
             # gear lines are checked like any other capability.
             if entry["text"] in ctx.capabilities or tiered_gear(entry["text"]):
@@ -459,6 +568,12 @@ def convert_requirement(entry, ctx):
 
             # Otherwise they're shown, but can't be checked.
             return {"kind": "capability", "text": entry["text"]}
+
+        # "Crystal pickaxe or better", "Tier 80+ pickaxe": any good enough tool.
+        tool = tool_check(entry["text"], entry["req"], ctx) if isinstance(entry["req"], str) else None
+
+        if tool:
+            return tool
 
         # A tiered gear line linked to a Wiki page ("Tier 95+ ranged weapons,
         # perked" -> Armoury) is a real gear check, not a "See also" link. A line
@@ -488,13 +603,28 @@ def convert_requirement(entry, ctx):
         for child in children:
             child.pop("_worded", None)
 
+        # A joined line's own words can be more exact than its gear link: "T70+
+        # magic armour with Scavenging" links the 61+ armour page. The line wins.
+        gear = tiered_gear(text) if text else None
+
+        if gear and gear["kind"] == "gear":
+            ctx.uses_gear = True
+            children = [dict(gear) if child["kind"] == "gear" else child for child in children]
+
         # Every option was a Wiki advice page: there's nothing left to check.
         if not children:
             return None
 
-        check = {"kind": "any", "children": children,
-                 "text": " or ".join([", ".join(child["text"] for child in children[:-1]), children[-1]["text"]])
-                 if len(children) > 1 else children[0]["text"]}
+        # ["any", ...] is one of these; ["all", ...] (a merged multi-link line)
+        # needs every one.
+        kind = "all" if entry[0] == "all" else "any"
+        joiner = " and " if kind == "all" else " or "
+
+        if len(children) == 1:
+            check = dict(children[0])
+        else:
+            check = {"kind": kind, "children": children,
+                     "text": joiner.join([", ".join(child["text"] for child in children[:-1]), children[-1]["text"]])}
 
         if all(child["kind"] == "item" for child in children):
             check["display_items"] = list(dict.fromkeys(child["itemId"] for child in children))
@@ -591,18 +721,102 @@ def check_icons(check):
     return icons
 
 
+# ---- One Wiki line, one requirement ---------------------------------------------
+#
+# The importer splits a line with several links into one entry per link, all with
+# the line's text ("Built a plank maker then a high capacity plank maker" twice).
+# Shown as is, that's the same line several times. join_split_lines puts them back
+# together as one check: "any one of" when the wording offers a choice, otherwise
+# "all of". A link named only inside brackets is a side note ("Tier 80+ pickaxe
+# ( Augmentable pickaxe highly recommended)"), not part of what's required.
+
+CHOICE = re.compile(r"\bor\b(?!\s+their\b)|\bsuch as\b|\blike\b|\be\.g\.|\betc\b|>|\)\s*/|\s/\s?", re.I)
+
+
+def link_outside_brackets(req, text):
+    """True unless the link is only mentioned inside (...) in the line."""
+    outside = re.sub(r"\([^)]*\)", " ", text).lower()
+
+    if isinstance(req, str) and req.startswith("skill:"):
+        # Skill links carry no name, just a level: "77 (105 for Expansive pouch)".
+        return re.search(rf"\b{req.rsplit(':', 1)[-1]}\b", outside) is not None
+
+    if isinstance(req, str) and ":" in req:
+        name = req.split(":", 1)[1].replace("_", " ").split("#")[0].lower()
+        return name not in text.lower() or name in outside
+
+    return True
+
+
+def join_split_lines(entries):
+    """The guide's entries with each split multi-link line joined back into one."""
+    joined = []
+
+    for entry in entries:
+        previous = joined[-1] if joined else None
+
+        if (isinstance(entry, dict) and "req" in entry and isinstance(previous, dict)
+                and previous.get("text") == entry["text"] and "parts" in previous):
+            previous["parts"].append(entry["req"])
+            continue
+
+        joined.append({"text": entry["text"], "parts": [entry["req"]]} if isinstance(entry, dict) and "req" in entry
+                      else entry)
+
+    for index, entry in enumerate(joined):
+        if not (isinstance(entry, dict) and "parts" in entry):
+            continue
+
+        # The same link twice ("Ring of imbuing for 10% more rune output") is one.
+        parts = list({json.dumps(part): part for part in entry["parts"]}.values())
+        kept = [part for part in parts if link_outside_brackets(part, entry["text"])] or parts
+
+        if len(kept) == 1:
+            joined[index] = {"text": entry["text"], "req": kept[0]}
+        else:
+            kind = "any" if CHOICE.search(entry["text"]) else "all"
+            joined[index] = {"text": entry["text"], "req": [kind, *kept]}
+
+    # Bare links that are the same thing twice ("Undead Slayer" and "Undead Slayer
+    # (ability)") are one requirement: keep the more specific name.
+    names = {entry for entry in joined if isinstance(entry, str)}
+
+    return [entry for entry in joined
+            if not (isinstance(entry, str) and any(other.startswith(entry + " (") and other.endswith(")")
+                                                   for other in names))]
+
+
+# The Wiki's templates add "recommended" after every link in a line ("Sana's
+# fyrtorch recommended, Ring of Whispers recommended, ..., etc. recommended").
+# Saying it once, at the end, is enough.
+REPEATED = re.compile(r"(?:\s+(?:highly\s+|strongly\s+)?(recommended|optional)\b)", re.I)
+
+
+def tidy_wording(text):
+    """One line's text with repeated "recommended" / "optional" said once."""
+    for word in ("recommended", "optional"):
+        matches = [match for match in REPEATED.finditer(text) if match.group(1).lower() == word]
+
+        # Keep the last one ("... recommended (highly recommended)" keeps "highly").
+        for match in reversed(matches[:-1]):
+            text = text[:match.start()] + text[match.end():]
+
+    return re.sub(r"\s+([,.)])", r"\1", re.sub(r"\(\s+", "(", text))
+
+
 def convert_requirements(requirements, ctx):
     access, recommended, tips, notes = [], [], [], []
     ctx.advice = []
 
     for importance, entries in requirements.items():
-        for entry in entries:
+        for entry in join_split_lines(entries):
             check = convert_requirement(entry, ctx)
 
             if check is None:
                 continue
 
             worded = check.pop("_worded", False)
+            check["text"] = tidy_wording(check["text"])
 
             # Required plain words nobody has researched ("Tier 90+ weapons", "A team
             # of 1-3 other players") are things only the player can judge. They're
@@ -910,6 +1124,14 @@ def merge(recipe_source=None, monsters=None):
     ctx = Context(items, meta or {"items": {}, "retrieved": None}, catalogue.load_capabilities(), recipes,
                   catalogue.load_quests(), load_outfits(), load_achievements())
 
+    # Tool tiers, so "Crystal pickaxe or better" knows what "better" is.
+    pickaxes = load_pickaxes()
+    ctx.tool_tiers[PICKAXE_GROUP] = {item_id: pickaxe_tier(piece) for piece in pickaxes for item_id in piece["item_ids"]}
+
+    if "hatchet" in curated.get("equipment", {}):
+        ctx.tool_tiers["hatchet"] = {candidate["item_id"]: candidate["tier"]
+                                     for candidate in curated["equipment"]["hatchet"]["candidates"]}
+
     # Rule 1: which guides our curated methods replace.
     by_key = {(guide["page"], (guide.get("version") or "").lower()): guide for guide in guides}
     replaced, unmatched = {}, []
@@ -1000,6 +1222,10 @@ def merge(recipe_source=None, monsters=None):
     # Tiered gear lines need the combat equipment group.
     if getattr(ctx, "uses_gear", False):
         merged.setdefault("equipment", {})[COMBAT_GEAR] = combat_gear_group(load_equipment(), ctx)
+
+    # And "any pickaxe" lines the pickaxe group (the hatchet group is curated).
+    if PICKAXE_GROUP in ctx.uses_tools:
+        merged.setdefault("equipment", {})[PICKAXE_GROUP] = pickaxe_group(pickaxes, ctx)
 
     return merged, details
 

@@ -65,6 +65,23 @@ local function event()
     }
 end
 
+-- Browse's search waits for a pause in typing (a few Logic ticks) before it
+-- redraws. Tests that type a search call this to let that pause pass.
+function settleSearch()
+    for _ = 1, 20 do
+        Event.Logic.emit({})
+    end
+end
+
+-- A method screen draws what's on screen first and the rest a piece per Logic
+-- tick. Tests that look past the open tab (or at long Income tables) call this
+-- to let it finish.
+function settleMethod()
+    for _ = 1, 60 do
+        Event.Logic.emit({})
+    end
+end
+
 -- Installs a fresh fake game client as globals and returns its `state` table.
 -- Tests flip fields on `state` to simulate things: state.available = false for
 -- logged out, state.failWrite = true for a storage failure, and so on.
@@ -655,6 +672,16 @@ local function pretty()
                 return self.activeIndex
             end
 
+            -- A player clicking a tab: PrettyUI calls onChange only for a new tab.
+            function tabs:SetActive(index)
+                local previous = self.activeIndex
+                self.activeIndex = index
+
+                if previous ~= index and options.onChange then
+                    options.onChange(self, index)
+                end
+            end
+
             self.tabs[#self.tabs + 1] = tabs
             return tabs
         end
@@ -756,87 +783,25 @@ test("logged-out player never reads skills or identity", function()
 
     local account = Account.new(function() end)
 
-    equal(account:readPlayer().status, "unavailable")
-    equal(account:inspectInventory("BANK").status, "unavailable")
+    equal(account:readCombatLevel().status, "unavailable")
+    equal(next(account:readSkills({ PRAYER = true })), nil)
+    equal(account:readOwnership({ [42] = true }).complete, false)
+    equal(account:readOwnership({ [42] = true }).counts[42], nil)
 
     account:destroy()
 end)
 
 -- Even if the player granted trackingAccess before, we must not read the ID
 -- (the fake GetTrackingID throws if anyone tries).
-test("player status never reads tracking identity, even with an existing grant", function()
+test("player reads never read tracking identity, even with an existing grant", function()
     local state = client()
     local account = Account.new(function() end)
-
-    equal(account:readPlayer().status, "available")
 
     state.permitted = true
-    local result = account:readPlayer()
 
-    equal(result.identity, nil)
-    equal(result.trackingId, nil)
-    equal(result.prayer, 92)
-
-    account:destroy()
-end)
-
--- "We couldn't read the bank" and "the bank is empty" must stay different answers.
-test("unavailable and known empty inventories differ", function()
-    local state = client()
-    local account = Account.new(function() end)
-
-    equal(account:inspectInventory("BANK").status, "unavailable")
-
-    state.inventory = container({})
-    local result = account:inspectInventory("BANK")
-
-    equal(result.status, "available")
-    equal(#result.items, 0)
-    equal(result.completeness, "unverified")
-
-    account:destroy()
-end)
-
--- Slots can have gaps (slot 1, then 7). We must copy the values out, not keep
--- references to native objects that might change underneath us.
-test("sparse slots are copied as plain item evidence", function()
-    local state = client()
-    local obj = { id = 42, name = "Fixture weapon" }
-    state.inventory = container({ [1] = { obj = obj, count = 3 }, [7] = { obj = { id = 43 }, count = 2 } })
-
-    local account = Account.new(function() end)
-    local result = account:inspectInventory("BANK")
-
-    equal(#result.items, 2)
-    equal(result.items[1].slot, 1)
-    equal(result.items[1].name, "Fixture weapon")
-
-    -- Change the "native" object afterwards; our copy must not change with it.
-    obj.name = "Changed name"
-    equal(result.items[1].name, "Fixture weapon")
-
-    obj.id = 999
-
-    for _, item in ipairs(result.items) do
-        assert(item.itemId ~= 999)
-        equal(item.obj, nil)
-    end
-
-    account:destroy()
-end)
-
-test("invalid config names and unknown configs are explicit", function()
-    local state = client()
-    state.inventory = container({})
-
-    local account = Account.new(function() end)
-    account:inspectInventory("BANK")
-
-    -- A bad name also clears the previous successful read.
-    equal(account:inspectInventory("BANK()").status, "invalid")
-    equal(account.inspection, nil)
-
-    equal(account:inspectInventory("NOT_A_CONFIG").status, "unknown")
+    equal(account:readSkills({ PRAYER = true }).PRAYER.level, 92)
+    equal(account:readCombatLevel().status, "available")
+    assert(account:readCharacterName())
 
     account:destroy()
 end)
@@ -849,67 +814,10 @@ test("native failure is not converted to an empty bank", function()
     end
 
     local account = Account.new(function() end)
-    local result = account:inspectInventory("BANK")
+    local result = account:readOwnership({ [42] = true })
 
-    equal(result.status, "error")
-    assert(result.message:find("Native read failed", 1, true))
-
-    account:destroy()
-end)
-
-test("nil and invalid native inventories remain unavailable", function()
-    local state = client()
-    local account = Account.new(function() end)
-
-    state.inventory = { isValid = false }
-    equal(account:inspectInventory("BANK").status, "unavailable")
-
-    state.inventory = container(nil)
-    equal(account:inspectInventory("BANK").status, "unavailable")
-
-    account:destroy()
-end)
-
--- An INV change mustn't throw away our BANK read; a BANK change must.
-test("changes invalidate only the inspected container", function()
-    local state = client()
-    state.inventory = container({})
-
-    local notifications = 0
-    local account = Account.new(function()
-        notifications = notifications + 1
-    end)
-
-    account:inspectInventory("BANK")
-
-    Event.InventoryUpdated.emit({ inv = config.Inv.INV })
-    assert(account.inspection)
-
-    Event.InventoryRemoved.emit({ inv = config.Inv.BANK })
-    equal(account.inspection, nil)
-
-    equal(notifications, 2)
-
-    account:destroy()
-end)
-
--- Login/logout/world hop: everything we read before is forgotten.
-test("game-state changes discard inspected account evidence", function()
-    local state = client()
-    state.inventory = container({})
-
-    local account = Account.new(function() end)
-    account:inspectInventory("BANK")
-    account:inspectQuest("FIXTURE_QUEST")
-
-    Event.InventoryUpdated.emit({ inv = config.Inv.INV })
-    equal(account.lastInventoryName, "INV")
-
-    Event.GameStateChanged.emit({ oldState = 30, newState = 20 })
-
-    equal(account.inspection, nil)
-    equal(account.questInspection, nil)
-    equal(account.lastInventoryName, nil)
+    equal(result.complete, false)
+    equal(result.counts[42], nil)
 
     account:destroy()
 end)
@@ -934,14 +842,14 @@ test("account teardown is idempotent and removes subscriptions", function()
     Event.InventoryAdded.emit({ inv = config.Inv.BANK })
 
     equal(notifications, 0)
-    equal(account:inspectInventory("BANK").status, "stopped")
+    equal(account:readCombatLevel().status, "unavailable")
 end)
 
 test("quest flags preserve completed, started and not-started states", function()
     client()
 
     local account = Account.new(function() end)
-    local result = account:inspectQuest("FIXTURE_QUEST")
+    local result = account:readQuest("FIXTURE_QUEST")
 
     equal(result.status, "available")
     equal(result.completed, true)
@@ -949,16 +857,16 @@ test("quest flags preserve completed, started and not-started states", function(
     -- An earlier result is a snapshot; changing the config later doesn't alter it.
     config.Quest.FIXTURE_QUEST.hasFinishedQuest = false
     equal(result.completed, true)
-    equal(account:inspectQuest("FIXTURE_QUEST").started, true)
+    equal(account:readQuest("FIXTURE_QUEST").started, true)
 
     config.Quest.FIXTURE_QUEST.hasStartedQuest = false
-    result = account:inspectQuest("FIXTURE_QUEST")
+    result = account:readQuest("FIXTURE_QUEST")
 
     equal(result.started, false)
     equal(result.completed, false)
 
     account:destroy()
-    equal(account:inspectQuest("FIXTURE_QUEST").status, "stopped")
+    equal(account:readQuest("FIXTURE_QUEST").status, "stopped")
 end)
 
 -- Missing or deprecated quest data means "we don't know", never "not completed".
@@ -966,19 +874,16 @@ test("missing or deprecated quest data is unknown rather than incomplete", funct
     client()
 
     local account = Account.new(function() end)
-    account:inspectQuest("FIXTURE_QUEST")
+    equal(account:readQuest("FIXTURE_QUEST()").status, "invalid")
 
-    equal(account:inspectQuest("FIXTURE_QUEST()").status, "invalid")
-    equal(account.questInspection, nil)
-
-    equal(account:inspectQuest("UNKNOWN_QUEST").status, "unknown")
+    equal(account:readQuest("UNKNOWN_QUEST").status, "unknown")
 
     config.Quest.FIXTURE_QUEST.deprecated = true
-    equal(account:inspectQuest("FIXTURE_QUEST").status, "unknown")
+    equal(account:readQuest("FIXTURE_QUEST").status, "unknown")
 
     config.Quest.FIXTURE_QUEST.deprecated = false
     config.Quest.FIXTURE_QUEST.hasFinishedQuest = nil
-    equal(account:inspectQuest("FIXTURE_QUEST").status, "unknown")
+    equal(account:readQuest("FIXTURE_QUEST").status, "unknown")
 
     account:destroy()
 end)
@@ -994,67 +899,14 @@ test("quest reads respect login availability and preserve native errors", functi
     end })
 
     -- Logged out: we bail out before touching the config at all.
-    equal(account:inspectQuest("FIXTURE_QUEST").status, "unavailable")
+    equal(account:readQuest("FIXTURE_QUEST").status, "unavailable")
 
     state.available = true
-    local result = account:inspectQuest("FIXTURE_QUEST")
+    local result = account:readQuest("FIXTURE_QUEST")
 
     equal(result.status, "error")
     assert(result.message:find("Quest native failure", 1, true))
 
-    account:destroy()
-end)
-
--- Diagnostics screen (temporary probes) ---------------------------------------
-
-test("probe buttons inspect the observed inventory and quest", function()
-    local state = client()
-    local account = Account.new(function() end)
-    local library = pretty()
-
-    local ui = UI.new(library, account, function() end, function(name)
-        return account:inspectQuest(name)
-    end)
-
-    ui.screen = "diagnostics"
-    ui:mount({ width = 600, height = 800 })
-
-    local buttons = library.views[1].buttons
-
-    -- Nothing has changed yet, so there's no "last changed inventory" to read.
-    buttons["Inspect last changed inventory"]()
-    equal(account.inspection, nil)
-
-    state.inventory = container({ [4] = { obj = { id = 42, name = "Fixture armour" }, count = 1 } })
-    Event.InventoryUpdated.emit({ inv = config.Inv.INV })
-
-    buttons["Inspect last changed inventory"]()
-    equal(account.inspection.name, "INV")
-
-    -- fields[2] is the quest name box. Empty is rejected; a real name works.
-    equal(library.views[1].fields[2].text, "COOKS_ASSISTANT")
-
-    library.views[1].fields[2].text = ""
-    buttons["Inspect quest"]()
-    equal(account.questInspection, nil)
-
-    library.views[1].fields[2].text = "FIXTURE_QUEST"
-    buttons["Inspect quest"]()
-    equal(account.questInspection.completed, true)
-
-    -- Both results should now be visible somewhere on the screen.
-    local output = {}
-
-    for _, label in ipairs(library.views[1].texts) do
-        output[#output + 1] = label.content
-    end
-
-    local text = table.concat(output, "\n")
-
-    assert(text:find("Fixture armour [42] x1", 1, true))
-    assert(text:find("Fixture quest: Completed", 1, true))
-
-    ui:destroy()
     account:destroy()
 end)
 
@@ -1512,42 +1364,6 @@ end)
 
 -- UI lifetime (ui.lua) ----------------------------------------------------------
 
--- Old buttons must go dead once their view is replaced (the "generation" guard),
--- and everything must go dead after destroy().
-test("remount destroys old UI and old callbacks become inert", function()
-    client()
-
-    local account = Account.new(function() end)
-    local library = pretty()
-    local quotes = 0
-
-    local screen = UI.new(library, account, function()
-        quotes = quotes + 1
-        return { status = "unavailable", message = "Unavailable" }
-    end)
-
-    screen.screen = "diagnostics"
-    screen:mount({ width = 700, height = 500 })
-    local old = library.views[1]
-
-    screen:mount({ width = 600, height = 400 })
-    assert(old.destroyed)
-
-    old.buttons["Check chronotes quote"]()
-    equal(quotes, 0)
-
-    library.views[2].buttons["Check chronotes quote"]()
-    equal(quotes, 1)
-
-    screen:destroy()
-    screen:destroy()
-
-    library.views[2].buttons["Check chronotes quote"]()
-    equal(quotes, 1)
-
-    account:destroy()
-end)
-
 -- If building a screen throws halfway, the half-built view is cleaned up and
 -- the error still reaches the caller.
 test("failed UI construction destroys the partial view and reports failure", function()
@@ -1557,7 +1373,7 @@ test("failed UI construction destroys the partial view and reports failure", fun
     local library = pretty()
     library.failTitle = true
 
-    local screen = UI.new(library, account, function() end)
+    local screen = UI.new(library, account)
 
     local ok, failure = pcall(function()
         screen:mount({ width = 700, height = 500 })
@@ -1593,23 +1409,10 @@ test("plugin enable/remount/shutdown cycles release all owned resources", functi
         assert(prettyui.views[1].destroyed)
         equal(#prettyui.windows, 0)
 
-        -- views[2] is the launcher, views[3] the Browse screen, views[4] Diagnostics.
+        -- views[2] is the launcher, views[3] the Browse screen, then a method.
         prettyui.views[2].buttons["Open Profit Path"]()
-        prettyui:findButton("Diagnostics")()
-
-        local latest = prettyui.views[4]
-        latest.fields[2].text = "FIXTURE_QUEST"
-        latest.buttons["Inspect quest"]()
-
-        local found = false
-
-        for _, label in ipairs(latest.texts) do
-            if label.content:find("Requirement: met.", 1, true) then
-                found = true
-            end
-        end
-
-        assert(found, "Main must connect quest evidence to the shared requirement checker")
+        prettyui:findMethod("Smelting steel bars")()
+        local latest = prettyui.views[#prettyui.views]
 
         PluginShutdown()
         PluginShutdown()
@@ -1618,7 +1421,7 @@ test("plugin enable/remount/shutdown cycles release all owned resources", functi
             equal(source.count(), 0)
         end
 
-        assert(prettyui.views[4].destroyed)
+        assert(latest.destroyed)
         assert(prettyui.windows[1].destroyed)
     end
 end)

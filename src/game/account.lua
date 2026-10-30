@@ -1,6 +1,4 @@
--- Lasting player-account reads and small manual probes live here. The temporary
--- toolbelt_probe.lua separately owns batched native-config discovery. This file
--- owns the client event subscriptions (inventory, skills, quests, game state) and
+-- Player-account reads live here. This file owns the client event subscriptions (inventory, skills, quests, game state) and
 -- tells its owner which evidence changed. It never does money maths or decides
 -- recommendations.
 --
@@ -28,13 +26,6 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         toolbeltBindings = toolbeltBindings or {},
         toolbeltVariables = {},
         toolbeltCache = nil,
-
-        -- Temporary diagnostics state; see the probe section below.
-        eventCount = 0,
-        lastEvent = "No inventory events observed yet.",
-        inspection = nil,
-        questInspection = nil,
-        lastInventoryName = nil,
     }
 
     -- Every event we subscribe to, so destroy() can unsubscribe all of them.
@@ -71,16 +62,6 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
             if snapshot.configId == inventoryConfig.id then
                 self.ownershipCache[name] = nil
             end
-        end
-
-        self.lastInventoryName = inventoryConfig.configName
-        self.eventCount = self.eventCount + 1
-        self.lastEvent = kind .. ": " .. inventoryConfig.configName
-
-        -- If the inventory we last read just changed, that read is out of date.
-        -- Drop it rather than keep showing old contents as if they were current.
-        if self.inspection and self.inspection.configId == inventoryConfig.id then
-            self.inspection = nil
         end
 
         notify("inventory")
@@ -378,18 +359,11 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
             event.Unsubscribe("profit-path-account")
         end
 
-        self.inspection = nil
-        self.questInspection = nil
-        self.lastInventoryName = nil
-
         subscriptions = {}
     end
 
-    -- Temporary development probes, used only by diagnostics.lua. Remove these
-    -- functions and the diagnostics state above together with that module.
-
     -- Unlock flags: game variables such as ARCH_RELIC_DEATH_NOTE_UNLOCKED, read by
-    -- name. Only names seen in game (Diagnostics' unlock scan) are ever asked for;
+    -- name. Only names found in the client's variable list are ever asked for;
     -- a missing or unreadable one is unknown, never "not unlocked".
     function self:readFlags(names)
         local flags = {}
@@ -461,129 +435,6 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         return { status = "available", level = level }
     end
 
-    function self:readPlayer()
-        if not self.active then
-            return { status = "stopped" }
-        end
-        if not Player.IsAvailable() then
-            return { status = "unavailable" }
-        end
-
-        return {
-            status = "available",
-            prayer = Player.GetLevelUncapped(SkillType.PRAYER),
-            herblore = Player.GetLevelUncapped(SkillType.HERBLORE),
-            combat = self:readCombatLevel().level,
-        }
-    end
-
-    function self:inspectInventory(name)
-        if not self.active then
-            return { status = "stopped" }
-        end
-        self.inspection = nil
-        if type(name) ~= "string" or not name:match("^[A-Z][A-Z0-9_]*$") then
-            return { status = "invalid", message = "Use an inventory config name such as BANK or INV." }
-        end
-        if not Player.IsAvailable() then
-            return { status = "unavailable", message = "Log into a game world first." }
-        end
-
-        -- Config resolution and inventory lifetime are the uncertain native boundary.
-        -- Preserve the failure reason instead of treating failed reads as an empty bank.
-        local ok, result = pcall(function()
-            local inventoryConfig = config.Inv[name]
-            if not inventoryConfig then
-                return { status = "unknown", message = "Inventory config is not available: " .. name }
-            end
-
-            local inventory = Inventory.Find(inventoryConfig)
-            if not inventory or not inventory.isValid then
-                return { status = "unavailable", configId = inventoryConfig.id, message = name .. " is not transmitted." }
-            end
-
-            local slots = inventory:GetSlots()
-            if not slots then
-                return { status = "unavailable", configId = inventoryConfig.id, message = name .. " slots are unavailable." }
-            end
-
-            local items = {}
-            for slotIndex, slot in pairs(slots) do
-                if slot.obj and slot.count > 0 then
-                    items[#items + 1] = {
-                        slot = slotIndex,
-                        itemId = slot.obj.id,
-                        name = slot.obj.name,
-                        quantity = slot.count,
-                    }
-                end
-            end
-
-            table.sort(items, function(left, right)
-                return left.slot < right.slot
-            end)
-
-            return {
-                status = "available",
-                configId = inventoryConfig.id,
-                name = name,
-                slotCount = inventory.slotCount,
-                items = items,
-                completeness = "unverified",
-            }
-        end)
-
-        if not ok then
-            result = { status = "error", message = "Inventory read failed: " .. tostring(result) }
-        end
-        self.inspection = result
-        return result
-    end
-
-    -- Temporary read-only probe. The config name is verified in Skill Tips, but
-    -- its numeric values aren't mapped yet, so this must not qualify equipment.
-    function self:inspectToolbeltHatchet()
-        if not self.active or not Player.IsAvailable() then
-            return { status = "unavailable", message = "Enter a game world first." }
-        end
-
-        local ok, result = pcall(function()
-            local setting = var.VarPlayer.TOOLBELT_HATCHET_LEVEL
-
-            if not setting then
-                return { status = "unknown", message = "The tool-belt hatchet variable is unavailable." }
-            end
-
-            local value = setting.value
-
-            if type(value) ~= "number" or value < 0 or value >= math.huge or value % 1 ~= 0 then
-                return { status = "unknown", message = "The tool-belt hatchet value is unavailable or not an integer." }
-            end
-
-            return { status = "available", value = value, configId = setting.id }
-        end)
-
-        if not ok then
-            return { status = "error", message = "Tool-belt read failed: " .. tostring(result) }
-        end
-
-        return result
-    end
-
-    -- Temporary diagnostics wrapper; the native reader above is lasting code.
-    function self:inspectQuest(name)
-        -- Invalid input and offline reads should clear the previous probe result.
-        -- Lasting requirement reads use readQuest without touching this UI state.
-        self.questInspection = nil
-        local result = self:readQuest(name)
-
-        if result.status ~= "invalid" and result.status ~= "unavailable" and result.status ~= "stopped" then
-            self.questInspection = result
-        end
-
-        return result
-    end
-
     -- Inventory events invalidate only the affected presence cache. Native item
     -- totals are re-read on demand while a method is visible, never each frame.
     subscribe(Event.InventoryAdded, function(event)
@@ -629,10 +480,6 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         self.questVariables = {}
         self.toolbeltCache = nil
         self.toolbeltVariables = {}
-        self.inspection = nil
-        self.questInspection = nil
-        self.lastInventoryName = nil
-        self.lastEvent = "Game state changed; inspect inventories again."
         self.ownershipCache = {}
 
         notify("game_state")

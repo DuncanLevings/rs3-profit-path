@@ -188,6 +188,57 @@ return function(test, equal, client, pretty)
         return screen.children[#screen.children]
     end
 
+    -- Typing redraws once, after a pause; Enter redraws at once; closing the
+    -- screen mid-pause leaves nothing waiting.
+    test("search redraws after a pause in typing, or straight away on Enter", function()
+        client()
+        prettyui = pretty()
+        gepl = nil
+
+        dofile("main.lua")
+
+        Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
+        prettyui:findButton("Open Profit Path")()
+
+        local browse = prettyui.views[2]
+        local field = browse.children[2].fields[1]
+        local original = list(browse)
+
+        field:SetText("st", true)
+        field:SetText("ste", true)
+        field:SetText("steel", true)
+        assert(not original.destroyed, "No redraw while still typing")
+
+        -- A few ticks isn't a pause yet; a new keystroke restarts the wait.
+        for _ = 1, 8 do
+            Event.Logic.emit({})
+        end
+
+        field:SetText("steel ", true)
+
+        for _ = 1, 8 do
+            Event.Logic.emit({})
+        end
+
+        assert(not original.destroyed, "Each keystroke restarts the wait")
+
+        settleSearch()
+        assert(original.destroyed, "Redraws after the pause")
+        assert(prettyui:findMethod("Smelting steel bars"))
+
+        -- Enter doesn't wait.
+        local filtered = list(browse)
+        field:SetText("elder", true)
+        field:Submit()
+        assert(filtered.destroyed, "Enter redraws at once")
+        assert(prettyui:findMethod("Cutting elder logs"))
+
+        -- Closing mid-pause cancels the wait.
+        field:SetText("steel", true)
+        PluginShutdown()
+        equal(Event.Logic.count(), 0, "Nothing left waiting after shutdown")
+    end)
+
     test("browser keeps filters and scroll on Back and ignores replaced row callbacks", function()
         client()
         prettyui = pretty()
@@ -204,6 +255,7 @@ return function(test, equal, client, pretty)
         local oldOpen = prettyui:findMethod("Smelting steel bars")
 
         header.fields[1]:SetText("steel", true)
+        settleSearch()
         assert(original.destroyed)
         assert(not header.destroyed)
 
@@ -316,6 +368,7 @@ return function(test, equal, client, pretty)
 
         local header = browse.children[2]
         header.fields[1]:SetText("steel", true)
+        settleSearch()
         header.nativeLists[1]:SetEntrySelected(1, true)
         Event.Logic.emit({})
         equal(calls, 30)
@@ -413,6 +466,7 @@ return function(test, equal, client, pretty)
 
         local success, problem = pcall(function()
             browse.children[2].fields[1]:SetText("steel", true)
+            settleSearch()
         end)
 
         equal(success, false)
@@ -425,6 +479,7 @@ return function(test, equal, client, pretty)
         -- The header still works: a subsequent valid rebuild can recover.
         prettyui.failTitle = false
         browse.children[2].fields[1]:SetText("", true)
+        settleSearch()
         assert(not list(browse).destroyed)
 
         PluginShutdown()
@@ -635,6 +690,7 @@ return function(test, equal, client, pretty)
         -- Elder logs has both required and recommended items, side by side.
         local halves, fulls = 0, 0
 
+        settleMethod()
         for _, section in ipairs(tabs.pages[2].children) do
             if section.size.width == 282 then
                 halves = halves + 1
@@ -644,7 +700,7 @@ return function(test, equal, client, pretty)
             end
         end
 
-        equal(halves, 2, "Required and recommended items share the row")
+        equal(halves, 4, "Required and recommended skills and items share their rows")
         assert(fulls > 0)
 
         PluginShutdown()
@@ -693,7 +749,7 @@ return function(test, equal, client, pretty)
         equal(detail.tabs[1].pages[1]:allFields()[1]:GetText(), "320")
 
         -- On the Requirements tab, switch to the wood spirits version.
-        detail.tabs[1].activeIndex = 2
+        detail.tabs[1]:SetActive(2)
         versions:SetEntrySelected(1, true)
         Event.Logic.emit({})
 
@@ -715,7 +771,8 @@ return function(test, equal, client, pretty)
         assert(table.concat(names, "|"):find("Elder wood spirit", 1, true), "Spirits are an input")
 
         -- Only the window's size check is still listening; the dropdown's one-off
-        -- callback is gone.
+        -- callback is gone, and the screen has finished drawing.
+        settleMethod()
         equal(Event.Logic.count(), 1)
 
         PluginShutdown()
@@ -743,7 +800,7 @@ return function(test, equal, client, pretty)
 
         -- The player types a draft rate and switches to the Requirements tab.
         tabs.pages[1]:allFields()[1]:SetText("1500", true)
-        tabs.activeIndex = 2
+        tabs:SetActive(2)
 
         window:resize(900, 600)
 
@@ -987,58 +1044,113 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
-    test("item sections share a row only when both required and recommended items exist", function()
+    test("requirements pair skills items and quests and hide empty sides", function()
         client()
         local library = pretty()
         local base = require("src/data/method_data").find("smelting-steel-bars.basic")
         local Requirements = require("src/game/requirements")
 
-        for _, counts in ipairs({ { 1, 1 }, { 1, 0 }, { 0, 1 }, { 0, 0 } }) do
-            local method = {}
+        for _, fixture in ipairs({
+            { category = "items", definition = { kind = "gear", text = "A suitable tool (recommended)", equipment_scope = "flexible" } },
+            { category = "skills", definition = { kind = "skill", skill = "WOODCUTTING", level = 90, text = "90 Woodcutting (required)" } },
+            { category = "quests", definition = { kind = "quest", quest = "COOKS_ASSISTANT", text = "Cook's Assistant recommended" } },
+        }) do
+            for _, counts in ipairs({ { 1, 1 }, { 1, 0 }, { 0, 1 }, { 0, 0 } }) do
+                local method = {}
 
-            for key, value in pairs(base) do
-                method[key] = value
-            end
-
-            local required = { kind = "all", text = "Required", children = {} }
-            local recommended = { kind = "all", text = "Recommended", children = {} }
-
-            for index, group in ipairs({ required, recommended }) do
-                if counts[index] == 1 then
-                    group.children[1] = { kind = "gear", text = "A suitable tool", equipment_scope = "flexible" }
+                for key, value in pairs(base) do
+                    method[key] = value
                 end
-            end
 
-            method.requirements = { coverage = "partial", access = required, recommended = recommended }
-            local calculator = {
-                rate = 2000,
-                result = require("src/methods/income").calculate(base.income, 2000, {}),
-                requirements = function()
-                    return Requirements.evaluate(required, {}), Requirements.evaluate(recommended, {})
-                end,
-                ownership = function() return { counts = {}, complete = false } end,
-            }
-            local view = library.SimpleView.new({ width = 700, height = 500 }, { width = 700, height = 500 })
-            require("src/ui/method_view").mount(view, method, calculator, function(callback) return callback end)
-            local panels = {}
+                local required = { kind = "all", text = "Required", children = {} }
+                local recommended = { kind = "all", text = "Recommended", children = {} }
 
-            for _, panel in ipairs(view.tabs[1].pages[2].children) do
-                panels[panel.texts[1].content] = panel
-            end
-
-            local both = counts[1] == 1 and counts[2] == 1
-
-            for index, title in ipairs({ "Required items", "Recommended items" }) do
-                equal(panels[title] ~= nil, counts[index] == 1)
-
-                if panels[title] then
-                    equal(panels[title].options.widthAnchor, both and 0.5 or nil)
-                    equal(panels[title].options.inline == true, both and index == 2)
+                for index, group in ipairs({ required, recommended }) do
+                    if counts[index] == 1 then
+                        group.children[1] = fixture.definition
+                    end
                 end
-            end
 
-            view:Destroy()
+                method.requirements = { coverage = "partial", access = required, recommended = recommended }
+                local calculator = {
+                    rate = 2000,
+                    result = require("src/methods/income").calculate(base.income, 2000, {}),
+                    requirements = function()
+                        return Requirements.evaluate(required, {}), Requirements.evaluate(recommended, {})
+                    end,
+                    ownership = function() return { counts = {}, complete = false } end,
+                }
+                local view = library.SimpleView.new({ width = 700, height = 500 }, { width = 700, height = 500 })
+                require("src/ui/method_view").mount(view, method, calculator, function(callback) return callback end)
+                local panels = {}
+
+                settleMethod()
+                for _, panel in ipairs(view.tabs[1].pages[2].children) do
+                    panels[panel.texts[1].content] = panel
+                end
+
+                local both = counts[1] == 1 and counts[2] == 1
+
+                for index, title in ipairs({ "Required " .. fixture.category, "Recommended " .. fixture.category }) do
+                    equal(panels[title] ~= nil, counts[index] == 1)
+
+                    if panels[title] then
+                        equal(panels[title].options.widthAnchor, both and 0.5 or nil)
+                        equal(panels[title].options.inline == true, both and index == 2)
+                        assert(not panels[title].texts[2].content:find("recommended", 1, true))
+                        assert(not panels[title].texts[2].content:find("(required)", 1, true))
+
+                        if both then
+                            equal(panels[title].size.height, panels["Required " .. fixture.category].size.height)
+                        end
+                    end
+                end
+
+                view:Destroy()
+            end
         end
+    end)
+
+    test("standalone item icons share rows while box-and-text requirements keep their own line", function()
+        client()
+        local library = pretty()
+        local base = require("src/data/method_data").find("smelting-steel-bars.basic")
+        local method = {}
+
+        for key, value in pairs(base) do
+            method[key] = value
+        end
+
+        local required = { kind = "all", text = "Required", children = {
+            { kind = "item", item_id = 440, text = "Iron ore", display_items = { 440 } },
+            { kind = "item", item_id = 453, text = "Coal", display_items = { 453 } },
+            { kind = "gear", text = "Use your best tool (required)", equipment_scope = "flexible" },
+            { kind = "item", item_id = 2353, text = "Steel bar", display_items = { 2353 } },
+        } }
+        local recommended = { kind = "all", text = "Recommended", children = {} }
+        method.requirements = { coverage = "partial", access = required, recommended = recommended }
+        local Requirements = require("src/game/requirements")
+        local calculator = {
+            rate = 2000,
+            result = require("src/methods/income").calculate(base.income, 2000, {}),
+            requirements = function()
+                return Requirements.evaluate(required, {}), Requirements.evaluate(recommended, {})
+            end,
+            ownership = function() return { counts = {}, complete = false } end,
+        }
+        local view = library.SimpleView.new({ width = 700, height = 500 }, { width = 700, height = 500 })
+        require("src/ui/method_view").mount(view, method, calculator, function(callback) return callback end)
+        settleMethod()
+        local panel = view.tabs[1].pages[2].children[1]
+
+        equal(panel.items[1].options.y, panel.items[2].options.y)
+        assert(panel.items[2].options.x > panel.items[1].options.x)
+        local text = panel.texts[2]
+        equal(text.content, "Use your best tool")
+        assert(text.options.y >= panel.items[1].options.y + 40)
+        assert(panel.items[3].options.y >= text.options.y + text.options.height)
+        equal(panel.items[3].options.x, panel.items[1].options.x)
+        view:Destroy()
     end)
 
     test("requirements show name-only tooltips and honest green red or unknown item borders", function()
@@ -1067,6 +1179,7 @@ return function(test, equal, client, pretty)
         prettyui:findMethod("Cutting elder logs")()
 
         local detail = prettyui.views[3]
+        settleMethod()
         local requirements = detail.tabs[1].pages[2]
         local items
 
@@ -1083,6 +1196,11 @@ return function(test, equal, client, pretty)
 
         for index, slot in ipairs(items.items) do
             equal(slot.tooltip, definitions[tostring(slot.object.id)].name)
+
+            -- Separate recommended items share a grid, including outfit pieces.
+            -- The sixth icon wraps once, rather than every item starting a row.
+            equal(slot.options.x, 12 + ((index - 1) % 5) * 44)
+            equal(slot.options.y, 34 + math.floor((index - 1) / 5) * 44)
 
             if slot.object.id == 44548 then
                 graceIndex = index
@@ -1122,6 +1240,7 @@ return function(test, equal, client, pretty)
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui:findButton("Open Profit Path")()
         prettyui:findMethod("Cutting elder logs")()
+        settleMethod()
         local detail = prettyui.views[3]
         local income = detail.tabs[1].pages[1]
         local save = income:button("Save rate")
@@ -1170,6 +1289,7 @@ return function(test, equal, client, pretty)
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui:findButton("Open Profit Path")()
         prettyui:findMethod("Killing abyssal demons")()
+        settleMethod()
         local income = prettyui.views[#prettyui.views].tabs[1].pages[1]
         local outputs = income.children[4]
         equal(#outputs.items, 16)
@@ -1184,6 +1304,59 @@ return function(test, equal, client, pretty)
         equal(calls, capturedCalls)
         equal(#outputs.items, 16)
         PluginShutdown()
+    end)
+
+    -- Drawing a whole method screen in one click could take the client past its
+    -- one-second limit. It draws the open tab and the first rows, then the rest a
+    -- piece per tick; a tab clicked early is drawn straight away.
+    test("a method screen draws in steps and a clicked tab is drawn at once", function()
+        client()
+        prettyui = pretty()
+        gepl = {
+            isReady = function() return true end,
+            getLatest = function() return { high = 1000, highTime = 50, low = 1000, lowTime = 50 } end,
+        }
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
+        prettyui:findButton("Open Profit Path")()
+
+        -- Abyssal demons have 16 output rows.
+        prettyui:findMethod("Killing abyssal demons")()
+        local tabs = prettyui.views[#prettyui.views].tabs[1]
+        local outputs = tabs.pages[1].children[4]
+
+        equal(#outputs.items, 6, "First batch of rows only")
+        equal(#tabs.pages[2].children, 0, "Requirements wait their turn")
+        equal(#tabs.pages[3].texts, 0, "Steps wait their turn")
+
+        -- Each tick draws another batch, and new rows show their numbers at once.
+        Event.Logic.emit({})
+        equal(#outputs.items, 12)
+        Event.Logic.emit({})
+        equal(#outputs.items, 16)
+
+        for _, label in ipairs(outputs.texts) do
+            assert(label.content ~= "", "Every drawn row has its numbers")
+        end
+
+        -- Clicking a tab that isn't drawn yet draws it now.
+        tabs:SetActive(3)
+        assert(#tabs.pages[3].texts > 0, "Clicked tab is drawn straight away")
+
+        -- The rest arrives, then nothing is left waiting but the window's size check.
+        settleMethod()
+        assert(#tabs.pages[2].children > 0, "Requirements drawn")
+        assert(#tabs.pages[4].texts > 0, "Getting there drawn")
+        equal(Event.Logic.count(), 1)
+
+        -- Leaving before it's done stops the drawing.
+        prettyui.views[#prettyui.views].buttons["Back to methods"]()
+        prettyui:findMethod("Killing abyssal demons")()
+        prettyui.views[#prettyui.views].buttons["Back to methods"]()
+        equal(Event.Logic.count(), 1)
+
+        PluginShutdown()
+        equal(Event.Logic.count(), 0)
     end)
 
     test("missing native sprites do not block browsing calculating or saving rates", function()

@@ -4,7 +4,6 @@ return function(test, equal, client, pretty)
     local Snapshot = require("src/storage/account_snapshot")
     local Account = require("src/game/account")
     local Requirements = require("src/game/requirements")
-    local ToolbeltProbe = require("src/game/toolbelt_probe")
     local Toolbelt = require("src/game/toolbelt")
 
     local function key(profile)
@@ -20,7 +19,7 @@ return function(test, equal, client, pretty)
         counts[42] = 99
         equal(state.db[key("First")], nil)
         snapshot:flush()
-        equal(state.db[key("First")].containers.BANK["42"], 3)
+        equal(state.db[key("First")].containers.BANK.counts["42"], 3)
         equal(snapshot.dirty, false)
         snapshot:observe("BANK", { [42] = 3 })
         equal(snapshot.dirty, false)
@@ -30,7 +29,7 @@ return function(test, equal, client, pretty)
         equal(restored.data.BANK[42], 3)
         equal(restored.dirty, false)
         restored:observe("BANK", { [42] = 4 })
-        equal(state.db[key("First")].containers.BANK["42"], 3)
+        equal(state.db[key("First")].containers.BANK.counts["42"], 3)
     end)
 
     test("snapshot profile switches isolate evidence and unbind blocks late writes", function()
@@ -39,11 +38,11 @@ return function(test, equal, client, pretty)
         snapshot:bind("First")
         snapshot:observe("INV", { [42] = 2 })
         snapshot:bind("Second")
-        equal(state.db[key("First")].containers.INV["42"], 2)
+        equal(state.db[key("First")].containers.INV.counts["42"], 2)
         equal(snapshot.data.INV, nil)
         snapshot:observe("INV", { [42] = 8 })
         snapshot:unbind()
-        equal(state.db[key("Second")].containers.INV["42"], 8)
+        equal(state.db[key("Second")].containers.INV.counts["42"], 8)
         snapshot:observe("INV", { [42] = 100 })
         equal(snapshot.dirty, false)
         snapshot:bind("First")
@@ -97,7 +96,72 @@ return function(test, equal, client, pretty)
         snapshot:flush()
         equal(snapshot.dirty, false)
         equal(snapshot.message, nil)
-        equal(state.db[key("Retry")].containers.INV["42"], 1)
+        equal(state.db[key("Retry")].containers.INV.counts["42"], 1)
+    end)
+
+    -- Tiered gear checks look for thousands of items, nearly all of them absent.
+    -- Their zeros save as one string, and reload as zeros (red borders), not unknown.
+    test("thousands of checked zeros save compactly and reload as absent", function()
+        local state = client()
+        local snapshot = Snapshot.new(PersistentDB)
+        snapshot:bind("Gear")
+        local counts = { [42] = 2 }
+
+        for itemId = 1000, 4999 do
+            counts[itemId] = 0
+        end
+
+        snapshot:observe("BANK", counts)
+        equal(snapshot.message, nil)
+        snapshot:flush()
+
+        local saved = state.db[key("Gear")].containers.BANK
+        equal(state.db[key("Gear")].schema, 2)
+        equal(saved.counts["42"], 2)
+        equal(saved.counts["1000"], nil)
+        equal(type(saved.absent), "string")
+
+        local restored = Snapshot.new(PersistentDB)
+        restored:bind("Gear")
+        equal(restored.writable, true)
+        equal(restored.data.BANK[42], 2)
+        equal(restored.data.BANK[1000], 0)
+        equal(restored.data.BANK[4999], 0)
+        equal(restored.data.BANK[5000], nil)
+    end)
+
+    -- Records saved by earlier versions (every count as its own key) still load,
+    -- and the next save rewrites them in the compact layout.
+    test("schema 1 snapshots still load and are rewritten compactly", function()
+        local state = client()
+        state.db[key("Old")] = { schema = 1, containers = { BANK = { ["42"] = 3, ["43"] = 0 } } }
+        local snapshot = Snapshot.new(PersistentDB)
+        snapshot:bind("Old")
+        equal(snapshot.writable, true)
+        equal(snapshot.data.BANK[42], 3)
+        equal(snapshot.data.BANK[43], 0)
+
+        snapshot:observe("BANK", { [42] = 3, [43] = 1 })
+        snapshot:flush()
+        equal(state.db[key("Old")].schema, 2)
+        equal(state.db[key("Old")].containers.BANK.counts["43"], 1)
+    end)
+
+    -- If the client's storage gives numeric-looking keys back as numbers, that
+    -- mustn't make the record look corrupt (and so never be saved again).
+    test("snapshots accept item IDs stored back as number keys", function()
+        local state = client()
+        state.db[key("Numbers")] = { schema = 2, containers = { BANK = { counts = { [42] = 3 }, absent = "43,44" } } }
+        local snapshot = Snapshot.new(PersistentDB)
+        snapshot:bind("Numbers")
+        equal(snapshot.writable, true)
+        equal(snapshot.data.BANK[42], 3)
+        equal(snapshot.data.BANK[44], 0)
+
+        state.db[key("Bad")] = { schema = 2, containers = { BANK = { counts = {}, absent = "43,x" } } }
+        snapshot:bind("Bad")
+        equal(snapshot.writable, false)
+        equal(snapshot.data.BANK, nil)
     end)
 
     test("saved containers never add to live counts or to each other", function()
@@ -135,7 +199,7 @@ return function(test, equal, client, pretty)
         equal(result.savedCounts[42], nil)
         equal(result.complete, true)
         account:destroy()
-        equal(state.db[key("First")].containers.BANK["42"], 0)
+        equal(state.db[key("First")].containers.BANK.absent, "42")
     end)
 
     test("last-checked absence survives a closed bank but not an unchecked ID or positive count", function()
@@ -204,156 +268,6 @@ return function(test, equal, client, pretty)
 
         return function() return calls end
     end
-
-    test("tool-belt discovery batches direct ID reads including negative varbits and all enum pairs", function()
-        client()
-        local calls = discoveryClient()
-        local lines, completed = {}, nil
-        local cancel = ToolbeltProbe.start(function(line) lines[#lines + 1] = line end, function() end, function(result) completed = result end)
-        equal(calls(), 0)
-        Event.Logic.emit({})
-        equal(calls(), 100)
-
-        for _ = 1, 1400 do
-            Event.Logic.emit({})
-        end
-
-        assert(completed)
-        equal(completed.status, "complete")
-        equal(completed.failures, 1)
-        equal(completed.matched, 2)
-        equal(completed.scanned, 122005)
-        local text = table.concat(lines, "\n")
-        assert(text:find("0 -> 100", 1, true))
-        assert(text:find("2 -> 102", 1, true))
-        assert(text:find("current value: 2", 1, true))
-        assert(text:find("FIXTURE_BASE [20]; mask: 15", 1, true))
-        assert(not text:find("TASK_PICKAXE_UNLOCKED", 1, true))
-        equal(completed.items, nil)
-        equal(Event.Logic.count(), 0)
-        cancel()
-        equal(completed.status, "complete")
-    end)
-
-    test("a busy discovery range does not starve enum mappings or later config types", function()
-        client()
-        discoveryClient()
-        local order, completed = {}, nil
-        config.Enum.FromID = function(index)
-            if index < 128 then
-                order[#order + 1] = "Enum"
-                return { id = index, configName = "TOOLBELT_MAP_" .. index, values = {}, valueCount = 0 }
-            end
-        end
-        var.VarPlayer.FromID = function(index)
-            if index == -1 then
-                order[#order + 1] = "VarPlayer"
-                return { id = index, configName = "TOOLBELT_PRESENT", value = 1 }
-            end
-        end
-        config.Param.FromID = function(index)
-            if index == 1 then
-                order[#order + 1] = "Param"
-                return { id = index, configName = "TOOLBELT_PARAM" }
-            end
-        end
-        config.Inv.FromID = function(index)
-            if index == 1 then
-                order[#order + 1] = "Inv"
-                return { id = index, configName = "TOOLBELT_INV" }
-            end
-        end
-        ToolbeltProbe.start(function() end, function() end, function(value) completed = value end)
-
-        for _ = 1, 1400 do
-            Event.Logic.emit({})
-        end
-
-        equal(completed.status, "partial")
-        equal(completed.matched, 131)
-        equal(order[1], "Enum")
-        equal(order[129], "VarPlayer")
-        equal(order[130], "Param")
-        equal(order[131], "Inv")
-        equal(Event.Logic.count(), 0)
-    end)
-
-    test("an oversized enum is marked partial without stopping the remaining scan", function()
-        client()
-        discoveryClient()
-        local values, lines, completed = {}, {}, nil
-
-        for index = 1, 129 do
-            values[index] = { index, index + 100 }
-        end
-
-        config.Enum.FromID = function(index)
-            if index == 12 then
-                return { id = index, configName = "TOOLBELT_MAP", values = values, valueCount = 129 }
-            end
-        end
-        ToolbeltProbe.start(function(line) lines[#lines + 1] = line end, function() end, function(value) completed = value end)
-
-        for _ = 1, 1400 do
-            Event.Logic.emit({})
-        end
-
-        equal(completed.status, "partial")
-        equal(completed.scanned, 122005)
-        equal(completed.matched, 2)
-        local text = table.concat(lines, "\n")
-        assert(text:find("128 -> 228", 1, true))
-        assert(not text:find("129 -> 229", 1, true))
-        assert(text:find("current value: 2", 1, true))
-        equal(Event.Logic.count(), 0)
-    end)
-
-    test("tool-belt discovery cancels on close navigation and shutdown without late native reads", function()
-        client()
-        local calls = discoveryClient()
-        prettyui = pretty()
-        gepl = nil
-        dofile("main.lua")
-        Event.ContentLayerReady.emit({ component = { width = 1000, height = 740 } })
-        prettyui:findButton("Diagnostics")()
-        prettyui:findButton("Inspect tool-belt metadata")()
-        equal(Event.Logic.count(), 2)
-        Event.Logic.emit({})
-        equal(calls(), 100)
-        prettyui.windows[1]:Close()
-        equal(Event.Logic.count(), 0)
-        Event.Logic.emit({})
-        equal(calls(), 100)
-        prettyui:findButton("Open Profit Path")()
-        prettyui:findButton("Inspect tool-belt metadata")()
-        prettyui:findButton("Back to methods")()
-        equal(Event.Logic.count(), 1)
-        Event.Logic.emit({})
-        equal(calls(), 100)
-        prettyui:findButton("Diagnostics")()
-        prettyui:findButton("Inspect tool-belt metadata")()
-        PluginShutdown()
-        equal(Event.Logic.count(), 0)
-        Event.Logic.emit({})
-        equal(calls(), 100)
-    end)
-
-    test("tool-belt discovery skips offline reads and stops if the player becomes unavailable", function()
-        local state = client()
-        local calls = discoveryClient()
-        local result
-        state.available = false
-        ToolbeltProbe.start(function() end, function() end, function(value) result = value end)
-        equal(result.status, "unavailable")
-        equal(calls(), 0)
-        state.available = true
-        ToolbeltProbe.start(function() end, function() end, function(value) result = value end)
-        state.available = false
-        Event.Logic.emit({})
-        equal(result.status, "cancelled")
-        equal(calls(), 0)
-        equal(Event.Logic.count(), 0)
-    end)
 
     -- Native mappings from the supplied metadata, not special cases in runtime.
     -- Tests mutate the native variables to exercise upgrades and removal events.
@@ -506,7 +420,7 @@ return function(test, equal, client, pretty)
         account:destroy()
 
         for _, container in ipairs({ "INV", "WORN", "BANK" }) do
-            equal(state.db[key("First")].containers[container]["1351"], 0)
+            equal(state.db[key("First")].containers[container].absent, "1351")
         end
     end)
 
@@ -545,6 +459,7 @@ return function(test, equal, client, pretty)
         prettyui:findButton("Open Profit Path")()
         prettyui:findMethod("Cutting elder logs")()
         local detail = prettyui.views[#prettyui.views]
+        settleMethod()
         local page = detail.tabs[1].pages[2]
 
         local function match(itemId)
@@ -563,7 +478,12 @@ return function(test, equal, client, pretty)
         local foundLabel = false
 
         for _, label in ipairs(page:allTexts()) do
-            foundLabel = foundLabel or label.content == "On your tool belt"
+            if label.content:find("On your tool belt", 1, true) then
+                foundLabel = true
+                equal(label.x, 62, "Tool wording sits beside its box")
+                local textCentre = label.y + label.options.height / 2
+                assert(math.abs(textCentre - (original.options.y + 20)) <= 0.5, "Tool wording and box share a vertical centre")
+            end
         end
 
         assert(foundLabel)
@@ -595,6 +515,7 @@ return function(test, equal, client, pretty)
         Event.ContentLayerReady.emit({ component = { width = 1000, height = 740 } })
         prettyui:findButton("Open Profit Path")()
         prettyui:findMethod("Killing abyssal demons")()
+        settleMethod()
         local page = prettyui.views[#prettyui.views].tabs[1].pages[2]
         local function find(itemId)
             for _, section in ipairs(page.children) do
@@ -651,7 +572,6 @@ return function(test, equal, client, pretty)
             updates = updates + 1
         end)
         equal(account:readQuest("FIXTURE_QUEST").completed, true)
-        equal(account.questInspection, nil)
         Event.VarTransmit.emit({ var = { id = 999 } })
         equal(updates, 0)
         Event.VarTransmit.emit({ var = { id = 321 } })
@@ -663,28 +583,6 @@ return function(test, equal, client, pretty)
         equal(updates, 1)
         account:destroy()
         equal(Event.VarTransmit.count(), 0)
-    end)
-
-    test("tool-belt probe reports raw values without inferring an owned hatchet", function()
-        local state = client()
-        local reads = 0
-        var = { VarPlayer = setmetatable({}, { __index = function(_, name)
-            equal(name, "TOOLBELT_HATCHET_LEVEL")
-            reads = reads + 1
-            return { id = -18523, value = 7 }
-        end }) }
-        local account = Account.new(function() end)
-        state.available = false
-        equal(account:inspectToolbeltHatchet().status, "unavailable")
-        equal(reads, 0)
-        state.available = true
-        local result = account:inspectToolbeltHatchet()
-        equal(result.value, 7)
-        equal(result.itemId, nil)
-        var.VarPlayer = setmetatable({}, { __index = function() error("native failure") end })
-        equal(account:inspectToolbeltHatchet().status, "error")
-        account:destroy()
-        equal(account:inspectToolbeltHatchet().status, "unavailable")
     end)
 
     -- Deliberately synthetic: these verify the matching rules, not actual game
@@ -802,6 +700,7 @@ return function(test, equal, client, pretty)
         local detail = prettyui.views[#prettyui.views]
         local lines = {}
 
+        settleMethod()
         for _, label in ipairs(detail.tabs[1].pages[2]:allTexts()) do
             lines[#lines + 1] = label.content
         end
@@ -813,6 +712,7 @@ return function(test, equal, client, pretty)
         local function hatchetSlots()
             local count = 0
 
+            settleMethod()
             for _, section in ipairs(detail.tabs[1].pages[2].children) do
                 for _, slot in ipairs(section.items or {}) do
                     if not slot.destroyed then
@@ -834,6 +734,7 @@ return function(test, equal, client, pretty)
         equal(hatchetSlots(), 0)
 
         -- No match: no coverage note next to the empty slot.
+        settleMethod()
         for _, label in ipairs(detail.tabs[1].pages[2]:allTexts()) do
             assert(not tostring(label.content):find("Checks carried", 1, true), "Coverage note shown")
         end
@@ -863,7 +764,7 @@ return function(test, equal, client, pretty)
         prettyui:findButton("Open Profit Path")()
         equal(state.db[key("Default")], nil)
         prettyui.windows[1]:Close()
-        equal(state.db[key("Default")].containers.BANK["1359"], 1)
+        equal(state.db[key("Default")].containers.BANK.counts["1359"], 1)
         PluginShutdown()
 
         -- Reload with an unreadable bank: do not infer the same hatchet still
@@ -882,11 +783,12 @@ return function(test, equal, client, pretty)
         Event.ContentLayerReady.emit({ component = { width = 1000, height = 740 } })
         prettyui:findButton("Open Profit Path")()
         prettyui:findMethod("Cutting elder logs")()
+        settleMethod()
         local requirements = prettyui.views[#prettyui.views].tabs[1].pages[2]
         local foundHint = false
 
         for _, label in ipairs(requirements:allTexts()) do
-            foundHint = foundHint or label.content == "Saved match - verify in game"
+            foundHint = foundHint or label.content:find("Saved match - verify in game", 1, true) ~= nil
         end
 
         assert(foundHint)
@@ -906,6 +808,7 @@ return function(test, equal, client, pretty)
         Event.ContentLayerReady.emit({ component = { width = 1000, height = 740 } })
         prettyui:findButton("Open Profit Path")()
         prettyui:findMethod("Killing abyssal demons")()
+        settleMethod()
         local requirements = prettyui.views[#prettyui.views].tabs[1].pages[2]
         local questLabel
 
