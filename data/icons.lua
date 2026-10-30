@@ -17,6 +17,9 @@ return {
     -- Same stopwatch-reset art PrettyUI uses for its UNDO sprite button.
     reset = "RS3_ICON_STOPWATCH_RESET_0",
 
+    -- The world map's quest-start marker, for any quest requirement.
+    quest = "RS3_ICON_WORLDMAP_QUEST_START",
+
     perk_honed = "INVENTION_ICON_PERKS_TOOLS_HONED",
     perk_fortune = "INVENTION_ICON_PERKS_TOOLS_FORTUNE",
 
@@ -30,4 +33,26 @@ return {
     skill_ranged = "HITMARK_ICON_SKILL_RANGED",
     skill_magic = "HITMARK_ICON_SKILL_MAGIC",
     skill_necromancy = "BP3_MISSION_ICON_SKILL_NECROMANCY",
+
+    -- The rest of the skills, from the same reference list (added for the Wiki
+    -- catalogue import; not yet seen in game). Hunter's sprite is named HUNTING.
+    skill_agility = "HITMARK_ICON_SKILL_AGILITY",
+    skill_archaeology = "HITMARK_ICON_SKILL_ARCHAEOLOGY",
+    skill_constitution = "HITMARK_ICON_SKILL_CONSTITUTION",
+    skill_construction = "HITMARK_ICON_SKILL_CONSTRUCTION",
+    skill_cooking = "HITMARK_ICON_SKILL_COOKING",
+    skill_crafting = "HITMARK_ICON_SKILL_CRAFTING",
+    skill_defence = "HITMARK_ICON_SKILL_DEFENCE",
+    skill_divination = "HITMARK_ICON_SKILL_DIVINATION",
+    skill_dungeoneering = "HITMARK_ICON_SKILL_DUNGEONEERING",
+    skill_farming = "HITMARK_ICON_SKILL_FARMING",
+    skill_firemaking = "HITMARK_ICON_SKILL_FIREMAKING",
+    skill_fishing = "HITMARK_ICON_SKILL_FISHING",
+    skill_fletching = "HITMARK_ICON_SKILL_FLETCHING",
+    skill_herblore = "HITMARK_ICON_SKILL_HERBLORE",
+    skill_mining = "HITMARK_ICON_SKILL_MINING",
+    skill_runecrafting = "HITMARK_ICON_SKILL_RUNECRAFTING",
+    skill_strength = "HITMARK_ICON_SKILL_STRENGTH",
+    skill_thieving = "HITMARK_ICON_SKILL_THIEVING",
+    skill_hunter = "HITMARK_ICON_SKILL_HUNTING",
 }

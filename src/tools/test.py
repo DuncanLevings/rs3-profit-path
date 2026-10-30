@@ -77,6 +77,18 @@ if recipes is not None:
 
 catalogue.verify_methods(monsters, recipes)
 
+# The Wiki guide snapshot (catalogue-source/wiki) isn't used by the plugin yet, but
+# it must stay a clean, consistent import until it is.
+import wiki_methods
+
+print(f"Verified {wiki_methods.verify_snapshot()} Wiki guides in the snapshot.")
+
+# Merged with our research, every imported guide must pass the same checks as a
+# curated method. (The plugin still loads only the curated ones until step 4.)
+import merge_methods
+
+print(f"Verified {merge_methods.verify_merge(monsters, recipes)} merged methods (curated + Wiki).")
+
 suite = unittest.defaultTestLoader.discover(str(ROOT / "src" / "tests"), pattern="test_*.py")
 
 if not unittest.TextTestRunner(verbosity=1).run(suite).wasSuccessful():

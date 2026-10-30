@@ -63,11 +63,19 @@ https://runescape.wiki/w/Bucket:Infobox_item
 Each recipe keeps its source page URL in catalogue-source/recipes.json. Wiki contributor
 attribution and the CC BY-NC-SA 3.0 licence above apply. Runtime uses data/recipes.lua.
 
+Money making guide snapshot (not yet used by the plugin)
+Derived from the RuneScape Wiki's money_making_guide and infobox_item structured data (Bucket API)
+and page revision IDs, retrieved 2026-10-29 with User-Agent "ProfitPath-development (Discord: Tatsuya)".
+https://runescape.wiki/w/Bucket:Money_making_guide
+https://runescape.wiki/w/Bucket:Infobox_item
+Each guide in catalogue-source/wiki/guides.jsonl records its page title and revision. Guides the Wiki
+marks as obsolete are not included. Wiki contributor attribution and the CC BY-NC-SA 3.0 licence above apply.
+
 rsprite runtime dependency
 Profit Path uses the public API of the separately installed rsprite 0.1.2 library by sereselene.
 Project: https://github.com/sereselene/rsprite
 Licence: PolyForm Strict 1.0.0, as supplied with rsprite. Its source code is not copied or bundled here.
-The small native sprite-name registry references RuneScape game assets, copyright Jagex Ltd.; Profit Path does not distribute these images.
+The small native sprite-name registry (data/icons.lua and catalogue-source/research/capabilities.json, whose names were matched against rsprite's reference list) references RuneScape game assets, copyright Jagex Ltd.; Profit Path does not distribute these images or rsprite's list.
 
 Abyssal demon output reconciliation, 2026-10-29
 Expected quantities checked against Money making guide/Killing abyssal demons revision 37017140. The method keeps references to the shared drop snapshot. Item source revisions are recorded in catalogue-source/methods.json. Salvage valuation is modified to actual high-alchemy proceeds rather than the source table's GE values (6,000 / 8,000 / 8,000 / 32,000 GP); spring inputs are retained.

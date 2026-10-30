@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — 2026-10-29
+
+- Add `src/tools/wiki_methods.py`, which snapshots every current RuneScape Wiki money making guide into `catalogue-source/wiki/guides.jsonl` (676 guides on 466 pages; the 200 the Wiki marks obsolete are skipped) and `meta.json` (1,667 of 1,695 income item names resolved to IDs). Each guide records its page revision, version, kills per hour or recurring cycle, income rows and parsed requirements. No plugin change yet: a later step merges the snapshot with our research.
+- `test.py` now checks the snapshot is consistent.
+- Merge the snapshot with our research (`src/tools/merge_methods.py`): curated methods replace their Wiki guide, and every other current guide becomes a full method record that passes the same validator (582 methods: 4 curated + 578 imported; 94 recurring guides wait for a per-run model). Per-hour guides get a "% of guide pace" rate. The Wiki's fixed and calculated values stay fixed values unless one of our recipes can cost them. Requirements become skill/item checks where the plugin can check them, and unknown capability checks otherwise.
+- Requirement icons: every skill now has its rsprite icon, and quests show the world-map quest marker. Abilities, spells, prayers, relics and perks get their sprite from `catalogue-source/research/capabilities.json`, drafted by `catalogue.py match-sprites` from rsprite's reference list (47 matched so far). Dose-less potions resolve to their dose family, so owning any dose counts.
+- New `catalogue.py report`: catalogue coverage and the methods to research first, ranked by the Wiki's profit figure. Plugin still shows only the 4 curated methods.
+- Validate with 116 Lua behaviour tests and 59 Python tests.
+
 ## 0.7.4-dev — 2026-10-29
 
 - Show a negative ROI in the same red as losses and the Inputs values, on the method page and in Browse. A positive Browse ROI stays grey; on the method page it stays green.

@@ -42,6 +42,33 @@ RECIPE_OUTPUT = ROOT / "data" / "recipes.lua"
 # This file is plain reference data, so loading it needs no game globals.
 ICON_NAMES = set(LuaRuntime().execute((ROOT / "data" / "icons.lua").read_text(encoding="utf-8")).keys())
 
+# Reviewed research: what each non-item requirement (an ability, spell, prayer,
+# relic, perk...) is, and the rsprite sprite that shows it. Drafted by
+# `catalogue.py match-sprites`, then checked by hand.
+CAPABILITIES = ROOT / "catalogue-source" / "research" / "capabilities.json"
+
+
+def capability_icon(sprite):
+    """The icon alias a capability's sprite is known by, e.g. sprite_arch_icon_..."""
+    return "sprite_" + sprite.lower()
+
+
+def load_capabilities():
+    """{requirement name: {"kind", "sprite"}}, or {} before any research exists."""
+    if not CAPABILITIES.exists():
+        return {}
+
+    source = json.loads(CAPABILITIES.read_text(encoding="utf-8"))
+
+    if source.get("schema") != 1 or not isinstance(source.get("capabilities"), dict):
+        raise ValueError("Unsupported capabilities research file")
+
+    return source["capabilities"]
+
+
+# Capability sprites are valid icons too.
+ICON_NAMES |= {capability_icon(entry["sprite"]) for entry in load_capabilities().values() if entry.get("sprite")}
+
 # Field order inside the packed Lua rows. monster_data.lua reads these by position
 # (row[1], row[2]...), so if you reorder or add a field here you MUST update that
 # reader too. `verify` will catch it if you forget.
@@ -725,6 +752,12 @@ def verify_recipes(source):
           f"({len(source['recipes'])} in the source, retrieved {source.get('retrieved')}).")
 
 
+# Rate units the calculator and saved rates understand. "actions/hour" is for
+# non-combat Wiki guides counted per action; "% of guide pace" for guides given only
+# per hour (100 is the guide's own pace).
+RATE_UNITS = {"kills/hour", "logs/hour", "smelts/hour", "actions/hour", "% of guide pace"}
+
+
 def validate_methods(source, monsters, recipes=None):
     """Check the fields consumed by native views and the pure requirement/calculator code."""
     # The plugin reads these fields without re-checking them, so anything wrong has
@@ -895,9 +928,11 @@ def validate_methods(source, monsters, recipes=None):
 
         rate = rate_definition.get("default")
 
+        # "% of guide pace" is for Wiki guides given only per hour: 100 is the
+        # guide's own pace, and every amount scales with it.
         if (not non_negative_number(rate)
-                or rate_definition.get("unit") not in {"kills/hour", "logs/hour", "smelts/hour"}):
-            raise ValueError("Invalid method rate")
+                or rate_definition.get("unit") not in RATE_UNITS):
+            raise ValueError(f"Invalid method rate for {method_id}")
 
         if income["coverage"] not in {"complete", "partial"}:
             raise ValueError("Invalid income coverage")
@@ -927,13 +962,20 @@ def validate_methods(source, monsters, recipes=None):
                 if "item_id" in line:
                     if not positive_integer(line["item_id"]) or str(line["item_id"]) not in items:
                         raise ValueError("Unresolved method item reference")
-                elif income["coverage"] == "complete":
+                elif income["coverage"] == "complete" and line.get("pricing") != "fixed":
+                    # A fixed-value row (coins, a clue scroll) needs no item to price it.
                     raise ValueError("Complete income cannot have unresolved item valuations")
 
                 # Untradeable supplies are priced by what they cost to make. The row
                 # names the recipe (a Wiki page) and the doses it's counted in, so
                 # e.g. a 6-dose potion made by a 6-dose recipe costs one recipe.
-                if "pricing" in line:
+                # A fixed value is a set GP amount per item (the Wiki's value for coins,
+                # clue scrolls and the like). It never pays GE tax.
+                if line.get("pricing") == "fixed":
+                    if not non_negative_number(line.get("unit_value")) or "tax_denominator" in line:
+                        raise ValueError(f"Fixed-value row {line['name']} needs a unit value and no sale tax")
+
+                elif "pricing" in line:
                     if line["pricing"] != "recipe" or direction != "inputs":
                         raise ValueError("Only input rows can be priced by recipe")
 
@@ -1435,11 +1477,138 @@ def verify_methods(monsters, recipe_source):
           f"({len(expected.encode('utf-8')):,} runtime bytes) with their shared-data references.")
 
 
+# ---------------------------------------------------------------------------
+# Capability sprites: drafting research/capabilities.json from rsprite's list
+# ---------------------------------------------------------------------------
+#
+# Many Wiki requirements aren't items: abilities, spells, prayers, relics and
+# Invention perks. Each of those has a native sprite, named in a regular way:
+#
+#   ability  COMBAT_ABILITY_ICON_<STYLE>_<NAME>      e.g. ..._ATTACK_BLADED_DIVE
+#   spell    SPELL_ICON_<BOOK>_<NAME> and similar    e.g. SPELL_ICON_NECROMANCY_DARKNESS
+#   prayer   PRAYER_ICON_<NAME> / CURSE_ICON_<NAME>
+#   relic    ARCH_ICON_RELIC_64PX_<NAME>             e.g. ..._DEATH_NOTE
+#   perk     INVENTION_ICON_PERKS_<GROUP>_<NAME>     e.g. ..._TOOLS_HONED
+#
+# match-sprites reads rsprite's reference list (a maintainer's local copy; we don't
+# copy it) and drafts an entry for every requirement name whose sprite matches
+# exactly. Only the matches we use are saved, like data/icons.lua. Existing
+# entries are never overwritten, so hand fixes stay. Locked, mobile and disabled
+# variants of a sprite are skipped: they're greyed or resized copies.
+
+SPRITE_FAMILIES = (
+    ("ability", r"COMBAT_ABILITY_ICON_(?:ATTACK|STRENGTH|DEFENCE|CONSTITUTION|MELEE|RANGED|MAGIC|NECROMANCY)_"),
+    ("spell", r"(?:SPELL_ANCIENT_MAGICKS_ICON_|SPELL_ICON_NECROMANCY_|SPELL_ICON_ANCIENT_|SPELL_ICON_ZAROS_"
+              r"|SPELL_ICON_(?:STANDARD|LUNAR|TELEPORT)_[A-Z]+_|SPELL_SKILLING_ICON_)"),
+    ("prayer", r"(?:PRAYER_ICON_|CURSE_ICON_)"),
+    ("relic", r"ARCH_ICON_RELIC_64PX_"),
+    ("perk", r"INVENTION_ICON_PERKS_[A-Z]+_"),
+)
+
+SPRITE_VARIANTS = re.compile(r"_(?:LOCKED|MOBILE|DISABLED|TOGGLED)(?:_|$)")
+
+
+def sprite_forms(name):
+    """The sprite-name spellings to try for a requirement name, best first."""
+    name = re.sub(r"#.*", "", name)
+    name = re.sub(r"\s*\((?:perk|ability|relic power|relic|prayer|spell)\)\s*$", "", name, flags=re.IGNORECASE)
+    words = re.sub(r"[^A-Z0-9]+", "_", name.replace("'", "").upper()).strip("_")
+    forms = [words]
+
+    # Perk ranks ("Biting 3") share one icon.
+    unranked = re.sub(r"_\d+$", "", words)
+
+    if unranked != words:
+        forms.append(unranked)
+
+    # Necromancy writes "Lesser Bone Shield" as BONE_SHIELD_LESSER.
+    for rank in ("GREATER", "LESSER"):
+        if words.startswith(rank + "_"):
+            forms.append(words[len(rank) + 1:] + "_" + rank)
+
+    return forms
+
+
+def match_sprite(name, sprites):
+    """(kind, sprite name) for a requirement name, or None."""
+    for form in sprite_forms(name):
+        for kind, prefix in SPRITE_FAMILIES:
+            pattern = re.compile(prefix + re.escape(form))
+            hits = sorted(sprite for sprite in sprites
+                          if pattern.fullmatch(sprite) and not SPRITE_VARIANTS.search(sprite))
+
+            if hits:
+                return kind, hits[0]
+
+    return None
+
+
+def match_sprites(sprite_list):
+    """Adds drafted entries to research/capabilities.json. Returns (added, missed)."""
+    sprites = set()
+
+    for line in sprite_list.read_text(encoding="utf-8").splitlines():
+        parts = line.split("\t")
+
+        if len(parts) >= 2 and re.fullmatch(r"[A-Z0-9_]+", parts[1]):
+            sprites.add(parts[1])
+
+    import wiki_methods
+
+    meta = json.loads(wiki_methods.META.read_text(encoding="utf-8"))
+    names = sorted(set(meta["unresolved_requirement_items"]) | set(meta["unresolved"]))
+    capabilities = load_capabilities()
+    added, missed = 0, []
+
+    for name in names:
+        if name in capabilities:
+            continue
+
+        match = match_sprite(name, sprites)
+
+        if match:
+            capabilities[name] = {"kind": match[0], "sprite": match[1]}
+            added += 1
+        else:
+            missed.append(name)
+
+    CAPABILITIES.parent.mkdir(parents=True, exist_ok=True)
+    document = {
+        "schema": 1,
+        "note": "What non-item requirements are, and the native sprite (from rsprite's reference list) that shows "
+                "each one. Drafted by catalogue.py match-sprites; reviewed by hand. Can't be checked in game yet, "
+                "so the plugin shows these as unknown.",
+        "capabilities": dict(sorted(capabilities.items())),
+    }
+    CAPABILITIES.write_text(source_text(document) + "\n", encoding="utf-8", newline="\n")
+
+    return added, missed
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("import-monsters", "format", "build", "verify"))
+    parser.add_argument("command", choices=("import-monsters", "format", "match-sprites", "report", "build", "verify"))
     parser.add_argument("--from", dest="checkout", type=Path)
     args = parser.parse_args()
+
+    # Drafts sprite matches for non-item requirements from rsprite's reference list
+    # (--from PATH to its sprites.tsv). Review the file afterwards.
+    if args.command == "match-sprites":
+        if args.checkout is None:
+            parser.error("match-sprites requires --from PATH to rsprite's sprites.tsv")
+
+        added, missed = match_sprites(args.checkout)
+        print(f"Added {added} capability sprites to {CAPABILITIES.relative_to(ROOT)}; "
+              f"{len(missed)} names have no exact sprite match.")
+        return
+
+    # Coverage of the full catalogue: what's imported, what's researched, and what
+    # still needs work, most valuable first.
+    if args.command == "report":
+        import merge_methods
+
+        merge_methods.print_report(json.loads(SOURCE.read_text(encoding="utf-8")), load_recipes())
+        return
 
     # Tidies a hand-edited methods.json into the standard layout. It only changes
     # line breaks and spacing; expanding it must give exactly the same methods.

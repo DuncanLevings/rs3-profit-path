@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "note": "What non-item requirements are, and the native sprite (from rsprite's reference list) that shows each one. Drafted by catalogue.py match-sprites; reviewed by hand. Can't be checked in game yet, so the plugin shows these as unknown.",
+  "capabilities": {
+    "Abyssal Link": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_ABYSSAL_LINK"},
+    "Aftershock": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_WEAPONS_AFTERSHOCK"},
+    "Animate Dead": {"kind": "spell", "sprite": "SPELL_ANCIENT_MAGICKS_ICON_ANIMATE_DEAD"},
+    "Berserker's Fury": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_BERSERKERS_FURY"},
+    "Biting": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_COMBAT_BITING"},
+    "Bladed Dive": {"kind": "ability", "sprite": "COMBAT_ABILITY_ICON_ATTACK_BLADED_DIVE"},
+    "Blessing of Het": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_BLESSING_OF_HET"},
+    "Caroming": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_COMBAT_CAROMING"},
+    "Conjure Putrid Zombie": {
+      "kind": "ability",
+      "sprite": "COMBAT_ABILITY_ICON_NECROMANCY_CONJURE_PUTRID_ZOMBIE"
+    },
+    "Conjure Skeleton Warrior": {
+      "kind": "ability",
+      "sprite": "COMBAT_ABILITY_ICON_NECROMANCY_CONJURE_SKELETON_WARRIOR"
+    },
+    "Conjure Vengeful Ghost": {
+      "kind": "ability",
+      "sprite": "COMBAT_ABILITY_ICON_NECROMANCY_CONJURE_VENGEFUL_GHOST"
+    },
+    "Corruption Blast": {"kind": "ability", "sprite": "COMBAT_ABILITY_ICON_MAGIC_CORRUPTION_BLAST"},
+    "Corruption Shot": {"kind": "ability", "sprite": "COMBAT_ABILITY_ICON_RANGED_CORRUPTION_SHOT"},
+    "Crackling": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_COMBAT_CRACKLING"},
+    "Crumble Undead": {"kind": "spell", "sprite": "SPELL_ICON_STANDARD_COMBAT_CRUMBLE_UNDEAD"},
+    "Darkness": {"kind": "spell", "sprite": "SPELL_ICON_NECROMANCY_DARKNESS"},
+    "Death Note": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_DEATH_NOTE"},
+    "Death Ward": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_DEATH_WARD"},
+    "Dive": {"kind": "ability", "sprite": "COMBAT_ABILITY_ICON_ATTACK_DIVE"},
+    "Divine Conversion": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_DIVINE_CONVERSION"},
+    "Flow State": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_FLOW_STATE"},
+    "Fortune": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_FORTUNE"},
+    "Greater Chain": {"kind": "ability", "sprite": "COMBAT_ABILITY_ICON_MAGIC_CHAIN_GREATER"},
+    "Greater Ricochet": {"kind": "ability", "sprite": "COMBAT_ABILITY_ICON_RANGED_RICOCHET_GREATER"},
+    "Hasty": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_HASTY"},
+    "Honed": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_HONED"},
+    "Imp Souled": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_IMP_SOULED"},
+    "Incite Fear": {"kind": "spell", "sprite": "SPELL_ANCIENT_MAGICKS_ICON_INCITE_FEAR"},
+    "Invoke Death": {"kind": "spell", "sprite": "SPELL_ICON_NECROMANCY_INVOKE_DEATH"},
+    "Lesser Bone Shield": {"kind": "spell", "sprite": "SPELL_ICON_NECROMANCY_BONE_SHIELD_LESSER"},
+    "Luck of the Dwarves (relic power)": {
+      "kind": "relic",
+      "sprite": "ARCH_ICON_RELIC_64PX_LUCK_OF_THE_DWARVES"
+    },
+    "Magma Tempest": {"kind": "ability", "sprite": "COMBAT_ABILITY_ICON_MAGIC_MAGMA_TEMPEST"},
+    "Naturalist": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_NATURALIST"},
+    "Nexus Mod": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_NEXUS_MOD"},
+    "Penance": {"kind": "spell", "sprite": "SPELL_ICON_STANDARD_COMBAT_PENANCE"},
+    "Pharm Ecology": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_PHARM_ECOLOGY"},
+    "Planted Feet": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_WEAPONS_PLANTED_FEET"},
+    "Polishing": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_POLISHING"},
+    "Pouch Protector": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_POUCH_PROTECTOR"},
+    "Preservationist": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_PRESERVATIONIST"},
+    "Ruthless": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_COMBAT_RUTHLESS"},
+    "Shadow's Grace": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_SHADOWS_GRACE"},
+    "Sticky Fingers": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_STICKY_FINGERS"},
+    "Sunshine": {"kind": "ability", "sprite": "COMBAT_ABILITY_ICON_MAGIC_SUNSHINE"},
+    "Vampyrism": {"kind": "spell", "sprite": "SPELL_ANCIENT_MAGICKS_ICON_VAMPYRISM"},
+    "Venomblood": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_ARMOUR_VENOMBLOOD"},
+    "Wild Runes": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_TOOLS_WILD_RUNES"}
+  }
+}
