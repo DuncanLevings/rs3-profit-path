@@ -59,6 +59,12 @@ local function categoryFor(definition)
         return category or "Other"
     end
 
+    -- A quest we can't check yet (not mapped to its game config) still belongs
+    -- with the quests.
+    if definition.kind == "capability" and definition.capability_kind == "quest" then
+        return "Quests"
+    end
+
     return categories[definition.kind] or "Other"
 end
 
@@ -250,6 +256,15 @@ local function mountRequirements(parent, method, calculator, fitter)
 
             y = y + entry.height
         end
+    end
+
+    -- Wiki pages the guide points to for gear and set-up advice. They're worth a
+    -- read, but they aren't requirements, so they're never checked or coloured.
+    local advice = method.requirements.advice or {}
+
+    if #advice > 0 then
+        parent:AddTitle("See also on the Wiki")
+        parent:AddText({ text = table.concat(advice, ", "), colour = Style.muted })
     end
 
     local storageStatus = parent:AddText({ text = "", height = 96, colour = Style.muted })

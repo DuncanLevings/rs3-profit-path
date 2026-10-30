@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1-dev — 2026-10-29
+
+- Research pass 1, requirements the plugin couldn't check. Quests now map to their in-game quest configs by exact name (`catalogue-source/research/quests.json`, built by `catalogue.py map-quests` from Skill Tips' verified in-game quest dump; deprecated configs never used). 115 Wiki quest names are mapped, so 399 quest requirements are real checks instead of unknowns, including Wiki links that are really quests (New Foundations).
+- Wiki advice pages ("Armoury", "Recommended equipment for PvM", armour and weapon comparisons) are no longer shown as unknown requirements: the Requirements tab lists them under "See also on the Wiki" (244 links). Every other unknown requirement name is classified by kind in `capabilities.json` (outfit, ability, relic, achievement, place...). Unknown checks fall from 1,772 to 1,044, and an unmapped quest still sits under Quests.
+- Validate with 120 Lua behaviour tests and 62 Python tests.
+
 ## 0.8.0-dev — 2026-10-29
 
 - Ship the full catalogue: 582 methods (our 4 curated ones plus 578 current Wiki guides; recurring daily/weekly guides come later). `data/methods.lua` is 747 KB and decodes in about 30 ms on desktop Lua.

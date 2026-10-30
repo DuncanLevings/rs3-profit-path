@@ -135,6 +135,49 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
+    test("wiki advice pages show as notes and mapped quests as real quest checks", function()
+        client()
+        prettyui = pretty()
+        gepl = countingLibrary()
+
+        -- A method whose guide links advice pages and needs a mapped quest.
+        local chosen
+
+        for _, method in ipairs(catalogue.methods) do
+            local hasQuest = false
+
+            for _, child in ipairs(method.requirements.access.children) do
+                hasQuest = hasQuest or child.kind == "quest"
+            end
+
+            if hasQuest and #(method.requirements.advice or {}) > 0 then
+                chosen = method
+                break
+            end
+        end
+
+        assert(chosen, "Expected a method with both advice links and a quest check")
+
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
+        prettyui:findButton("Open Profit Path")()
+        prettyui.views[#prettyui.views].children[2].fields[1]:SetText(chosen.title, true)
+        prettyui:findMethod(chosen.title)()
+
+        local requirements = prettyui.views[#prettyui.views].tabs[1].pages[2]
+        local texts = {}
+
+        for _, label in ipairs(requirements:allTexts()) do
+            texts[#texts + 1] = tostring(label.content)
+        end
+
+        local all = table.concat(texts, " / ")
+        assert(all:find("See also on the Wiki", 1, true), "Advice section")
+        assert(all:find(chosen.requirements.advice[1], 1, true), "First advice link")
+
+        PluginShutdown()
+    end)
+
     test("every capability icon a method uses resolves to a sprite name", function()
         local icons = require("data/icons")
         local missing = {}

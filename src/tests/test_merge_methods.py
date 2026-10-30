@@ -17,7 +17,7 @@ def guide(**fields):
     return base
 
 
-def context(recipes=None, capabilities=None):
+def context(recipes=None, capabilities=None, quests=None):
     meta = {
         "retrieved": "2026-10-29",
         "items": {"Coins": 995, "Logs": 1511, "Aggroverload": 48239, "Gem bag (upgraded)": 31455,
@@ -25,7 +25,7 @@ def context(recipes=None, capabilities=None):
         "item_families": {"Aggroverload": [48229, 48239]},
     }
 
-    return merge_methods.Context({}, meta, capabilities or {}, recipes or {})
+    return merge_methods.Context({}, meta, capabilities or {}, recipes or {}, quests or {})
 
 
 class IncomeTests(unittest.TestCase):
@@ -129,6 +129,58 @@ class RequirementTests(unittest.TestCase):
 
         self.assertEqual(requirements["access"]["children"][0]["text"], "Coins or above")
         self.assertEqual(requirements["recommended"]["children"][0]["text"], "Priest in Peril recommended for teleports")
+
+
+class ResearchTests(unittest.TestCase):
+    """How research/quests.json and capabilities.json change a converted method."""
+
+    def convert(self, requirements):
+        ctx = context(
+            capabilities={
+                "Armoury": {"kind": "guidance"},
+                "Recommended equipment for PvM/Magic": {"kind": "guidance"},
+                "Master camouflage outfit": {"kind": "outfit"},
+            },
+            quests={"Priest in Peril": "PRIEST_IN_PERIL", "New Foundations": "QUEST_FORT_INTRO"},
+        )
+        method = merge_methods.convert_guide(guide(requirements=requirements), ctx, "pvm")
+
+        return method["requirements"]
+
+    def test_mapped_quests_become_real_quest_checks_even_when_linked_as_items(self):
+        requirements = self.convert({"required": ["quest:Priest in Peril", "item:New Foundations",
+                                                  "quest:Some Unmapped Quest"]})
+        priest, foundations, unmapped = requirements["access"]["children"]
+
+        self.assertEqual(priest, {"kind": "quest", "quest": "PRIEST_IN_PERIL", "text": "Priest in Peril",
+                                  "display_icon": "quest"})
+        self.assertEqual(foundations["quest"], "QUEST_FORT_INTRO")
+
+        # An unmapped quest stays unknown, but still says it's a quest.
+        self.assertEqual((unmapped["kind"], unmapped["capability_kind"]), ("capability", "quest"))
+
+    def test_wiki_advice_pages_become_notes_not_checks(self):
+        requirements = self.convert({
+            "required": ["item:Armoury", ["any", "item:Coins", "item:Recommended equipment for PvM/Magic"]],
+            "recommended": [{"req": "item:Armoury", "text": "Armoury for the best gear"}],
+        })
+
+        # The advice-only requirement is gone, and the group keeps its real option.
+        children = requirements["access"]["children"]
+        self.assertEqual(len(children), 1)
+        self.assertEqual(children[0]["children"][0]["itemId"], 995)
+        self.assertEqual(requirements["recommended"]["children"], [])
+
+        # Each advice page once, in the guide's order; the Wiki's wording wins.
+        self.assertEqual(requirements["advice"],
+                         ["Armoury", "Recommended equipment for PvM: Magic", "Armoury for the best gear"])
+
+    def test_classified_capabilities_say_what_they_are(self):
+        requirements = self.convert({"required": ["item:Master camouflage outfit", "item:Something else"]})
+        outfit, other = requirements["access"]["children"]
+
+        self.assertEqual(outfit["capability_kind"], "outfit")
+        self.assertNotIn("capability_kind", other)
 
 
 class NamingTests(unittest.TestCase):

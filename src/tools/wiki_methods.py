@@ -518,6 +518,20 @@ def requirement_items(requirement):
     return set()
 
 
+def requirement_quests(requirement):
+    """Quest names inside one parsed requirement."""
+    if isinstance(requirement, dict):
+        return requirement_quests(requirement.get("req"))
+
+    if isinstance(requirement, list):
+        return {name for child in requirement[1:] for name in requirement_quests(child)}
+
+    if isinstance(requirement, str) and requirement.startswith("quest:"):
+        return {requirement[len("quest:"):]}
+
+    return set()
+
+
 def requirement_names(guides):
     """Every item name any guide lists as a requirement."""
     return {name for guide in guides for group in guide.get("requirements", {}).values()

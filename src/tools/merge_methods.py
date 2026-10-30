@@ -29,9 +29,12 @@ and report what still needs research."""
 #        - the Wiki's calculated values use our creation-cost recipe when we have
 #          one, otherwise the Wiki's figure as a fixed value with a note
 #        - requirements become skill/item checks where the plugin can check them,
-#          and "capability" checks (shown as unknown) for everything else: quests,
-#          outfits, abilities, perks... A capability gets its sprite when the
-#          research file has one, and quests get the quest icon.
+#          and quest checks for quests mapped to their client config (research/
+#          quests.json). Wiki advice pages ("Armoury", "Recommended equipment") become
+#          "see also" notes, not checks. Everything else is a "capability" check,
+#          shown as unknown: outfits, abilities, perks... A capability records its
+#          kind and gets its sprite when the research file has them; unmapped quests
+#          get the quest icon.
 from __future__ import annotations
 
 import collections
@@ -66,11 +69,14 @@ def activity_category(source_category):
 
 def tidy_name(name):
     """A Wiki link target as readable text: "Armour/Magic armour#High level (61+)"
-    becomes "Magic armour: High level (61+)"."""
+    becomes "Magic armour: High level (61+)", and "Recommended equipment for
+    PvM/Magic" becomes "Recommended equipment for PvM: Magic"."""
     base, _, anchor = name.replace("_", " ").partition("#")
-    base = base.rsplit("/", 1)[-1]
 
-    return f"{base}: {anchor}" if anchor else base
+    if anchor:
+        return f"{base.rsplit('/', 1)[-1]}: {anchor}"
+
+    return base.replace("/", ": ")
 
 
 def load_snapshot():
@@ -86,11 +92,15 @@ def load_snapshot():
 class Context:
     """Shared lookups while converting guides, plus the items table they fill in."""
 
-    def __init__(self, items, meta, capabilities, recipes):
+    def __init__(self, items, meta, capabilities, recipes, quests=None):
         self.items = items
         self.meta = meta
         self.capabilities = capabilities
         self.recipes = recipes or {}
+        self.quests = quests or {}
+
+        # Wiki advice links found while converting the current method.
+        self.advice = []
 
     def item_id(self, name):
         """The item ID for a Wiki name, adding it to the items table on first use.
@@ -136,13 +146,29 @@ class Context:
 
 
 def capability(name, ctx, quest=False):
+    """A requirement the plugin can't check yet, or None for a Wiki advice page
+    (those are collected into ctx.advice instead)."""
+    research = ctx.capabilities.get(name, {})
+
+    # A quest we've mapped to its client config can be checked for real.
+    if name in ctx.quests:
+        return {"kind": "quest", "quest": ctx.quests[name], "text": tidy_name(name), "display_icon": "quest"}
+
+    if research.get("kind") == "guidance":
+        ctx.advice.append(tidy_name(name))
+        return None
+
     check = {"kind": "capability", "text": tidy_name(name)}
-    sprite = ctx.capabilities.get(name, {}).get("sprite")
 
     if quest:
+        check["capability_kind"] = "quest"
         check["display_icon"] = "quest"
-    elif sprite:
-        check["display_icon"] = catalogue.capability_icon(sprite)
+    else:
+        if research.get("kind"):
+            check["capability_kind"] = research["kind"]
+
+        if research.get("sprite"):
+            check["display_icon"] = catalogue.capability_icon(research["sprite"])
 
     return check
 
@@ -160,6 +186,12 @@ def convert_requirement(entry, ctx):
 
     if isinstance(entry, list):
         children = [convert_requirement(child, ctx) for child in entry[1:]]
+        children = [child for child in children if child]
+
+        # Every option was a Wiki advice page: there's nothing left to check.
+        if not children:
+            return None
+
         check = {"kind": "any", "children": children,
                  "text": " or ".join([", ".join(child["text"] for child in children[:-1]), children[-1]["text"]])
                  if len(children) > 1 else children[0]["text"]}
@@ -202,6 +234,13 @@ def convert_requirement(entry, ctx):
     else:
         raise ValueError(f"Unknown requirement in the Wiki snapshot: {entry}")
 
+    if check is None:
+        # Keep the Wiki's own wording for an advice link when it has some.
+        if text and ctx.advice:
+            ctx.advice[-1] = text
+
+        return None
+
     if text:
         check["text"] = text
 
@@ -210,10 +249,15 @@ def convert_requirement(entry, ctx):
 
 def convert_requirements(requirements, ctx):
     access, recommended = [], []
+    ctx.advice = []
 
     for importance, entries in requirements.items():
         for entry in entries:
             check = convert_requirement(entry, ctx)
+
+            if check is None:
+                continue
+
             suffix = SUFFIX[importance]
 
             # Don't say "recommended" twice when the Wiki's own wording already does.
@@ -229,6 +273,9 @@ def convert_requirements(requirements, ctx):
         "access": {"kind": "all", "text": "Required", "children": access},
         "recommended": {"kind": "all", "text": "Recommended", "children": recommended},
         "unresolved": [],
+
+        # Wiki pages worth reading for this method, in the guide's order.
+        "advice": list(dict.fromkeys(ctx.advice)),
     }
 
 
@@ -355,7 +402,8 @@ def merge(recipe_source=None):
     recipes = catalogue.choose_recipes(recipe_source) if recipe_source else {}
 
     items = dict(curated["items"])
-    ctx = Context(items, meta or {"items": {}, "retrieved": None}, catalogue.load_capabilities(), recipes)
+    ctx = Context(items, meta or {"items": {}, "retrieved": None}, catalogue.load_capabilities(), recipes,
+                  catalogue.load_quests())
 
     # Rule 1: which guides our curated methods replace.
     by_key = {(guide["page"], (guide.get("version") or "").lower()): guide for guide in guides}
@@ -484,6 +532,7 @@ def print_report(monsters, recipe_source):
 
     # Requirements: what the plugin will be able to check.
     kinds, unknown_names, with_icon = collections.Counter(), collections.Counter(), 0
+    capability_kinds = collections.Counter()
 
     for method in methods:
         for group in ("access", "recommended"):
@@ -494,14 +543,18 @@ def print_report(monsters, recipe_source):
                 kinds[check["kind"]] += 1
 
                 if check["kind"] == "capability":
-                    # Checks with an icon are already researched (a sprite or a quest).
-                    if "display_icon" in check:
-                        with_icon += 1
-                    else:
+                    with_icon += 1 if "display_icon" in check else 0
+                    capability_kinds[check.get("capability_kind", "unclassified")] += 1
+
+                    # Classified checks are researched; list the ones that aren't.
+                    if "capability_kind" not in check:
                         unknown_names[check["text"].replace(" (recommended)", "").replace(" (optional)", "")] += 1
 
     print(f"\nRequirement checks: {dict(kinds)}")
     print(f"  {kinds['capability']} can't be checked yet (shown as unknown); {with_icon} of them have a sprite")
+    print(f"  By kind: {dict(capability_kinds.most_common())}")
+    print(f"  Wiki advice links shown as notes instead of checks: "
+          f"{sum(len(method['requirements'].get('advice', [])) for method in methods)}")
     print("  Most common checks not researched yet (add these to capabilities.json first):")
 
     for name, count in unknown_names.most_common(15):
