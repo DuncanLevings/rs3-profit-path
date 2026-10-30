@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.3-dev — 2026-10-29
+
+- Research pass 3, combat levels. A combat level requirement ("70 Combat", "138 Combat") is now a real check against the client's own combat level (`Player.GetCombatLevel`), so free-to-play rules are the client's. "90 Melee" is read as 90 Attack and 90 Strength. Constitution requirements are now checked too: the client's SkillType calls the skill HITPOINTS, so they had always read as unknown. 32 combat and 12 melee requirements become checks; unknown checks fall from 879 to 835. Combat level rows have no icon (the Skills tab's badge isn't a sprite the plugin can read). Diagnostics shows the combat level.
+- Browse rows: the version label after a method title is smaller and muted, and the title and version share the space before the profit column without tooltips. A full page of tooltips (PrettyUI builds 11 native components per tooltip) had used up the native component IDs. Browse ROI keeps its sign colour in subtler shades so the profit figure stands out.
+- Validate with 121 Lua behaviour tests and 67 Python tests.
+
 ## 0.8.2-dev — 2026-10-29
 
 - Research pass 2, outfits. `wiki_methods.py --outfits` reads each outfit's `{{Infobox Set}}` on the Wiki (with its page revision) and resolves every piece to an item ID, retrying charged pieces like "Ghost hunter goggles (20)" by name so any charge level counts. 19 outfits, all 94 pieces resolved (`catalogue-source/research/outfits.json`).

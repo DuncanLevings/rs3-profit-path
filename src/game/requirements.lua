@@ -87,6 +87,23 @@ function Requirements.evaluate(requirement, account)
         return result(requirement, status, reason, nil, children)
     end
 
+    -- Combat level, as the client reports it (account.combat, from
+    -- Player.GetCombatLevel).
+    if kind == "combat_level" then
+        local entry = account.combat
+
+        if not available(entry) or not nonNegativeInteger(entry.level) then
+            return result(requirement, "unknown", "Combat level is unavailable.")
+        end
+
+        local level = entry.level
+        local met = level >= requirement.level
+
+        return result(requirement, met and "met" or "unmet",
+            met and "Combat level meets the requirement." or "Combat level is below the requirement.",
+            { { combat = level } })
+    end
+
     -- Skill check: compares the base level, not a temporarily boosted one.
     if kind == "skill" then
         local entry = account.skills and account.skills[requirement.skill]

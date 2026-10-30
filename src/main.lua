@@ -186,6 +186,9 @@ function App.start()
     -- Collect the bounded set needed by this catalogue. Extra tool candidates
     -- are included so a basic hatchet can satisfy 'your highest-tier hatchet'.
     local wanted, skillNames, questNames = {}, {}, {}
+
+    -- Whether any method has a combat level requirement (then we read it with skills).
+    local needsCombat = false
     local equipment = catalogue.equipment or {}
 
     -- Include charged/worn IDs as ownership aliases, but keep the display ID stable.
@@ -202,6 +205,8 @@ function App.start()
     local function collect(requirement)
         if requirement.kind == "skill" then
             skillNames[requirement.skill] = true
+        elseif requirement.kind == "combat_level" then
+            needsCombat = true
         elseif requirement.kind == "quest" then
             questNames[requirement.quest] = true
         elseif requirement.kind == "item" then
@@ -260,6 +265,11 @@ function App.start()
 
         if reason == nil or reason == "skills" then
             evidence.skills = account:readSkills(skillNames)
+
+            -- Combat level only changes when a combat skill levels up.
+            if needsCombat then
+                evidence.combat = account:readCombatLevel()
+            end
         end
 
         if reason == nil or reason == "quests" then

@@ -208,6 +208,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         -- Style.panelFitter: a scrollbar may appear partway through). The list's
         -- side padding is 10.
         local fitter = Style.panelFitter(results, 10)
+        local headings = {}
 
         heading.content = browser.section == "favourites" and "Favourites" or "Browse methods"
 
@@ -239,7 +240,6 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
             local method = rows[index]
             local estimate = browser.estimates[method.id]
             local available = estimate and estimate.status == "available"
-            local name = method.title .. (method.variant and " - " .. method.variant or "")
             local row = fitter:add(results:AddPanel({ height = 96, scrollable = false, marginBottom = 8 }), 96)
 
             -- Titles always take their activity colour (PvM red, skilling green,
@@ -261,8 +261,26 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
             })
 
             -- Reserve the right column for profit. Anchored offsets let the title
-            -- shrink with the window without running underneath the figure.
-            row:AddTitle({ text = name, x = ROW_INSET + 32, y = 6, width = -238, widthAnchor = 1, height = 28, colour = titleColour })
+            -- shrink with the window without running underneath the figure. Keep
+            -- these labels tooltip-free: PrettyUI eagerly builds 11 components
+            -- per tooltip, which exhausted the native IDs on a full Browse page.
+            local title = row:AddTitle({
+                text = method.title, x = ROW_INSET + 32, y = 6,
+                width = -238, widthAnchor = 1, height = 28, colour = titleColour,
+            })
+
+            if method.variant then
+                -- A smaller, neutral suffix keeps the method name easy to scan.
+                -- Fit both labels once the card has its final scrollbar-aware width.
+                local variantText = " - " .. method.variant
+                local variant = row:AddText({
+                    text = variantText, x = ROW_INSET + 32, y = 6,
+                    width = 0, height = 28, maxLines = 1, colour = Style.muted,
+                })
+                Style.setFont(variant, "MUSEO_SANS_11PT_REGULAR")
+                headings[#headings + 1] = { row = row, title = title, variant = variant,
+                    titleText = method.title, variantText = variantText }
+            end
 
             -- Profit reads "[coin] 1.2M / H": coin at the start of the right
             -- column, the figure straight after it, both centred on one line.
@@ -294,13 +312,12 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
                 x = ROW_INSET, y = 36, width = -242, widthAnchor = 1, height = 24, colour = Style.muted,
             })
 
-            -- ROI stays quiet grey normally, but a negative ROI is a loss, so it
-            -- gets the same red as the profit figure and the Inputs values.
+            -- Keep the sign colour, but let the profit figure take visual priority.
             if available and estimate.roi then
                 row:AddText({
                     text = Style.number(estimate.roi, 1) .. "% ROI",
                     x = -184, xAnchor = 1, y = 36, width = 174, height = 24,
-                    colour = estimate.roi < 0 and Style.bad or Style.muted,
+                    colour = estimate.roi < 0 and Style.subtleBad or Style.subtleGood,
                 })
             end
 
@@ -364,6 +381,22 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
 
         results:AddText({ text = "RuneScape Wiki contributors / CC BY-NC-SA 3.0. GEPL trade estimates may use old trades.", colour = Style.muted })
         fitter:fit()
+
+        -- Title and variant share only the space before the profit column. Long
+        -- names clip independently; neither overlaps money. The method page has
+        -- the full title, so we don't need another tooltip for every list label.
+        for _, heading in ipairs(headings) do
+            local x, gap = ROW_INSET + 32, 8
+            local available = math.max(0, heading.row.content.width - x - 196)
+            local variantWidth = math.min(Style.textWidth(heading.variantText) + 4, available * 0.4)
+            local titleWidth = math.min(Style.textWidth(heading.titleText, true) + 4,
+                math.max(0, available - variantWidth - gap))
+
+            heading.title:SetSize(titleWidth, 28, 0, 0)
+            heading.variant:SetPos(x + titleWidth + gap, 6)
+            heading.variant:SetSize(math.max(0, available - titleWidth - gap), 28, 0, 0)
+        end
+
         results:SetScrollPosition(browser.scroll)
     end
 

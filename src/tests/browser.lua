@@ -261,7 +261,7 @@ return function(test, equal, client, pretty)
             end
 
             if text:find("% ROI", 1, true) and text:sub(1, 1) == "-" then
-                equal(label.options.colour, Style.bad, "Negative ROI colour for " .. text)
+                equal(label.options.colour, Style.subtleBad, "Negative ROI colour for " .. text)
                 redRois = redRois + 1
             end
         end
@@ -305,9 +305,9 @@ return function(test, equal, client, pretty)
                 coloured = coloured + 1
             end
 
-            -- ROI stays grey unless it's negative, which is red like a loss.
+            -- ROI retains its sign using the quieter secondary money palette.
             if text:find("% ROI", 1, true) then
-                local expected = text:sub(1, 1) == "-" and Style.bad or Style.muted
+                local expected = text:sub(1, 1) == "-" and Style.subtleBad or Style.subtleGood
                 equal(label.options.colour, expected, "ROI colour for " .. text)
             end
         end
@@ -472,9 +472,8 @@ return function(test, equal, client, pretty)
         local sidebar = prettyui.views[2].children[1]
         local titles = {
             ["Smelting steel bars"] = Style.categories.production,
-            ["Cutting elder logs - Without wood spirits"] = Style.categories.skilling,
-            ["Cutting elder logs - With wood spirits"] = Style.categories.skilling,
-            ["Killing abyssal demons - Melee"] = Style.categories.pvm,
+            ["Cutting elder logs"] = Style.categories.skilling,
+            ["Killing abyssal demons"] = Style.categories.pvm,
         }
 
         -- Counts the coloured titles currently shown, checking each one's colour.
@@ -511,6 +510,15 @@ return function(test, equal, client, pretty)
                 equal(fill.width, 0)
                 equal(accent.width, 4)
                 equal(accent.rgba, title, "Accent bar matches the title colour")
+
+                for _, label in ipairs(row.texts) do
+                    if label.content:sub(1, 3) == " - " then
+                        equal(label.options.colour, Style.muted)
+                        assert(label.size and label.x + label.size.width <= row.content.width - 190,
+                            "Variant must stay clear of the profit column")
+                    end
+                end
+
                 assert(fill.rgba ~= accent.rgba)
                 rows = rows + 1
             end

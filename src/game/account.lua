@@ -353,6 +353,23 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
     -- Temporary development probes, used only by diagnostics.lua. Remove these
     -- functions and the diagnostics state above together with that module.
 
+    -- The player's combat level, straight from the client (Player.GetCombatLevel).
+    -- The client applies its own rules, including free-to-play worlds, so we don't
+    -- work it out ourselves.
+    function self:readCombatLevel()
+        if not self.active or not Player.IsAvailable() then
+            return { status = "unavailable" }
+        end
+
+        local ok, level = pcall(Player.GetCombatLevel)
+
+        if not ok or type(level) ~= "number" or level < 1 or level % 1 ~= 0 then
+            return { status = "unknown", message = "Combat level is unavailable." }
+        end
+
+        return { status = "available", level = level }
+    end
+
     function self:readPlayer()
         if not self.active then
             return { status = "stopped" }
@@ -365,6 +382,7 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
             status = "available",
             prayer = Player.GetLevelUncapped(SkillType.PRAYER),
             herblore = Player.GetLevelUncapped(SkillType.HERBLORE),
+            combat = self:readCombatLevel().level,
         }
     end
 

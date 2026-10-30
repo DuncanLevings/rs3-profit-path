@@ -27,7 +27,7 @@ function Diagnostics.new(account, inspectQuote, inspectQuest)
         local player = account:readPlayer()
         if player.status == "available" then
             labels.player.content = "Base levels - Prayer: " .. player.prayer .. "; Herblore: " .. player.herblore
-                .. ". Unlock checks are not implemented."
+                .. "; combat level: " .. tostring(player.combat or "unavailable") .. ". Unlock checks are not implemented."
         else
             labels.player.content = "Player data is unavailable outside a game world."
         end

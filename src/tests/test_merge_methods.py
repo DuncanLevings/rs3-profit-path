@@ -107,13 +107,13 @@ class RequirementTests(unittest.TestCase):
 
     def test_everything_else_is_an_unknown_capability_with_its_sprite_or_the_quest_icon(self):
         requirements, _ = self.convert({
-            "required": ["skill:COMBAT_LEVEL:90", "quest:Priest in Peril", "item:Death Note",
+            "required": ["skill:TOTAL_LEVEL:1500", "quest:Priest in Peril", "item:Death Note",
                          "item:Armour/Magic armour#High level equipment (61+)"],
             "optional": [{"text": "A team of 1-3 other players"}],
         }, {"Death Note": {"kind": "relic", "sprite": "ARCH_ICON_RELIC_64PX_DEATH_NOTE"}})
         combat, quest, relic, page = requirements["access"]["children"]
 
-        self.assertEqual(combat, {"kind": "capability", "text": "90 Combat level"})
+        self.assertEqual(combat, {"kind": "capability", "text": "1500 Total level"})
         self.assertEqual(quest["display_icon"], "quest")
         self.assertEqual(relic["display_icon"], catalogue.capability_icon("ARCH_ICON_RELIC_64PX_DEATH_NOTE"))
         self.assertEqual(page["text"], "Magic armour: High level equipment (61+)")
@@ -181,6 +181,40 @@ class ResearchTests(unittest.TestCase):
 
         self.assertEqual(outfit["capability_kind"], "outfit")
         self.assertNotIn("capability_kind", other)
+
+
+class CombatTests(unittest.TestCase):
+    def test_combat_and_melee_levels_become_checks(self):
+        ctx = context()
+        method = merge_methods.convert_guide(guide(requirements={
+            "required": ["skill:COMBAT:70", "skill:MELEE:90"],
+            "recommended": [{"req": "skill:COMBAT:40", "text": "40 recommended for Dragon Slayer"}],
+        }), ctx, "pvm")
+        combat, melee = method["requirements"]["access"]["children"]
+
+        self.assertEqual(combat, {"kind": "combat_level", "level": 70, "text": "70 Combat"})
+
+        # "Melee" means both melee skills at that level.
+        self.assertEqual(melee["kind"], "all")
+        self.assertEqual(melee["text"], "90 Melee (Attack and Strength)")
+        self.assertEqual([(c["skill"], c["level"]) for c in melee["children"]], [("ATTACK", 90), ("STRENGTH", 90)])
+
+        # The Wiki's own wording is kept, and it already says "recommended".
+        self.assertEqual(method["requirements"]["recommended"]["children"][0]["text"], "40 recommended for Dragon Slayer")
+
+        catalogue.validate_methods({"schema": 1, "items": ctx.items, "methods": [method]}, {"monsters": []})
+
+    def test_constitution_uses_the_clients_hitpoints_skill_name(self):
+        ctx = context()
+        method = merge_methods.convert_guide(guide(requirements={"required": ["skill:CONSTITUTION:80"]}), ctx, "pvm")
+
+        # Checked as HITPOINTS (the client's SkillType), but players read "Constitution".
+        self.assertEqual(method["requirements"]["access"]["children"][0],
+                         {"kind": "skill", "skill": "HITPOINTS", "level": 80, "text": "80 Constitution"})
+
+    def test_combat_level_above_the_maximum_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "1 to 152"):
+            catalogue.validate_requirement({"kind": "combat_level", "level": 200, "text": "200 Combat"}, {})
 
 
 class OutfitTests(unittest.TestCase):

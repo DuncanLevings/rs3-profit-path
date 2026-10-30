@@ -23,6 +23,9 @@ local Style = {
     gold = 0xE3BF70FF,
     good = 0xB7D8A6FF,
     bad = 0xE4A099FF,
+    -- Secondary money figures keep their sign colour below the headline's weight.
+    subtleGood = 0x8FA184FF,
+    subtleBad = 0xAA8580FF,
     categories = { pvm = 0xDEA19AFF, skilling = 0xACCEA0FF, production = 0x9EBEDFFF },
 }
 

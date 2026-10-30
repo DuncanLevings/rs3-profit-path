@@ -300,6 +300,11 @@ def validate_requirement(check, items, equipment=None):
         if "skill_" + name.lower() not in ICON_NAMES:
             raise ValueError("Unresolved skill icon name")
 
+    elif kind == "combat_level":
+        # Worked out in game from nine combat skills; 152 is the highest possible.
+        if not positive_integer(check.get("level")) or check["level"] > 152:
+            raise ValueError("Combat level requirement must be 1 to 152")
+
     elif kind == "quest":
         name = check.get("quest")
 

@@ -49,6 +49,12 @@ PREFIX = "Money making guide/"
 
 SUFFIX = {"required": "", "recommended": " (recommended)", "optional": " (optional)"}
 
+# Wiki skill names that the client knows by another SkillType name.
+CLIENT_SKILL_NAMES = {"CONSTITUTION": "HITPOINTS"}
+
+# How a skill reads in requirement text, where the client's name isn't the one players use.
+SKILL_LABELS = {"HITPOINTS": "Constitution"}
+
 
 def slug(text):
     return re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
@@ -249,11 +255,26 @@ def convert_requirement(entry, ctx):
     elif entry.startswith("skill:"):
         _, name, level = entry.split(":")
 
-        # Only the client's real skills (each has an icon) can be checked. Things
-        # like "combat level" stay as unknown capabilities.
-        if "skill_" + name.lower() in catalogue.ICON_NAMES:
+        # The client's SkillType calls Constitution HITPOINTS (developer.runescape.com
+        # Player docs); the Wiki says Constitution.
+        name = CLIENT_SKILL_NAMES.get(name, name)
+
+        # Combat level: the plugin works it out from the combat skills.
+        if name in ("COMBAT", "COMBAT_LEVEL"):
+            check = {"kind": "combat_level", "level": int(level), "text": f"{level} Combat"}
+
+        # "Melee" is the Wiki's shorthand for the melee skills, Attack and Strength.
+        elif name == "MELEE":
+            check = {"kind": "all", "text": f"{level} Melee (Attack and Strength)", "children": [
+                {"kind": "skill", "skill": "ATTACK", "level": int(level), "text": f"{level} Attack"},
+                {"kind": "skill", "skill": "STRENGTH", "level": int(level), "text": f"{level} Strength"},
+            ]}
+
+        # Only the client's real skills (each has an icon) can be checked. Anything
+        # else stays an unknown capability.
+        elif "skill_" + name.lower() in catalogue.ICON_NAMES:
             check = {"kind": "skill", "skill": name, "level": int(level),
-                     "text": f"{level} {name.capitalize()}"}
+                     "text": f"{level} {SKILL_LABELS.get(name, name.capitalize())}"}
         else:
             check = {"kind": "capability", "text": f"{level} {name.replace('_', ' ').capitalize()}"}
 

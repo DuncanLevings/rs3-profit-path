@@ -100,6 +100,12 @@ local function client(database)
             assert(state.available, "Skill read while logged out")
             return skill == 5 and 92 or 96
         end,
+
+        -- The client's own combat level (state.combat lets a test change it).
+        GetCombatLevel = function()
+            assert(state.available, "Combat level read while logged out")
+            return state.combat or 126
+        end,
         GetEntity = function()
             return { isValid = state.available, displayName = state.characterName or "Fixture" }
         end,
@@ -423,6 +429,10 @@ local function pretty()
 
             function label:SetPos(x, y)
                 self.x, self.y = x, y
+            end
+
+            function label:SetSize(width, height)
+                self.size = { width = width, height = height }
             end
 
             return label
@@ -1072,6 +1082,29 @@ test("skill checks use available base levels and preserve source wording", funct
 end)
 
 -- Negative, fractional, infinite, NaN (0/0) or text "levels" must never pass a check.
+-- Combat level comes straight from the client (Player.GetCombatLevel), so the
+-- rules only compare it; an unreadable level is unknown, never a guess.
+test("combat level checks use the client's combat level and stay unknown without it", function()
+    local requirement = { kind = "combat_level", level = 138, text = "138 Combat" }
+
+    equal(Requirements.evaluate(requirement, { combat = { status = "available", level = 138 } }).status, "met")
+    equal(Requirements.evaluate(requirement, { combat = { status = "available", level = 21 } }).status, "unmet")
+    equal(Requirements.evaluate(requirement, { combat = { status = "unknown" } }).status, "unknown")
+    equal(Requirements.evaluate(requirement, {}).status, "unknown")
+
+    -- Account reads it only in a game world, and turns bad values into unknown.
+    local state = client()
+    local account = Account.new(function() end)
+    equal(account:readCombatLevel().level, 126)
+
+    state.combat = 0 / 0
+    equal(account:readCombatLevel().status, "unknown")
+
+    state.available = false
+    equal(account:readCombatLevel().status, "unavailable")
+    account:destroy()
+end)
+
 test("invalid numerical evidence cannot qualify a requirement", function()
     for _, value in ipairs({ -1, 2.5, math.huge, 0 / 0, "99" }) do
         local account = {

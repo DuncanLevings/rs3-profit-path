@@ -39,6 +39,9 @@ return {
     skill_agility = "HITMARK_ICON_SKILL_AGILITY",
     skill_archaeology = "HITMARK_ICON_SKILL_ARCHAEOLOGY",
     skill_constitution = "HITMARK_ICON_SKILL_CONSTITUTION",
+
+    -- The client's SkillType for Constitution is HITPOINTS; same icon.
+    skill_hitpoints = "HITMARK_ICON_SKILL_CONSTITUTION",
     skill_construction = "HITMARK_ICON_SKILL_CONSTRUCTION",
     skill_cooking = "HITMARK_ICON_SKILL_COOKING",
     skill_crafting = "HITMARK_ICON_SKILL_CRAFTING",

@@ -37,7 +37,9 @@ local SECOND_LINE_Y = 46
 local itemDefinitions = require("src/data/method_data").items
 
 -- Which Requirements section each kind of check goes in.
-local categories = { skill = "Skills", item = "Items", gear = "Items", quest = "Quests", capability = "Other" }
+local categories = {
+    skill = "Skills", combat_level = "Skills", item = "Items", gear = "Items", quest = "Quests", capability = "Other",
+}
 
 -- Picks the section for one requirement. An "any of these" group stays in one
 -- piece: splitting it across sections would make it look like every alternative is
@@ -78,6 +80,8 @@ local function requirementIcons(definition)
     local function collect(requirement)
         local icon = requirement.display_icon
 
+        -- Combat level has no icon: the Skills tab's badge isn't a sprite the
+        -- plugin can find, and a stand-in looked wrong.
         if requirement.kind == "skill" then
             icon = "skill_" .. requirement.skill:lower()
         end
