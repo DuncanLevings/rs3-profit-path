@@ -183,6 +183,41 @@ class ResearchTests(unittest.TestCase):
         self.assertNotIn("capability_kind", other)
 
 
+class RecurringTests(unittest.TestCase):
+    def test_recurring_guides_count_per_run_with_a_yield_and_their_cycle(self):
+        ctx = context()
+        method = merge_methods.convert_guide(guide(
+            recurring={"every": "24 Hours", "minutes": 2},
+            inputs=[["Coins", 500, "run", "value", 1]],
+            outputs=[["Logs", 100, "run", "ge", 50]],
+        ), ctx, "skilling")
+        income = method["income"]
+
+        self.assertEqual(income["period"], "run")
+        self.assertEqual(income["rate"], {"key": "guide_yield", "unit": "% of guide yield", "default": 100})
+        self.assertEqual(income["recurrence"], {"every": "24 hours", "minutes": 2})
+
+        # Stored per 1% of yield, like a pace: 100% gives the guide's own amounts.
+        self.assertEqual((income["outputs"][0]["quantity"], income["outputs"][0]["basis"]), (1, "action"))
+        self.assertIn("Can be done every 24 hours; a run takes about 2 minutes.", income["assumptions"])
+
+        catalogue.validate_methods({"schema": 1, "items": ctx.items, "methods": [method]}, {"monsters": []})
+
+    def test_per_run_income_needs_its_cycle_and_hourly_income_has_none(self):
+        ctx = context()
+        method = merge_methods.convert_guide(guide(recurring={"every": "7 days", "minutes": 5}), ctx, "skilling")
+        del method["income"]["recurrence"]
+
+        with self.assertRaisesRegex(ValueError, "Recurring income"):
+            catalogue.validate_methods({"schema": 1, "items": ctx.items, "methods": [method]}, {"monsters": []})
+
+        hourly = merge_methods.convert_guide(guide(), ctx, "skilling")
+        hourly["income"]["recurrence"] = {"every": "1 day", "minutes": 1}
+
+        with self.assertRaisesRegex(ValueError, "Only per-run"):
+            catalogue.validate_methods({"schema": 1, "items": ctx.items, "methods": [hourly]}, {"monsters": []})
+
+
 class CombatTests(unittest.TestCase):
     def test_combat_and_melee_levels_become_checks(self):
         ctx = context()

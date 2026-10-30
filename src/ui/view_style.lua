@@ -26,7 +26,9 @@ local Style = {
     -- Secondary money figures keep their sign colour below the headline's weight.
     subtleGood = 0x8FA184FF,
     subtleBad = 0xAA8580FF,
-    categories = { pvm = 0xDEA19AFF, skilling = 0xACCEA0FF, production = 0x9EBEDFFF },
+    -- Activity colours for titles and sidebar buttons: PvM red, skilling green,
+    -- production blue and recurring (daily/weekly) a subtle orange.
+    categories = { pvm = 0xDEA19AFF, skilling = 0xACCEA0FF, production = 0x9EBEDFFF, recurring = 0xDDB487FF },
 }
 
 -- The Coins item, and the fonts PrettyUI uses for body text and titles. We
@@ -343,7 +345,10 @@ end
 
 -- Short numbers like "1.2m / h" for the Browse list, where space is tight. The
 -- title font shows it as "1.2M / H". The full figure is in the Income tab.
-function Style.compact(value)
+-- `unit` is what the figure is per: "h" (the default) or "run" for recurring methods.
+function Style.compact(value, unit)
+    local per = " / " .. (unit or "h")
+
     if value == nil then
         return "Not estimated"
     end
@@ -351,18 +356,18 @@ function Style.compact(value)
     local magnitude = math.abs(value)
 
     if magnitude >= 1000000000 then
-        return string.format("%.1fb / h", value / 1000000000)
+        return string.format("%.1fb", value / 1000000000) .. per
     end
 
     if magnitude >= 1000000 then
-        return string.format("%.1fm / h", value / 1000000)
+        return string.format("%.1fm", value / 1000000) .. per
     end
 
     if magnitude >= 1000 then
-        return string.format("%.1fk / h", value / 1000)
+        return string.format("%.1fk", value / 1000) .. per
     end
 
-    return Style.number(value, 0) .. " / h"
+    return Style.number(value, 0) .. per
 end
 
 -- Quantities can be fractional (e.g. 0.04 potion doses an hour), unlike GP. Show up

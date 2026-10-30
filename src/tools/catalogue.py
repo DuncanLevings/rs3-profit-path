@@ -840,7 +840,7 @@ def verify_recipes(source):
 # Rate units the calculator and saved rates understand. "actions/hour" is for
 # non-combat Wiki guides counted per action; "% of guide pace" for guides given only
 # per hour (100 is the guide's own pace).
-RATE_UNITS = {"kills/hour", "logs/hour", "smelts/hour", "actions/hour", "% of guide pace"}
+RATE_UNITS = {"kills/hour", "logs/hour", "smelts/hour", "actions/hour", "% of guide pace", "% of guide yield"}
 
 
 def validate_methods(source, monsters, recipes=None):
@@ -1003,8 +1003,19 @@ def validate_methods(source, monsters, recipes=None):
 
         income = require_record(method.get("income"), "Method income")
 
-        if income.get("period") != "hour":
-            raise ValueError("Only hourly income periods are supported by this calculator")
+        # Income is per hour, or per run for a recurring (daily/weekly) method, which
+        # also says how often it can be done.
+        if income.get("period") not in ("hour", "run"):
+            raise ValueError("Income period must be hour or run")
+
+        if income["period"] == "run":
+            recurrence = require_record(income.get("recurrence"), "Recurring income")
+            require_text(recurrence.get("every"), "Recurring cycle")
+
+            if not non_negative_number(recurrence.get("minutes")):
+                raise ValueError("A recurring run needs its minutes per run")
+        elif "recurrence" in income:
+            raise ValueError("Only per-run income has a recurrence")
 
         # The rate is the number the player can edit. Its key and unit are part of the
         # saved-rate contract; a unit change makes old saved rates invalid on purpose.

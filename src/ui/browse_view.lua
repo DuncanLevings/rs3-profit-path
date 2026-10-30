@@ -11,6 +11,9 @@ local categories = {
     { id = "pvm", label = "PvM" },
     { id = "skilling", label = "Skilling" },
     { id = "production", label = "Production" },
+
+    -- Daily/weekly methods, counted per run rather than per hour.
+    { id = "recurring", label = "Recurring" },
 }
 
 -- Native dropdown entries need integer IDs. Keep those UI-only numbers separate
@@ -301,14 +304,17 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
             end
 
             row:AddTitle({
-                text = Style.compact(available and estimate.profit or nil),
+                text = Style.compact(available and estimate.profit or nil, method.income.period == "run" and "run" or "h"),
                 x = profitX, xAnchor = 1, y = 6, width = -10 - profitX, height = 28,
                 colour = profitColour,
                 tooltip = estimateText(method, estimate),
             })
 
+            -- A recurring method says how often it can be done.
+            local recurrence = method.income.recurrence
+
             row:AddText({
-                text = method.source_category,
+                text = method.source_category .. (recurrence and ("  /  every " .. recurrence.every) or ""),
                 x = ROW_INSET, y = 36, width = -242, widthAnchor = 1, height = 24, colour = Style.muted,
             })
 

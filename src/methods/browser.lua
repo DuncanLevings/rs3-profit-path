@@ -21,6 +21,11 @@ local function sortValue(method, estimates, key)
     end
 end
 
+-- Whether a method counts per run (a recurring daily/weekly) rather than per hour.
+local function perRun(method)
+    return method.income ~= nil and method.income.period == "run"
+end
+
 -- "any" lets everything through. Otherwise the method's label has to match; a
 -- method with no difficulty rating never matches a specific difficulty.
 local function matchesLevel(chosen, value)
@@ -153,6 +158,14 @@ function Browser.new(methods, preferences, estimateMethod)
         end
 
         table.sort(rows, function(left, right)
+            -- Recurring (per-run) methods always come after hourly ones, in both
+            -- directions: a 2-minute daily's "per run" isn't comparable to per hour.
+            local leftRuns = perRun(left)
+
+            if leftRuns ~= perRun(right) then
+                return not leftRuns
+            end
+
             local a = sortValue(left, self.estimates, self.sort)
             local b = sortValue(right, self.estimates, self.sort)
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.4-dev — 2026-10-29
+
+- Research pass 4, recurring guides. The 94 daily/weekly Wiki guides are now methods, counted per run: "Profit per run", "Per run" columns and "1.2M / RUN" in Browse, with the cycle shown on the row ("every 24 hours") and in Notes with the minutes per run. Their rate box is "Yield (% of guide)" (100 is the guide's own amounts). They have their own Recurring section in the Browse sidebar, after Production, with a subtle orange title colour; under All activities they're always listed after hourly methods, so a two-minute daily never outranks a real hourly method. The catalogue is now 676 methods (889 KB).
+- Validate with 122 Lua behaviour tests and 70 Python tests.
+
 ## 0.8.3-dev — 2026-10-29
 
 - Research pass 3, combat levels. A combat level requirement ("70 Combat", "138 Combat") is now a real check against the client's own combat level (`Player.GetCombatLevel`), so free-to-play rules are the client's. "90 Melee" is read as 90 Attack and 90 Strength. Constitution requirements are now checked too: the client's SkillType calls the skill HITPOINTS, so they had always read as unknown. 32 combat and 12 melee requirements become checks; unknown checks fall from 879 to 835. Combat level rows have no icon (the Skills tab's badge isn't a sprite the plugin can read). Diagnostics shows the combat level.

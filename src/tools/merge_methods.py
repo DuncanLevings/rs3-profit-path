@@ -18,8 +18,8 @@ and report what still needs research."""
 # The rules, in order:
 #   1. A curated method replaces the Wiki guide it was made from (same page, same
 #      version label). Our research always wins over the raw import.
-#   2. Recurring guides (daily/weekly runs) are left out for now: their income is per
-#      run, and the calculator only does per hour. They're listed in the report.
+#   2. Recurring guides (daily/weekly runs) count per run, not per hour: their rate
+#      is a "% of guide yield", and they keep how often they can be done.
 #   3. Every other guide becomes a method:
 #        - per-kill guides keep their kills per hour as the rate
 #        - per-hour guides get a "% of guide pace" rate: 100 is the guide's own pace,
@@ -350,8 +350,17 @@ def convert_requirements(requirements, ctx):
 def convert_income(guide, ctx, pvm):
     pace = "kph" not in guide
     retrieved = ctx.meta["retrieved"]
+    recurring = guide.get("recurring")
 
-    if pace:
+    if recurring:
+        # A daily/weekly run: amounts are for one run. Like a pace, 100% is the
+        # guide's own yield, and every amount scales with it.
+        rate = {"key": "guide_yield", "unit": "% of guide yield", "default": 100}
+        every = recurring["every"].lower()
+        minutes = recurring["minutes"]
+        assumptions = [f"Amounts are one run of the Wiki guide at 100% yield. Set your own yield as a percentage.",
+                       f"Can be done every {every}; a run takes about {minutes:g} minutes."]
+    elif pace:
         rate = {"key": "guide_pace", "unit": "% of guide pace", "default": 100}
         assumptions = ["Amounts are the Wiki guide's hourly figures at 100% pace. "
                        "Set your own pace as a percentage of the guide's."]
@@ -361,11 +370,15 @@ def convert_income(guide, ctx, pvm):
         assumptions = [f"Assumes the guide's {guide['kph']:,} {unit.split('/')[0]} per hour. Adjust it to your own pace."]
 
     assumptions.append(f"Imported from the Wiki guide on {retrieved}; not yet reviewed for Profit Path.")
-    income = {"coverage": "complete", "period": "hour", "rate": rate,
+    income = {"coverage": "complete", "period": "run" if recurring else "hour", "rate": rate,
               "inputs": [], "outputs": [], "assumptions": assumptions, "unresolved": []}
+
+    if recurring:
+        income["recurrence"] = {"every": recurring["every"].lower(), "minutes": recurring["minutes"]}
 
     for direction in ("inputs", "outputs"):
         for name, quantity, basis, pricing, value, *note in guide[direction]:
+            # Per-hour and per-run guides store amounts per 1% of pace or yield.
             line = {"name": name,
                     "quantity": quantity / 100 if pace else quantity,
                     "basis": "action" if pace else basis}
@@ -490,7 +503,9 @@ def merge(recipe_source=None):
     page_categories = collections.defaultdict(collections.Counter)
 
     for guide in guides:
-        page_categories[guide["page"]][activity_category(guide.get("category"))] += 1
+        # Recurring (daily/weekly) guides are their own activity group in Browse.
+        category = "recurring" if "recurring" in guide else activity_category(guide.get("category"))
+        page_categories[guide["page"]][category] += 1
 
     for method in curated["methods"]:
         page_categories[method["source"]["title"]][method["category"]] += 100
@@ -513,10 +528,8 @@ def merge(recipe_source=None):
             details["wiki_profit"][replaced[key]] = guide["wiki_profit"]
             continue
 
-        # Rule 2: recurring runs wait for a per-run income model.
         if "recurring" in guide:
             details["recurring"].append(guide)
-            continue
 
         method = convert_guide(guide, ctx, page_categories[guide["page"]].most_common(1)[0][0])
         method["research"] = research_status(method, False)
@@ -583,8 +596,7 @@ def print_report(monsters, recipe_source):
 
     print(f"Catalogue coverage (Wiki snapshot {details['retrieved']})")
     print(f"  Methods: {len(methods)} = {details['curated']} curated + {imported} imported from the Wiki")
-    print(f"  Left out for now: {len(details['recurring'])} recurring guides (income is per run; "
-          "the calculator only does per hour)")
+    print(f"  Recurring (per run, sorted after hourly methods): {len(details['recurring'])}")
 
     if details["unmatched_curated"]:
         print(f"  Curated methods with no current Wiki guide: {', '.join(details['unmatched_curated'])}")

@@ -404,7 +404,10 @@ end
 -- out (Inputs), subtle green for money coming in (Outputs).
 --
 -- Returns an update function that fills in the numbers.
-local function itemTable(panel, definitions, moneyColour)
+local function itemTable(panel, definitions, moneyColour, period)
+    -- Recurring (daily/weekly) methods count per run instead of per hour.
+    local perRun = period == "run"
+
     -- Right edge of the Value column, from the panel's right side. The shaded
     -- bands sit 12 in from both panel edges, and the values 8 inside the bands.
     local valueRight = -20
@@ -412,7 +415,7 @@ local function itemTable(panel, definitions, moneyColour)
     -- Column headings on a shaded band.
     Style.rectangle(panel, { x = 12, y = 34, width = -24, widthAnchor = 1, height = 28, colour = 0x39372EFF })
     panel:AddText({ text = "Item", x = 12, y = 36, width = 50, colour = Style.muted })
-    panel:AddText({ text = "Per hour", x = 66, y = 36, width = 90, colour = Style.muted })
+    panel:AddText({ text = perRun and "Per run" or "Per hour", x = 66, y = 36, width = 90, colour = Style.muted })
     panel:AddText({ text = "Value", x = valueRight - 130, xAnchor = 1, y = 36, width = 130, colour = Style.muted, alignHorizontal = ui.AlignMode.BOTTOMRIGHT })
 
     -- Item rows, with alternating background shades.
@@ -450,7 +453,7 @@ local function itemTable(panel, definitions, moneyColour)
             row.total.content = Style.number(values[index].value)
         end
 
-        subtotal.content = total and Style.number(total) .. " / h" or "Unavailable"
+        subtotal.content = total and Style.number(total) .. (perRun and " / run" or " / h") or "Unavailable"
         Style.placeCoin(coin, subtotal.content, { rightEdge = valueRight, y = coinY, size = 20 })
     end
 end
@@ -598,8 +601,10 @@ function MethodView.mount(view, method, calculator, guarded, options)
     }), TOP_ROW_HEIGHT, { fixed = RATE_WIDTH })
 
     -- First line: the label, with Reset at the right end.
-    -- Wiki guides given only per hour use a pace instead: 100 is the guide's own.
-    local rateLabel = method.income.rate.unit == "% of guide pace" and "Pace (% of guide)" or "Rate per hour"
+    -- Wiki guides given only per hour use a pace instead (100 is the guide's own),
+    -- and recurring runs a yield.
+    local rateLabels = { ["% of guide pace"] = "Pace (% of guide)", ["% of guide yield"] = "Yield (% of guide)" }
+    local rateLabel = rateLabels[method.income.rate.unit] or "Rate per hour"
     ratePanel:AddText({ text = rateLabel, x = TOP_INSET, y = FIRST_LINE_Y, width = 150, height = 28, colour = Style.muted, tooltip = method.income.rate.unit })
 
     -- SetText(..., false) puts the default back without firing onChange, so the reset
@@ -652,7 +657,8 @@ function MethodView.mount(view, method, calculator, guarded, options)
         inline = true, scrollable = false,
     }), TOP_ROW_HEIGHT, { rest = RATE_WIDTH })
 
-    summary:AddText({ text = "Profit per hour (after tax)", x = TOP_INSET, y = FIRST_LINE_Y, width = 200, colour = Style.muted })
+    local perRun = method.income.period == "run"
+    summary:AddText({ text = perRun and "Profit per run (after tax)" or "Profit per hour (after tax)", x = TOP_INSET, y = FIRST_LINE_Y, width = 200, colour = Style.muted })
 
     -- Unsaved changes and errors show at the top right of the profit panel, right
     -- beside the rate box, so they're hard to miss.
@@ -707,8 +713,8 @@ function MethodView.mount(view, method, calculator, guarded, options)
 
     -- Costs read red and earnings green, so it's obvious at a glance which way
     -- the money goes. The "Inputs"/"Outputs" headings still say it in words.
-    local updateInputs = itemTable(inputs, method.income.inputs, Style.bad)
-    local updateOutputs = itemTable(outputs, outputDefinitions, Style.good)
+    local updateInputs = itemTable(inputs, method.income.inputs, Style.bad, method.income.period)
+    local updateOutputs = itemTable(outputs, outputDefinitions, Style.good, method.income.period)
 
     income:AddTitle("Notes")
 
@@ -795,7 +801,7 @@ function MethodView.mount(view, method, calculator, guarded, options)
         local headlineColour = Style.gold
 
         if result.profit then
-            profit.content = Style.number(result.profit) .. " / h"
+            profit.content = Style.number(result.profit) .. (perRun and " / run" or " / h")
             headlineColour = result.profit < 0 and Style.bad or Style.good
         else
             profit.content = "Not estimated"

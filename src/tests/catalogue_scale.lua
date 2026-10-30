@@ -178,6 +178,96 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
+    test("recurring methods show per-run profit with their cycle and sort after hourly ones", function()
+        client()
+        prettyui = pretty()
+        gepl = countingLibrary()
+
+        local recurring
+
+        for _, method in ipairs(catalogue.methods) do
+            if method.income.period == "run" then
+                recurring = method
+                break
+            end
+        end
+
+        assert(recurring, "Expected recurring methods in the catalogue")
+
+        -- Sorting: once a per-run method appears, no hourly method follows it.
+        local Browser = require("src/methods/browser")
+        local Preferences = require("src/storage/preferences")
+        local browser = Browser.new(catalogue.methods, Preferences.new(PersistentDB), function()
+            return { status = "available", profit = math.random(1, 1000000), roi = 1 }
+        end)
+        browser:refreshEstimates()
+        local seenRun = false
+
+        for _, method in ipairs(browser:rows()) do
+            local isRun = method.income.period == "run"
+            assert(not (seenRun and not isRun), "An hourly method came after a recurring one")
+            seenRun = seenRun or isRun
+        end
+
+        assert(seenRun, "Recurring methods should be listed")
+
+        -- The method page speaks per run, with a yield and the cycle in Notes.
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
+        prettyui:findButton("Open Profit Path")()
+        prettyui.views[#prettyui.views].children[2].fields[1]:SetText(recurring.title, true)
+
+        local rowTexts = {}
+
+        for _, view in ipairs(prettyui.allViews) do
+            if not view.destroyed and view.buttons["View method"] then
+                for _, label in ipairs(view.texts) do
+                    rowTexts[#rowTexts + 1] = tostring(label.content)
+                end
+            end
+        end
+
+        assert(table.concat(rowTexts, " / "):find("every " .. recurring.income.recurrence.every, 1, true),
+            "Browse row shows the cycle")
+
+        -- Recurring methods are their own activity, with a sidebar button after
+        -- Production that shows only them.
+        equal(recurring.category, "recurring")
+        prettyui.views[#prettyui.views].children[2].fields[1]:SetText("", true)
+        prettyui:findButton("Recurring")()
+        local shown = 0
+
+        for _, view in ipairs(prettyui.allViews) do
+            if not view.destroyed and view.buttons["View method"] then
+                shown = shown + 1
+            end
+        end
+
+        assert(shown > 0, "The Recurring section lists methods")
+
+        for _, method in ipairs(catalogue.methods) do
+            equal(method.category == "recurring", method.income.period == "run")
+        end
+
+        -- Search for it again so its row is on the first page.
+        prettyui.views[#prettyui.views].children[2].fields[1]:SetText(recurring.title, true)
+        prettyui:findMethod(recurring.title)()
+        local income = prettyui.views[#prettyui.views].tabs[1].pages[1]
+        local texts = {}
+
+        for _, label in ipairs(income:allTexts()) do
+            texts[#texts + 1] = tostring(label.content)
+        end
+
+        local all = table.concat(texts, " / ")
+        assert(all:find("Profit per run (after tax)", 1, true), "Per-run headline")
+        assert(all:find("Yield (% of guide)", 1, true), "Yield label")
+        assert(all:find("Per run", 1, true), "Per-run column")
+        assert(all:find("Can be done every", 1, true), "Cycle note")
+
+        PluginShutdown()
+    end)
+
     test("every capability icon a method uses resolves to a sprite name", function()
         local icons = require("data/icons")
         local missing = {}

@@ -465,7 +465,7 @@ class MethodTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     catalogue.methods_text(self.methods, self.monsters)
 
-    def test_rejects_blank_requirement_labels_and_non_hourly_periods(self):
+    def test_rejects_blank_requirement_labels_and_unknown_periods(self):
         requirement = self.methods["methods"][0]["requirements"]["access"]["children"][0]
         requirement["text"] = ""
 
@@ -473,9 +473,16 @@ class MethodTests(unittest.TestCase):
             catalogue.methods_text(self.methods, self.monsters)
 
         requirement["text"] = "92 Prayer"
+        # A per-run (recurring) method must say how often it can be done, and no
+        # other period is allowed.
         self.methods["methods"][0]["income"]["period"] = "run"
 
-        with self.assertRaisesRegex(ValueError, "Only hourly"):
+        with self.assertRaisesRegex(ValueError, "Recurring income"):
+            catalogue.methods_text(self.methods, self.monsters)
+
+        self.methods["methods"][0]["income"]["period"] = "day"
+
+        with self.assertRaisesRegex(ValueError, "hour or run"):
             catalogue.methods_text(self.methods, self.monsters)
 
     def test_input_tax_is_rejected_and_validated_loot_can_be_complete(self):
