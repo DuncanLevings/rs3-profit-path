@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.10-dev – 2026-10-30
+
+- A method screen that fails to draw one of its later pieces stops drawing and reports the error once. Before, a failing Income row was retried every game tick: 50 errors a second, each leaving another half-made row behind.
+- Guideline pass: the README no longer describes the removed equipment and quest probe buttons and lists every requirement kind it checks (combat level, unlock flags, achievements); stale comments left by the Diagnostics removal are fixed; a quest-name error no longer asks the player to type a name; the method screen's description sits on the right function; clearer names where a loop variable hid another and where the Income tables' update was called `fill`; spacing between steps in a few places.
+
 ## 0.8.9-dev – 2026-10-30
 
 - Opening a method no longer runs past the client's one-second limit. The screen used to draw all four tabs in one click, up to about 300 components and 90 tooltips for a boss with a long drop table (PrettyUI builds every tooltip up front). Now it draws the open tab and the first 6 rows of each Income table, then the rest a piece per game tick: more rows, then each other tab. Clicking a tab that isn't drawn yet draws it straight away, and leaving the screen stops the drawing. The biggest single click is now under 90 components and about 22 tooltips.

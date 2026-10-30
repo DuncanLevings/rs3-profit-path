@@ -165,6 +165,7 @@ function Preferences.new(db)
         local normalized = name:gsub("[A-Z]", function(letter)
             return string.char(letter:byte() + 32)
         end)
+
         local profile = bindings[normalized]
 
         -- New character: work out its profile and save the binding.

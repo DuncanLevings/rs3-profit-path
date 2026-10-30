@@ -1,6 +1,6 @@
--- Player-account reads live here. This file owns the client event subscriptions (inventory, skills, quests, game state) and
--- tells its owner which evidence changed. It never does money maths or decides
--- recommendations.
+-- Player-account reads live here. This file owns the client event subscriptions
+-- (inventory, skills, quests, game state) and tells its owner which evidence
+-- changed. It never does money maths or decides recommendations.
 --
 -- Bank data may be unavailable while closed. Readable backpack/worn/bank contents
 -- and mapped tool-belt families still don't establish full account ownership.
@@ -12,7 +12,7 @@ local Account = {}
 local SLOT_SCAN_THRESHOLD = 200
 
 -- App supplies the optional snapshot owner and validated tool-belt bindings;
--- isolated native probes can omit them without importing the whole catalogue.
+-- tests can leave them out without importing the whole catalogue.
 function Account.new(onChanged, snapshot, toolbeltBindings)
     local self = {
         active = true,
@@ -292,7 +292,7 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         end
 
         if type(name) ~= "string" or not name:match("^[A-Z][A-Z0-9_]*$") then
-            return { status = "invalid", message = "Enter a current, non-deprecated quest config name." }
+            return { status = "invalid", message = "Not a valid quest config name: " .. tostring(name) }
         end
 
         if not Player.IsAvailable() then

@@ -33,7 +33,8 @@ end
 
 -- `requirement` is one node from the method data: a group ("all"/"any" with children)
 -- or a single check ("skill", "quest", "item", ...). `account` holds plain evidence
--- tables: account.skills, account.quests and account.items.
+-- tables: skills, quests, items, flags, achievements, combat and equipment (see
+-- refreshEvidence in src/main.lua).
 function Requirements.evaluate(requirement, account)
     local kind = requirement.kind
 

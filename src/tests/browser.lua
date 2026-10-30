@@ -1359,6 +1359,40 @@ return function(test, equal, client, pretty)
         equal(Event.Logic.count(), 0)
     end)
 
+    -- A piece that fails to draw is reported once, not retried 50 times a second.
+    test("a method screen that fails to draw a piece stops drawing", function()
+        client()
+        prettyui = pretty()
+        gepl = nil
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
+        prettyui:findButton("Open Profit Path")()
+        -- Abyssal demons have 16 output rows, so rows are still waiting after the
+        -- first batch; make the next one fail to draw.
+        prettyui:findMethod("Killing abyssal demons")()
+
+        local outputs = prettyui.views[#prettyui.views].tabs[1].pages[1].children[4]
+        outputs.AddText = function()
+            error("fixture draw failure")
+        end
+
+        local failures = 0
+
+        for _ = 1, 10 do
+            local ok, problem = pcall(Event.Logic.emit, {})
+
+            if not ok then
+                failures = failures + 1
+                assert(tostring(problem):find("fixture draw failure", 1, true))
+            end
+        end
+
+        equal(failures, 1)
+        equal(Event.Logic.count(), 1, "Only the window's size check is left")
+
+        PluginShutdown()
+    end)
+
     test("missing native sprites do not block browsing calculating or saving rates", function()
         local state = client()
         rsprite.Get = function() return nil end

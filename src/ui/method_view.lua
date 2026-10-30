@@ -470,7 +470,9 @@ local function mountRequirements(parent, method, calculator, fitter)
                 if not match and checked.lastKnownAbsent then
                     colour = Style.bad
                 end
+
                 update.matchText.rgba = colour
+
                 if update.matchBorder then
                     update.matchBorder.rgba = colour
                 end
@@ -692,17 +694,6 @@ local function mountTitle(view, method, guarded, versions, onVersion)
     return release
 end
 
--- Builds the whole method screen inside `view`. `guarded` comes from the workbench:
--- wrap every callback with it, so clicks on a screen we've left are ignored.
---
--- options (all optional):
---   activeTab   reopen this tab, e.g. when the screen is rebuilt after a resize
---   versions    every version of this method, in catalogue order
---   onVersion   called with the chosen method when the player picks a version
---
--- Returns three functions: refresh(reason), which the workbench calls when the
--- account changes; activeTab(), which says which tab is open right now; and
--- release(), which cancels pending dropdown callbacks when the screen goes away.
 -- What hasn't been researched for a method, as short phrases for the Notes and
 -- for Browse. Curated methods (and any method without research data) have none.
 function MethodView.researchGaps(method)
@@ -741,6 +732,18 @@ function MethodView.researchGaps(method)
     return gaps
 end
 
+-- Builds the whole method screen inside `view`. `guarded` comes from the workbench:
+-- wrap every callback with it, so clicks on a screen we've left are ignored.
+--
+-- options (all optional):
+--   activeTab   reopen this tab, e.g. when the screen is rebuilt after a resize
+--   versions    every version of this method, in catalogue order
+--   onVersion   called with the chosen method when the player picks a version
+--
+-- Returns three functions: refresh(reason), which the workbench calls when the
+-- account changes; activeTab(), which says which tab is open right now; and
+-- release(), which stops the staged drawing and the version dropdown's pending
+-- callback when the screen goes away.
 function MethodView.mount(view, method, calculator, guarded, options)
     options = options or {}
 
@@ -904,9 +907,9 @@ function MethodView.mount(view, method, calculator, guarded, options)
     -- Costs read red and earnings green, so it's obvious at a glance which way
     -- the money goes. The "Inputs"/"Outputs" headings still say it in words.
     -- Each table's update function, plus addRows to draw its item rows later.
-    local updateInputs, updateOutputs = {}, {}
-    updateInputs.fill, updateInputs.addRows = itemTable(inputs, method.income.inputs, Style.bad, method.income.period)
-    updateOutputs.fill, updateOutputs.addRows = itemTable(outputs, outputDefinitions, Style.good, method.income.period)
+    local inputTable, outputTable = {}, {}
+    inputTable.update, inputTable.addRows = itemTable(inputs, method.income.inputs, Style.bad, method.income.period)
+    outputTable.update, outputTable.addRows = itemTable(outputs, outputDefinitions, Style.good, method.income.period)
 
     income:AddTitle("Notes")
 
@@ -1025,8 +1028,8 @@ function MethodView.mount(view, method, calculator, guarded, options)
         roi.content = result.roi and Style.number(result.roi, 1) .. "% ROI" or ""
         roi.rgba = result.roi and (result.roi < 0 and Style.bad or Style.good) or headlineColour
 
-        updateOutputs.fill(result.outputs or {}, result.revenue)
-        updateInputs.fill(result.inputs or {}, result.cost)
+        outputTable.update(result.outputs or {}, result.revenue)
+        inputTable.update(result.inputs or {}, result.cost)
     end
 
     -- Every Income panel exists now (their heights already allow for every item
@@ -1040,7 +1043,7 @@ function MethodView.mount(view, method, calculator, guarded, options)
 
     -- Draws one more piece of the screen. Returns false once it's all drawn.
     local function buildStep()
-        if updateInputs.addRows(ROWS_PER_STEP) + updateOutputs.addRows(ROWS_PER_STEP) > 0 then
+        if inputTable.addRows(ROWS_PER_STEP) + outputTable.addRows(ROWS_PER_STEP) > 0 then
             return true
         end
 
@@ -1071,8 +1074,16 @@ function MethodView.mount(view, method, calculator, guarded, options)
 
     if building then
         Event.Logic.Subscribe(BUILD_EVENT, guarded(function()
-            if not buildStep() then
+            -- If a piece fails to draw, stop here and report it once. Carrying on
+            -- would retry the same piece every tick, 50 errors a second.
+            local ok, more = pcall(buildStep)
+
+            if not ok or not more then
                 stopBuilding()
+            end
+
+            if not ok then
+                error(more, 0)
             end
         end))
     end

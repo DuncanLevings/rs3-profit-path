@@ -1,5 +1,5 @@
 -- Draws the workbench's sidebar, filters and method list. This file owns three
--- child views; its cleanup runs before ui.lua destroys the parent screen.
+-- child views; its cleanup runs before workbench.lua destroys the parent screen.
 -- Browser state and money calculations live elsewhere, so repainting is cheap.
 local Browser = require("src/methods/browser")
 local Dropdown = require("src/ui/dropdown")
@@ -123,6 +123,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
     local heading
     local sectionButtons, categoryButtons = {}, {}
     local renderResults
+
     -- release() functions for pending callbacks (the dropdowns' and the search
     -- box's), so nothing fires after the screen is gone.
     local dropdownReleases = {}
@@ -402,16 +403,16 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         -- Title and variant share only the space before the profit column. Long
         -- names clip independently; neither overlaps money. The method page has
         -- the full title, so we don't need another tooltip for every list label.
-        for _, heading in ipairs(headings) do
+        for _, entry in ipairs(headings) do
             local x, gap = ROW_INSET + 32, 8
-            local available = math.max(0, heading.row.content.width - x - 196)
-            local variantWidth = math.min(Style.textWidth(heading.variantText) + 4, available * 0.4)
-            local titleWidth = math.min(Style.textWidth(heading.titleText, true) + 4,
-                math.max(0, available - variantWidth - gap))
+            local room = math.max(0, entry.row.content.width - x - 196)
+            local variantWidth = math.min(Style.textWidth(entry.variantText) + 4, room * 0.4)
+            local titleWidth = math.min(Style.textWidth(entry.titleText, true) + 4,
+                math.max(0, room - variantWidth - gap))
 
-            heading.title:SetSize(titleWidth, 28, 0, 0)
-            heading.variant:SetPos(x + titleWidth + gap, 6)
-            heading.variant:SetSize(math.max(0, available - titleWidth - gap), 28, 0, 0)
+            entry.title:SetSize(titleWidth, 28, 0, 0)
+            entry.variant:SetPos(x + titleWidth + gap, 6)
+            entry.variant:SetSize(math.max(0, room - titleWidth - gap), 28, 0, 0)
         end
 
         results:SetScrollPosition(browser.scroll)

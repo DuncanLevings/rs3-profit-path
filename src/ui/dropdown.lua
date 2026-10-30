@@ -48,6 +48,7 @@ function Dropdown.new(parent, options)
         control.entryHeight = 24
         control.entryText.rgba = 0xB5B1A2FF
     end
+
     control.dropdownMaxVisibleEntries = #entries
 
     for _, entry in ipairs(entries) do
