@@ -86,6 +86,175 @@ def tidy_name(name):
     return base.replace("/", ": ")
 
 
+# ---- Tiered gear ("Tier 90+ magic weapon", "Magic armour#High level equipment (61+)")
+#
+# research/equipment.json lists every tier 60+ weapon, shield and body piece with
+# its tier, style and slot. A tiered line becomes a gear check on that group: owning
+# any piece of a high enough tier, in the right style and slot, meets it. Perks
+# ("perked") can't be checked, so only the tier counts.
+
+COMBAT_GEAR = "combat_equipment"
+
+# The Wiki's equipment slots, as the three kinds of piece guides ask for. Body
+# armour stands for "armour" (a set always has a body).
+GEAR_SLOTS = {"main hand weapon": "weapon", "2h weapon": "weapon", "torso": "body", "off-hand": "shield"}
+GEAR_STYLES = {"melee": "melee", "ranged": "ranged", "range": "ranged", "magic": "magic", "mage": "magic",
+               "necromancy": "necromancy"}
+GEAR_PIECE = re.compile(r"\b(weapons?|armou?r|shields?|equipment)\b", re.I)
+GEAR_STYLE = re.compile(r"\b(melee|ranged?|magic|mage|necromancy)\b", re.I)
+GEAR_TIER = re.compile(r"\b(?:tier|t)\s*(\d{2,3})\b|\((\d{2,3})\+\)", re.I)
+
+# Tiered things that aren't gear (reputation, luck, farm buildings, tools).
+NOT_GEAR = re.compile(r"luck|reputation|dinosaur|lodge|workbench|town hall|perk from|pickaxe|hatchet", re.I)
+
+
+def load_equipment():
+    """[{name, item_ids, tier, slot, style, type?}] from research/equipment.json."""
+    if not wiki_methods.EQUIPMENT.exists():
+        return []
+
+    return json.loads(wiki_methods.EQUIPMENT.read_text(encoding="utf-8"))["pieces"]
+
+
+def gear_label(check):
+    """"T90+ magic weapon": what one gear check looks for."""
+    armour = (check.get("armour_type") or "").split()
+    piece = {"weapon": "weapon", "body": "body armour", "shield": "shield"}[check["slot"]]
+    words = [f"T{check['minimum_tier']}+", check.get("style"), armour[0].lower() if armour else None, piece]
+
+    return " ".join(word for word in words if word)
+
+
+def gear_clause(text, style_hint=None):
+    """One "Tier 90+ magic weapon" clause as a gear check (or an "any" over its
+    styles and pieces), or None if it isn't one."""
+    tier = GEAR_TIER.search(text)
+    piece = GEAR_PIECE.search(text)
+
+    if not tier or not piece:
+        return None
+
+    word = piece.group(1).lower()
+
+    if word.startswith("weapon"):
+        slots = ["weapon"]
+    elif word.startswith("shield"):
+        slots = ["shield"]
+    elif word.startswith("armo"):
+        slots = ["body"]
+    else:
+        # "Equipment": a weapon or armour of that tier.
+        slots = ["weapon", "body"]
+
+    # The page a link points to says the style ("Magic armour#High level ...").
+    styles = list(dict.fromkeys(GEAR_STYLES[match.lower()] for match in GEAR_STYLE.findall(text)))
+    styles = styles or [style_hint]
+
+    armour_type = None
+
+    if re.search(r"power armou?r", text, re.I):
+        armour_type = "Power armour"
+    elif re.search(r"tank armou?r", text, re.I):
+        armour_type = "Tank armour"
+
+    options = []
+
+    for style in styles:
+        for slot in slots:
+            check = {"kind": "gear", "equipment_scope": "flexible", "equipment_group": COMBAT_GEAR,
+                     "minimum_tier": int(tier.group(1) or tier.group(2)), "slot": slot}
+
+            if style:
+                check["style"] = style
+
+            if armour_type and slot == "body":
+                check["armour_type"] = armour_type
+
+            check["text"] = gear_label(check)
+            options.append(check)
+
+    if len(options) == 1:
+        return options[0]
+
+    return {"kind": "any", "text": " or ".join(option["text"] for option in options), "children": options}
+
+
+def tiered_gear(text):
+    """A tiered gear line as a check, or None. "Tier 90+ weapon and Tier 80+
+    armour" needs both; the line's own wording is kept as its text."""
+    if NOT_GEAR.search(text):
+        return None
+
+    # A Wiki link: the page names the style, the anchor the tier.
+    base, _, anchor = text.replace("_", " ").partition("#")
+    hint = GEAR_STYLE.search(base) if anchor else None
+    hint = GEAR_STYLES[hint.group(1).lower()] if hint else None
+    plain = f"{base} {anchor}" if anchor else text
+
+    # The Wiki's armour and weapon pages call their 61+ section "High level
+    # equipment", so a link to it without the number still means 61+.
+    if anchor and not GEAR_TIER.search(anchor) and re.search(r"high[- ]level equipment", anchor, re.I):
+        plain += " (61+)"
+
+    clauses = [clause for clause in re.split(r"\band\b", plain) if GEAR_TIER.search(clause)]
+
+    if len(clauses) == 1 and re.search(r"weapons?\s+and\s+armou?r", plain, re.I):
+        # "Tier 90+ magic weapon and armour": one tier for both pieces.
+        checks = [gear_clause(re.sub(r"\s+and\s+armou?r", "", plain, flags=re.I), hint),
+                  gear_clause(re.sub(r"weapons?\s+and\s+", "", plain, flags=re.I), hint)]
+    elif len(clauses) > 1:
+        checks = [gear_clause(clause, hint) for clause in clauses]
+    else:
+        checks = [gear_clause(plain, hint)]
+
+    checks = [check for check in checks if check]
+
+    if not checks:
+        return None
+
+    check = checks[0] if len(checks) == 1 else {"kind": "all", "children": checks}
+    check["text"] = tidy_name(text)
+
+    return check
+
+
+def combat_gear_group(pieces, ctx):
+    """The combat_equipment group: every listed weapon, shield and body piece."""
+    candidates = []
+
+    for piece in pieces:
+        slot = GEAR_SLOTS.get(piece["slot"])
+
+        # Off-hand shields only; off-hand weapons aren't what "shield" means.
+        if not slot or (slot == "shield" and piece.get("type") not in ("Shield", "Defender", "Rebounder", "Repriser")):
+            continue
+
+        for item_id in piece["item_ids"]:
+            if str(item_id) not in ctx.items:
+                ctx.items[str(item_id)] = {"name": piece["name"], "source": "RuneScape Wiki infobox_item"}
+
+            candidate = {"item_id": item_id, "tier": piece["tier"], "skills": {}, "slot": slot}
+
+            if piece["style"] in GEAR_STYLES.values():
+                candidate["style"] = piece["style"]
+
+            if piece.get("type") in ("Power armour", "Tank armour"):
+                candidate["armour_type"] = piece["type"]
+
+            candidates.append(candidate)
+
+    # The same item listed twice (two versions sharing an ID): keep the lower tier.
+    unique = {}
+
+    for candidate in sorted(candidates, key=lambda candidate: candidate["tier"]):
+        unique.setdefault(candidate["item_id"], candidate)
+
+    return {"complete": True, "candidates": list(unique.values()),
+            "note": "Checks Wiki equipment of tier 60 and above (weapons, shields and body armour) carried, worn "
+                    "or banked. Perks aren't checked.",
+            "source": "RuneScape Wiki infobox_bonuses and infobox_item buckets"}
+
+
 def load_achievements():
     """{requirement name: [in-game achievement IDs]} from research/achievements.json."""
     if not wiki_methods.ACHIEVEMENTS.exists():
@@ -141,7 +310,9 @@ class Context:
         self.outfits = outfits or {}
         self.achievements = achievements or {}
 
-        # Wiki advice links found while converting the current method.
+        # Wiki advice links found while converting the current method. They're
+        # dropped (bare page names can't be clicked in game); only the guide's own
+        # wording for one survives, as a tip or a "Check yourself" note.
         self.advice = []
 
     def item_id(self, name):
@@ -202,12 +373,23 @@ def capability(name, ctx, quest=False):
     (those are collected into ctx.advice instead)."""
     research = ctx.capabilities.get(name, {})
 
+    # "Tier 90+ magic weapon", "Magic armour#High level equipment (61+)".
+    gear = None if quest else tiered_gear(name)
+
+    if gear:
+        ctx.uses_gear = True
+        return gear
+
     # A quest we've mapped to its client config can be checked for real.
     if name in ctx.quests:
         return {"kind": "quest", "quest": ctx.quests[name], "text": tidy_name(name), "display_icon": "quest"}
 
     if research.get("kind") == "guidance":
         ctx.advice.append(tidy_name(name))
+        return None
+
+    # Wiki parsing leftovers with nothing to say ("83", "High", "Strategies").
+    if research.get("kind") == "noise":
         return None
 
     # A relic (or other unlock) with a flag verified in game is checked directly.
@@ -266,17 +448,45 @@ def capability(name, ctx, quest=False):
 def convert_requirement(entry, ctx):
     """One parsed Wiki requirement as one full requirement record."""
     text = None
+    advice_before = len(ctx.advice)
 
     if isinstance(entry, dict):
         if "req" not in entry:
-            # Plain words with nothing structured: shown, but can't be checked.
+            # Plain words we've researched ("Lunar spellbook active") and tiered
+            # gear lines are checked like any other capability.
+            if entry["text"] in ctx.capabilities or tiered_gear(entry["text"]):
+                return capability(entry["text"], ctx)
+
+            # Otherwise they're shown, but can't be checked.
             return {"kind": "capability", "text": entry["text"]}
+
+        # A tiered gear line linked to a Wiki page ("Tier 95+ ranged weapons,
+        # perked" -> Armoury) is a real gear check, not a "See also" link. A line
+        # that already has skill checks ("90 or 90 to wield ...") keeps them.
+        gear = tiered_gear(entry["text"]) if isinstance(entry["req"], str) and entry["req"].startswith("item:") else None
+
+        if gear:
+            ctx.uses_gear = True
+            advice = len(ctx.advice)
+            linked = convert_requirement(entry["req"], ctx)
+            del ctx.advice[advice:]
+
+            # Linked to a real item ("... Inquisitor staff is best in slot"):
+            # owning that item counts too.
+            if linked and linked["kind"] == "item":
+                return {"kind": "any", "text": gear["text"], "children": [gear, linked]}
+
+            return gear
 
         text, entry = entry["text"], entry["req"]
 
     if isinstance(entry, list):
         children = [convert_requirement(child, ctx) for child in entry[1:]]
         children = [child for child in children if child]
+
+        # Worded advice inside a group is just an unchecked option.
+        for child in children:
+            child.pop("_worded", None)
 
         # Every option was a Wiki advice page: there's nothing left to check.
         if not children:
@@ -345,9 +555,15 @@ def convert_requirement(entry, ctx):
         raise ValueError(f"Unknown requirement in the Wiki snapshot: {entry}")
 
     if check is None:
-        # Keep the Wiki's own wording for an advice link when it has some.
-        if text and ctx.advice:
-            ctx.advice[-1] = text
+        page = ctx.advice[-1] if len(ctx.advice) > advice_before else None
+        del ctx.advice[advice_before:]
+
+        # A bare advice link ("Armoury", "Spear") is dropped. The guide's own
+        # words for one ("Hybrid armour recommended (suggested warpriest armour)")
+        # are real advice, kept as plain text.
+        if page and text and text.strip().lower() != page.lower():
+            # "_worded" tells convert_requirements to route it; it's removed there.
+            return {"kind": "capability", "text": text, "_worded": True}
 
         return None
 
@@ -376,7 +592,7 @@ def check_icons(check):
 
 
 def convert_requirements(requirements, ctx):
-    access, recommended, tips = [], [], []
+    access, recommended, tips, notes = [], [], [], []
     ctx.advice = []
 
     for importance, entries in requirements.items():
@@ -384,6 +600,18 @@ def convert_requirements(requirements, ctx):
             check = convert_requirement(entry, ctx)
 
             if check is None:
+                continue
+
+            worded = check.pop("_worded", False)
+
+            # Required plain words nobody has researched ("Tier 90+ weapons", "A team
+            # of 1-3 other players") are things only the player can judge. They're
+            # listed under "Check yourself", never coloured or counted as unknown.
+            free_text = (isinstance(entry, dict) and "req" not in entry and check["kind"] == "capability"
+                         and "capability_kind" not in check) or worded
+
+            if importance == "required" and free_text:
+                notes.append(check["text"])
                 continue
 
             # Something only recommended that the plugin can't check (a relic, an
@@ -419,11 +647,11 @@ def convert_requirements(requirements, ctx):
         "recommended": {"kind": "all", "text": "Recommended", "children": recommended},
         "unresolved": [],
 
-        # Wiki pages worth reading for this method, in the guide's order.
-        "advice": list(dict.fromkeys(ctx.advice)),
-
         # Recommended things the plugin can't check, shown as tips with icons.
         "tips": tips,
+
+        # Required things only the player can judge (gear tiers, team size).
+        "notes": list(dict.fromkeys(notes)),
     }
 
 
@@ -767,7 +995,11 @@ def merge(recipe_source=None, monsters=None):
 
     for key in ("equipment", "toolbelt"):
         if key in curated:
-            merged[key] = curated[key]
+            merged[key] = dict(curated[key])
+
+    # Tiered gear lines need the combat equipment group.
+    if getattr(ctx, "uses_gear", False):
+        merged.setdefault("equipment", {})[COMBAT_GEAR] = combat_gear_group(load_equipment(), ctx)
 
     return merged, details
 
@@ -837,10 +1069,10 @@ def print_report(monsters, recipe_source):
     print(f"\nRequirement checks: {dict(kinds)}")
     print(f"  {kinds['capability']} can't be checked yet (shown as unknown); {with_icon} of them have a sprite")
     print(f"  By kind: {dict(capability_kinds.most_common())}")
-    print(f"  Wiki advice links shown as notes instead of checks: "
-          f"{sum(len(method['requirements'].get('advice', [])) for method in methods)}")
     print(f"  Recommended things shown as tips instead of checks: "
           f"{sum(len(method['requirements'].get('tips', [])) for method in methods)}")
+    print(f"  Required things only the player can judge (\"Check yourself\"): "
+          f"{sum(len(method['requirements'].get('notes', [])) for method in methods)}")
     print("  Most common checks not researched yet (add these to capabilities.json first):")
 
     for name, count in unknown_names.most_common(15):

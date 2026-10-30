@@ -61,6 +61,7 @@ META = OUTPUT / "meta.json"
 CAPABILITIES = ROOT / "catalogue-source" / "research" / "capabilities.json"
 OUTFITS = ROOT / "catalogue-source" / "research" / "outfits.json"
 ACHIEVEMENTS = ROOT / "catalogue-source" / "research" / "achievements.json"
+EQUIPMENT = ROOT / "catalogue-source" / "research" / "equipment.json"
 
 API = "https://runescape.wiki/api.php"
 
@@ -792,6 +793,97 @@ def import_achievements():
     return mapped, missing
 
 
+# ---- Equipment tiers: for "Tier 90+ magic weapon" style requirements -------------
+#
+# The Wiki's `infobox_bonuses` bucket gives every equipment version's tier, slot,
+# combat class and type (power / tank armour). `infobox_item` on the same page
+# version gives its item IDs (degraded and charged versions have their own). The
+# plugin then counts any owned item of a high enough tier, style and slot.
+
+# Lowest tier any guide asks for ("High level equipment (61+)").
+EQUIPMENT_MIN_TIER = 60
+
+
+def fetch_equipment():
+    """Every non-cosmetic equipment version of EQUIPMENT_MIN_TIER or above."""
+    rows, offset = [], 0
+
+    while True:
+        page = bucket("bucket('infobox_bonuses').select('page_name','page_name_sub','equipment_tier','equipment_slot',"
+                      "'combat_class','equipment_type','is_cosmetic_recolour')"
+                      f".where({{'equipment_tier','>=',{EQUIPMENT_MIN_TIER}}})"
+                      f".limit({PAGE_SIZE}).offset({offset}).run()")
+        rows += page
+
+        if len(page) < PAGE_SIZE:
+            return [row for row in rows if not row.get("is_cosmetic_recolour")]
+
+        offset += PAGE_SIZE
+
+
+def import_equipment():
+    """Writes research/equipment.json. Returns (pieces written, pages with no item ID)."""
+    rows = fetch_equipment()
+    pages = sorted({row["page_name"] for row in rows})
+    item_rows = {}
+
+    # Every item on each page: the "new" version has the bonuses, but "used",
+    # "charged" and similar versions are the same equipment with their own IDs.
+    for batch in batches(pages, 50):
+        for item in bucket(f"bucket('infobox_item').select('page_name','page_name_sub','item_name','item_id')"
+                           f".where({any_of('page_name', batch)}).limit({PAGE_SIZE}).run()"):
+            item_rows.setdefault(item["page_name"], []).append(item)
+
+    by_page = {}
+
+    for row in rows:
+        by_page.setdefault(row["page_name"], []).append(row)
+
+    pieces, missing = [], []
+
+    for page, bonuses in by_page.items():
+        items = [item for item in item_rows.get(page, []) if "(broken)" not in (item.get("item_name") or "")]
+
+        if not items:
+            missing.append(page)
+            continue
+
+        # An item version with its own bonuses row takes that row. Any other
+        # version on the page takes the page's lowest-tier row, so a tier is never
+        # overstated.
+        own = {row["page_name_sub"]: row for row in bonuses}
+        lowest = min(bonuses, key=lambda row: row["equipment_tier"])
+
+        for item in items:
+            row = own.get(item["page_name_sub"], lowest)
+            ids = sorted({item_id for item_id in (item.get("item_id") or []) if item_id > 0})
+
+            if not ids:
+                continue
+
+            piece = {"name": item.get("item_name") or page, "item_ids": ids, "tier": row["equipment_tier"],
+                     "slot": row.get("equipment_slot") or "", "style": row.get("combat_class") or ""}
+
+            if row.get("equipment_type"):
+                piece["type"] = row["equipment_type"]
+
+            pieces.append(piece)
+
+    pieces.sort(key=lambda piece: (piece["tier"], piece["name"]))
+    document = {
+        "schema": 1,
+        "retrieved": datetime.date.today().isoformat(),
+        "source": "RuneScape Wiki infobox_bonuses (tier, slot, class, type) and infobox_item (item IDs) buckets. "
+                  "RuneScape Wiki contributors, CC BY-NC-SA 3.0.",
+        "note": f"Every non-cosmetic equipment version of tier {EQUIPMENT_MIN_TIER}+, for tiered gear requirements.",
+        "pieces": pieces,
+        "missing": sorted(set(missing)),
+    }
+    EQUIPMENT.write_text(json.dumps(document, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+
+    return pieces, missing
+
+
 def verify_snapshot():
     """Checks the files on disk: every line a valid guide, sorted, no duplicates,
     and meta.json's counts and item table agreeing with them. Run by test.py, so a
@@ -827,11 +919,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bucket-file", type=Path,
                         help="reuse a saved money_making_guide download ({'retrieved', 'rows'}) instead of fetching it")
+    parser.add_argument("--equipment", action="store_true",
+                        help="instead of the guides, import every tier 60+ equipment piece for tiered gear requirements")
     parser.add_argument("--achievements", action="store_true",
                         help="instead of the guides, import the in-game IDs of every achievement requirement")
     parser.add_argument("--outfits", action="store_true",
                         help="instead of the guides, import the pieces of every outfit in research/capabilities.json")
     args = parser.parse_args()
+
+    if args.equipment:
+        pieces, missing = import_equipment()
+        print(f"Wrote {len(pieces)} equipment pieces to {EQUIPMENT.relative_to(ROOT)}; "
+              f"{len(set(missing))} versions have no item ID.")
+        return
 
     if args.achievements:
         mapped, missing = import_achievements()

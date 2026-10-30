@@ -180,13 +180,32 @@ function Requirements.evaluate(requirement, account)
         local best, saved, uncertain = nil, nil, false
         local lastKnownAbsent, candidateCount = true, 0
 
-        for _, candidate in ipairs(group.candidates) do
+        -- The combat equipment group has thousands of pieces; bySlot (built by
+        -- main.lua) lets a "T90+ weapon" check look at weapons only.
+        local candidates = requirement.slot and group.bySlot and group.bySlot[requirement.slot] or group.candidates
+
+        for _, candidate in ipairs(candidates) do
             local matches = candidate.tier >= (requirement.minimum_tier or 0)
                 and (not requirement.style or candidate.style == requirement.style)
                 and (not requirement.slot or candidate.slot == requirement.slot)
+                and (not requirement.armour_type or candidate.armour_type == requirement.armour_type)
+
+            local owned = account.items and account.items[candidate.item_id]
+
+            -- A candidate whose ID the client names differently (a retired or
+            -- renamed version on the Wiki) can't be trusted either way. If you
+            -- don't hold it, skip it: one stale ID among thousands must not make
+            -- every tier check "unknown". If you do hold it, it might be a real
+            -- match, so the answer stays unknown.
+            if matches and owned and owned.verified == false then
+                matches = false
+
+                if nonNegativeInteger(owned.quantity) and owned.quantity > 0 then
+                    uncertain = true
+                end
+            end
 
             if matches then
-                local owned = account.items and account.items[candidate.item_id]
                 local usable = true
                 candidateCount = candidateCount + 1
                 lastKnownAbsent = lastKnownAbsent and owned ~= nil and owned.lastKnownAbsent == true

@@ -74,6 +74,9 @@ ICON_NAMES |= {capability_icon(entry["sprite"]) for entry in load_capabilities()
 CAPABILITY_KINDS = {
     "ability", "spell", "prayer", "relic", "perk", "outfit", "achievement", "place",
     "unlock", "familiar", "item", "quest", "guidance", "other",
+
+    # Wiki parsing leftovers with nothing to say ("83", "Strategies"): dropped.
+    "noise",
 }
 
 # Reviewed research: Wiki quest names -> the client's quest config names, so quest
@@ -236,7 +239,7 @@ def validate_requirement(check, items, equipment=None):
             if not isinstance(group_name, str) or group_name not in (equipment or {}):
                 raise ValueError("Unresolved equipment group")
 
-        for field in ("style", "slot"):
+        for field in ("style", "slot", "armour_type"):
             if field in check:
                 require_text(check[field], "Equipment " + field)
 
@@ -937,7 +940,7 @@ def validate_methods(source, monsters, recipes=None):
             if not positive_integer(candidate.get("tier")) or not isinstance(candidate.get("skills"), dict):
                 raise ValueError("Equipment candidates need a tier and use levels")
 
-            for field in ("style", "slot"):
+            for field in ("style", "slot", "armour_type"):
                 if field in candidate:
                     require_text(candidate[field], "Equipment " + field)
 
@@ -1003,8 +1006,9 @@ def validate_methods(source, monsters, recipes=None):
 
         require_text_list(requirements.get("unresolved", []), "Unresolved requirements")
 
-        # Wiki advice pages for the method: shown as notes, never checked.
-        require_text_list(requirements.get("advice", []), "Requirement advice")
+
+        # Required things only the player can judge: listed, never checked.
+        require_text_list(requirements.get("notes", []), "Requirement notes")
 
         # Tips: recommended things that can't be checked, with optional icons.
         tips = requirements.get("tips", [])

@@ -101,6 +101,41 @@ local function requirementIcons(definition)
     return icons
 end
 
+-- "Any one of these" tiered gear (magic, melee, ranged or necromancy armour): drawn
+-- as one slot per option instead of one long line of link text.
+local function gearOptions(definition)
+    if definition.kind ~= "any" then
+        return false
+    end
+
+    for _, child in ipairs(definition.children) do
+        if child.kind ~= "gear" then
+            return false
+        end
+    end
+
+    return true
+end
+
+-- A short name for one tiered gear option: "T61+ magic armour".
+local GEAR_PIECES = { weapon = "weapon", body = "armour", shield = "shield" }
+
+local function gearLabel(requirement)
+    local words = { "T" .. requirement.minimum_tier .. "+" }
+
+    if requirement.style then
+        words[#words + 1] = requirement.style
+    end
+
+    if requirement.armour_type then
+        words[#words + 1] = requirement.armour_type:match("^(%a+)"):lower()
+    end
+
+    words[#words + 1] = GEAR_PIECES[requirement.slot] or requirement.slot
+
+    return table.concat(words, " ")
+end
+
 -- Builds the Requirements tab, grouped like the Wiki. Two kinds of live feedback:
 --   * text colour on each requirement: met / unmet / unknown (from account evidence)
 --   * a border on each item icon: found in backpack, worn or bank / not found / can't tell
@@ -154,6 +189,10 @@ local function mountRequirements(parent, method, calculator, fitter)
                 entry.height = entry.height + 24
             end
 
+            if gearOptions(entry.definition) then
+                entry.height = 24 + #entry.definition.children * 44 + 8
+            end
+
             height = height + entry.height
         end
 
@@ -205,7 +244,27 @@ local function mountRequirements(parent, method, calculator, fitter)
             local requirement = entry.definition
             local icons = requirement.display_items
 
-            if icons then
+            if gearOptions(requirement) then
+                -- One slot per option: an owned match shows its icon, otherwise
+                -- the empty slot's border gives the verdict. The short label sits
+                -- beside it, coloured the same way.
+                section:AddText({ text = "Any one", x = 12, y = y, height = 24, colour = Style.muted })
+
+                for childIndex, child in ipairs(requirement.children) do
+                    local matchY = y + 24 + (childIndex - 1) * 44
+
+                    updates[#updates + 1] = {
+                        index = entry.index,
+                        recommended = entry.recommended,
+                        childIndex = childIndex,
+                        matchSection = section,
+                        minimumItemId = child.minimum_item_id,
+                        matchY = matchY,
+                        fixedText = gearLabel(child),
+                        matchText = section:AddText({ text = "", x = 62, y = matchY + 6, width = -78, widthAnchor = 1, height = 30, colour = Style.muted }),
+                    }
+                end
+            elseif icons then
                 -- Item requirement: a grid of item icons. Each tooltip is just the
                 -- item's name, and the border shows presence only. Owning an item
                 -- doesn't prove you can use it, so we never claim that.
@@ -247,8 +306,9 @@ local function mountRequirements(parent, method, calculator, fitter)
                 local update = { label = label, index = entry.index, recommended = entry.recommended }
 
                 if requirement.equipment_group then
-                    -- Show an owned match or an explicitly named minimum. A broad
-                    -- 'your highest tool' requirement still gets no placeholder box.
+                    -- Show an owned match or an explicitly named minimum. With
+                    -- neither, an empty bordered slot shows the verdict (red when
+                    -- missing), never a placeholder item.
                     update.matchSection = section
                     update.minimumItemId = requirement.minimum_item_id
                     update.matchY = y + 44
@@ -259,6 +319,18 @@ local function mountRequirements(parent, method, calculator, fitter)
             end
 
             y = y + entry.height
+        end
+    end
+
+    -- Required things only the player can judge (gear tiers, team size, a shop
+    -- upgrade the game doesn't expose): one per line, never coloured or counted.
+    local notes = method.requirements.notes or {}
+
+    if #notes > 0 then
+        parent:AddTitle("Check yourself")
+
+        for _, note in ipairs(notes) do
+            parent:AddText({ text = note, colour = Style.muted })
         end
     end
 
@@ -286,15 +358,6 @@ local function mountRequirements(parent, method, calculator, fitter)
         end
     end
 
-    -- Wiki pages the guide points to for gear and set-up advice. They're worth a
-    -- read, but they aren't requirements, so they're never checked or coloured.
-    local advice = method.requirements.advice or {}
-
-    if #advice > 0 then
-        parent:AddTitle("See also on the Wiki")
-        parent:AddText({ text = table.concat(advice, ", "), colour = Style.muted })
-    end
-
     local storageStatus = parent:AddText({ text = "", height = 96, colour = Style.muted })
 
     -- Apply the shared verdict to text and update the owned-equipment match.
@@ -306,7 +369,14 @@ local function mountRequirements(parent, method, calculator, fitter)
             local results = update.recommended and suggested or required
             local checked = results.children[update.index]
 
-            update.label.rgba = Style.statusColour(checked.status)
+            -- One option of an "any one" gear group has its own result.
+            if update.childIndex then
+                checked = checked.children[update.childIndex]
+            end
+
+            if update.label then
+                update.label.rgba = Style.statusColour(checked.status)
+            end
 
             if update.matchSection then
                 local match = checked.evidence[1]
@@ -320,25 +390,36 @@ local function mountRequirements(parent, method, calculator, fitter)
                     object, name = ItemIcon.resolve(displayId)
                 end
 
-                local itemId = object and displayId or nil
+                -- false (not nil) when there's no item, so the first refresh still
+                -- draws the empty slot.
+                local itemId = object and displayId or false
 
                 if update.matchId ~= itemId then
                     if update.matchSlot then
                         update.matchSlot:Destroy()
-                        update.matchBorder:Destroy()
-                        update.matchSlot, update.matchBorder = nil, nil
+                        update.matchSlot = nil
                     end
 
+                    if update.matchBorder then
+                        update.matchBorder:Destroy()
+                        update.matchBorder = nil
+                    end
+
+                    -- An owned match shows its icon. With no match, the slot stays
+                    -- empty and its border shows the verdict, like item icons do.
                     if object then
                         update.matchSlot = update.matchSection:AddItemSlot(object, { x = 12, y = update.matchY, tooltip = name, clickthrough = false })
-                        update.matchBorder = Style.rectangle(update.matchSection, { x = 12, y = update.matchY, width = 40, height = 40, fill = false, colour = Style.muted })
                     end
 
+                    update.matchBorder = Style.rectangle(update.matchSection, { x = 12, y = update.matchY, width = 40, height = 40, fill = false, colour = Style.muted })
                     update.matchId = itemId
                 end
 
-                update.matchText:SetPos(object and 62 or 12, update.matchY + 6)
-                local description = checked.reason
+                update.matchText:SetPos(62, update.matchY + 6)
+
+                -- An empty slot speaks for itself; the group's coverage note was
+                -- just clutter next to it.
+                local description = ""
 
                 if object then
                     if not match then
@@ -352,7 +433,8 @@ local function mountRequirements(parent, method, calculator, fitter)
                     end
                 end
 
-                update.matchText.content = description
+                -- Gear options always show their short name ("T61+ magic armour").
+                update.matchText.content = update.fixedText or description
                 local colour = match and match.saved and Style.gold or Style.statusColour(checked.status)
 
                 if not match and checked.lastKnownAbsent then

@@ -9,6 +9,10 @@
 local Toolbelt = require("src/game/toolbelt")
 local Account = {}
 
+-- Above this many unread items, a container is read slot by slot instead of with one
+-- GetTotal call per item.
+local SLOT_SCAN_THRESHOLD = 200
+
 -- App supplies the optional snapshot owner and validated tool-belt bindings;
 -- isolated native probes can omit them without importing the whole catalogue.
 function Account.new(onChanged, snapshot, toolbeltBindings)
@@ -192,6 +196,37 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
 
                 -- Start from what's cached and only ask about items we haven't yet.
                 local counts = snapshot and snapshot.counts or {}
+                local missing = 0
+
+                for itemId in pairs(wanted) do
+                    if counts[itemId] == nil then
+                        missing = missing + 1
+                    end
+                end
+
+                -- With many items to ask about (the combat equipment group has
+                -- thousands), one pass over the container's slots is far cheaper
+                -- than one GetTotal call per item. Items not in any slot are 0.
+                local slots = missing > SLOT_SCAN_THRESHOLD and inventory.GetSlots and inventory:GetSlots()
+
+                if slots then
+                    local found = {}
+
+                    for _, slot in pairs(slots) do
+                        local itemId = slot.obj and slot.obj.id
+                        local count = slot.count
+
+                        if type(itemId) == "number" and type(count) == "number" and count > 0 and wanted[itemId] then
+                            found[itemId] = (found[itemId] or 0) + count
+                        end
+                    end
+
+                    for itemId in pairs(wanted) do
+                        if counts[itemId] == nil then
+                            counts[itemId] = found[itemId] or 0
+                        end
+                    end
+                end
 
                 for itemId in pairs(wanted) do
                     if counts[itemId] == nil then

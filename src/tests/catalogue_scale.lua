@@ -135,12 +135,12 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
-    test("wiki advice pages show as notes and mapped quests as real quest checks", function()
+    test("mapped quests are real quest checks, tips sit on their own lines and there's no See also", function()
         client()
         prettyui = pretty()
         gepl = countingLibrary()
 
-        -- A method whose guide links advice pages and needs a mapped quest.
+        -- A method with tips and a mapped quest.
         local chosen
 
         for _, method in ipairs(catalogue.methods) do
@@ -150,13 +150,13 @@ return function(test, equal, client, pretty)
                 hasQuest = hasQuest or child.kind == "quest"
             end
 
-            if hasQuest and #(method.requirements.advice or {}) > 0 then
+            if hasQuest and #(method.requirements.tips or {}) > 0 then
                 chosen = method
                 break
             end
         end
 
-        assert(chosen, "Expected a method with both advice links and a quest check")
+        assert(chosen, "Expected a method with both tips and a quest check")
 
         dofile("main.lua")
         Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
@@ -172,7 +172,7 @@ return function(test, equal, client, pretty)
         end
 
         local all = table.concat(texts, " / ")
-        assert(all:find("See also on the Wiki", 1, true), "Advice section")
+        assert(not all:find("See also on the Wiki", 1, true), "Advice section is gone")
 
         -- Recommended things the plugin can't check show as tips, not grey checks.
         if #(chosen.requirements.tips or {}) > 0 then
@@ -195,7 +195,104 @@ return function(test, equal, client, pretty)
                 assert(not label.options.inline, "Tip shares a line: " .. label.content)
             end
         end
-        assert(all:find(chosen.requirements.advice[1], 1, true), "First advice link")
+
+        PluginShutdown()
+    end)
+
+    test("required things only the player can judge are listed under Check yourself", function()
+        client()
+        prettyui = pretty()
+        gepl = countingLibrary()
+
+        local chosen
+
+        for _, method in ipairs(catalogue.methods) do
+            if #(method.requirements.notes or {}) > 0 then
+                chosen = method
+                break
+            end
+        end
+
+        assert(chosen, "Expected a method with Check yourself notes")
+
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
+        prettyui:findButton("Open Profit Path")()
+        prettyui.views[#prettyui.views].children[2].fields[1]:SetText(chosen.title, true)
+        prettyui:findMethod(chosen.title)()
+
+        local requirements = prettyui.views[#prettyui.views].tabs[1].pages[2]
+        local found = {}
+
+        for _, label in ipairs(requirements:allTexts()) do
+            found[tostring(label.content)] = label
+        end
+
+        assert(found["Check yourself"], "Check yourself section")
+
+        -- Each note is its own line.
+        for _, note in ipairs(chosen.requirements.notes) do
+            assert(found[note], "Missing note: " .. note)
+            assert(not found[note].options.inline, "Note shares a line: " .. note)
+        end
+
+        PluginShutdown()
+    end)
+
+    test("any-one tiered gear shows one slot per option with a short label", function()
+        client()
+        prettyui = pretty()
+        gepl = countingLibrary()
+
+        -- A method whose required items include "any one" of several gear tiers.
+        local chosen, group
+
+        for _, method in ipairs(catalogue.methods) do
+            for _, child in ipairs(method.requirements.access.children) do
+                local allGear = child.kind == "any" and #child.children > 1
+
+                for _, option in ipairs(allGear and child.children or {}) do
+                    allGear = allGear and option.kind == "gear"
+                end
+
+                if allGear then
+                    chosen, group = method, child
+                end
+            end
+
+            if chosen then
+                break
+            end
+        end
+
+        assert(chosen, "Expected a method with any-one tiered gear")
+
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
+        prettyui:findButton("Open Profit Path")()
+        prettyui.views[#prettyui.views].children[2].fields[1]:SetText(chosen.title, true)
+        prettyui:findMethod(chosen.title)()
+
+        local found = {}
+
+        for _, label in ipairs(prettyui.views[#prettyui.views].tabs[1].pages[2]:allTexts()) do
+            found[tostring(label.content)] = true
+        end
+
+        -- The joined link text is gone; each option has its own short line.
+        assert(not found[group.text], "Long joined text shown")
+        assert(found["Any one"], "Any one heading")
+
+        for _, option in ipairs(group.children) do
+            local short = "T" .. option.minimum_tier .. "+ " .. (option.style and option.style .. " " or "")
+            local hit = false
+
+            for text in pairs(found) do
+                hit = hit or text:sub(1, #short) == short
+            end
+
+            assert(hit, "Missing option label starting " .. short)
+        end
 
         PluginShutdown()
     end)

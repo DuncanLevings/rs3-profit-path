@@ -1146,6 +1146,75 @@ test("unlock flags and achievements are read from the client and checked", funct
     config.Achievement = nil
 end)
 
+-- Tiered gear: any owned piece of the right tier, style, slot (and armour type).
+test("tiered gear checks find any owned piece of a high enough tier", function()
+    local group = { complete = true, candidates = {
+        { item_id = 1, tier = 80, skills = {}, slot = "weapon", style = "magic" },
+        { item_id = 2, tier = 90, skills = {}, slot = "weapon", style = "magic" },
+        { item_id = 3, tier = 90, skills = {}, slot = "body", style = "magic", armour_type = "Power armour" },
+    } }
+    group.bySlot = { weapon = { group.candidates[1], group.candidates[2] }, body = { group.candidates[3] } }
+
+    local owned = { status = "available", quantity = 1, complete = true }
+    local none = { status = "available", quantity = 0, complete = true }
+    local function account(items)
+        return { equipment = { combat_equipment = group }, items = items, skills = {} }
+    end
+
+    local weapon = { kind = "gear", equipment_group = "combat_equipment", minimum_tier = 90, style = "magic", slot = "weapon" }
+    equal(Requirements.evaluate(weapon, account({ [1] = owned, [2] = none, [3] = owned })).status, "unmet")
+    equal(Requirements.evaluate(weapon, account({ [1] = none, [2] = owned, [3] = none })).status, "met")
+
+    -- A stale ID (the client names it differently) that you don't hold is skipped;
+    -- one you do hold might be a real match, so the answer stays unknown.
+    local stale = { status = "unknown", verified = false, quantity = 0 }
+    equal(Requirements.evaluate(weapon, account({ [1] = none, [2] = stale, [3] = none })).status, "unmet")
+    equal(Requirements.evaluate(weapon, account({ [1] = none, [2] = { status = "unknown", verified = false, quantity = 1 },
+        [3] = none })).status, "unknown")
+
+    -- Can't tell at all (verified is nil): still unknown, never a false "missing".
+    equal(Requirements.evaluate(weapon, account({ [1] = none, [2] = { status = "unknown", quantity = 0 }, [3] = none })).status, "unknown")
+
+    -- Tank armour asked for: a power body doesn't count.
+    local tank = { kind = "gear", equipment_group = "combat_equipment", minimum_tier = 90, slot = "body", armour_type = "Tank armour" }
+    equal(Requirements.evaluate(tank, account({ [1] = none, [2] = none, [3] = owned })).status, "unmet")
+end)
+
+-- With many items wanted, a container is read slot by slot, not per item.
+test("ownership reads a container's slots once when many items are wanted", function()
+    local state = client()
+    local calls = { total = 0 }
+    local wanted = {}
+
+    for itemId = 1, 300 do
+        wanted[itemId] = true
+    end
+
+    local function fakeInventory(slots)
+        return {
+            isValid = true, slotCount = 10,
+            GetTotal = function() calls.total = calls.total + 1; return 0 end,
+            GetSlots = function() return slots end,
+        }
+    end
+
+    Inventory = { Find = function(definition)
+        if definition.configName == "BANK" then
+            return fakeInventory({ [0] = { obj = { id = 7 }, count = 5 }, [3] = { obj = { id = 7 }, count = 2 } })
+        end
+
+        return fakeInventory({})
+    end }
+
+    local account = Account.new(function() end)
+    local read = account:readOwnership(wanted)
+
+    equal(calls.total, 0)
+    equal(read.counts[7], 7)
+    equal(read.counts[8], 0)
+    account:destroy()
+end)
+
 test("invalid numerical evidence cannot qualify a requirement", function()
     for _, value in ipairs({ -1, 2.5, math.huge, 0 / 0, "99" }) do
         local account = {

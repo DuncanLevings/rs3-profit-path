@@ -1,9 +1,19 @@
 {
  "schema": 1,
- "retrieved": "2026-10-29",
+ "retrieved": "2026-10-30",
  "source": "RuneScape Wiki achievement bucket (in-game achievement IDs; Area Tasks subcategories for diary tiers). RuneScape Wiki contributors, CC BY-NC-SA 3.0.",
  "note": "A requirement is met when every listed achievement is complete in game (progress COMPLETE).",
  "achievements": {
+  "Breaking the Seal": {
+   "ids": [
+    2388
+   ]
+  },
+  "Breaking the seal": {
+   "ids": [
+    2388
+   ]
+  },
   "Dagon Bye": {
    "ids": [
     2376
@@ -59,6 +69,11 @@
     951,
     952,
     953
+   ]
+  },
+  "Eclipse of the Heart": {
+   "ids": [
+    4042
    ]
   },
   "Elite Ardougne achievements": {
@@ -189,6 +204,11 @@
   "Embrace the Chaos": {
    "ids": [
     2374
+   ]
+  },
+  "Everything Is Oresome": {
+   "ids": [
+    2783
    ]
   },
   "Gielinor's Most Expensive Doorstop": {
@@ -441,6 +461,9 @@
  "missing": [
   "Crossing that Bridge",
   "Desert achievements",
+  "Elite Ardougne achievements (for teleporting)",
+  "Everything Is Oresome (only obtainable in Pay to play but effect applies in Free to play)",
+  "Morytania legs 2 or better",
   "New Varrock achievements",
   "On the Threshold of the Mind",
   "Seers' Village achievements",

@@ -56,10 +56,10 @@
     "Bonecrusher#Bonecrusher upgrade": {"kind": "unlock", "flag": "ELR2_BONECRUSHER_UPGRADE_UNLOCKED"},
     "Bountiful Harvest 2": {"kind": "other"},
     "Caroming": {"kind": "perk", "sprite": "INVENTION_ICON_PERKS_COMBAT_CAROMING"},
-    "Comparison of high-level magic weapons": {"kind": "guidance"},
-    "Comparison of high-level melee weapons": {"kind": "guidance"},
-    "Comparison of high-level necromancy weapons": {"kind": "guidance"},
-    "Comparison of high-level ranged weapons": {"kind": "guidance"},
+    "Comparison of high-level magic weapons": {"kind": "noise"},
+    "Comparison of high-level melee weapons": {"kind": "noise"},
+    "Comparison of high-level necromancy weapons": {"kind": "noise"},
+    "Comparison of high-level ranged weapons": {"kind": "noise"},
     "Conjure Putrid Zombie": {
       "kind": "ability",
       "sprite": "COMBAT_ABILITY_ICON_NECROMANCY_CONJURE_PUTRID_ZOMBIE"
@@ -341,6 +341,51 @@
     "partial potion producer DX": {"kind": "unlock"},
     "pickaxe": {"kind": "guidance"},
     "shield": {"kind": "guidance"},
-    "simple generator": {"kind": "unlock"}
+    "simple generator": {"kind": "unlock"},
+    "Lunar spells activated": {"kind": "spell", "requires": ["quest:Lunar Diplomacy"]},
+    "Lunar spellbook active": {"kind": "spell", "requires": ["quest:Lunar Diplomacy"]},
+    "Lunar spells as active spellbook": {"kind": "spell", "requires": ["quest:Lunar Diplomacy"]},
+    "Lunar spells as active spellbook in order to cast Magic Imbue and Repair Rune Pouch": {
+      "kind": "spell",
+      "requires": ["quest:Lunar Diplomacy"]
+    },
+    "Lunar spells as active spellbook in order to cast Humidify": {
+      "kind": "spell",
+      "requires": ["quest:Lunar Diplomacy"]
+    },
+    "Be on the Ancient Magicks spellbook": {"kind": "spell", "requires": ["quest:Desert Treasure"]},
+    "Prifddinas unlocked": {"kind": "place", "requires": ["quest:Plague's End"]},
+    "Having unlocked the Divine Conversion relic from Archaeology": {
+      "kind": "relic",
+      "flag": "ARCH_RELIC_DIVINE_CONVERSION_UNLOCKED"
+    },
+    "Elite Ardougne achievements (for teleporting)": {
+      "kind": "achievement",
+      "requires": ["item:Elite Ardougne achievements"]
+    },
+    "Morytania legs 2 or better": {"kind": "achievement", "requires": ["item:Medium Morytania achievements"]},
+    "Eclipse of the Heart": {"kind": "achievement"},
+    "Breaking the Seal": {"kind": "achievement"},
+    "Breaking the seal": {"kind": "achievement"},
+    "Everything Is Oresome": {"kind": "achievement"},
+    "Everything Is Oresome (only obtainable in Pay to play but effect applies in Free to play)": {
+      "kind": "achievement",
+      "requires": ["item:Everything Is Oresome"]
+    },
+    "Plague's End": {"kind": "quest"},
+    "83": {"kind": "noise"},
+    "96": {"kind": "noise"},
+    "High": {"kind": "noise"},
+    "Various": {"kind": "noise"},
+    "Strategies": {"kind": "noise"},
+    "Coins": {"kind": "noise"},
+    "Divination": {"kind": "noise"},
+    "Farming": {"kind": "noise"},
+    "Hunter": {"kind": "noise"},
+    "Invention": {"kind": "noise"},
+    "Thieving": {"kind": "noise"},
+    "High for Beast of Burden": {"kind": "noise"},
+    "Hotspot Calc (determining how many Venator's per hour you can obtain, per your input)": {"kind": "noise"},
+    "Restore calc (determine total materials needed depending on your artefacts per hour)": {"kind": "noise"}
   }
 }

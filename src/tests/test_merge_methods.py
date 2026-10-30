@@ -166,10 +166,12 @@ class ResearchTests(unittest.TestCase):
         # An unmapped quest stays unknown, but still says it's a quest.
         self.assertEqual((unmapped["kind"], unmapped["capability_kind"]), ("capability", "quest"))
 
-    def test_wiki_advice_pages_become_notes_not_checks(self):
+    def test_bare_wiki_advice_links_are_dropped_and_worded_advice_kept(self):
         requirements = self.convert({
-            "required": ["item:Armoury", ["any", "item:Coins", "item:Recommended equipment for PvM/Magic"]],
-            "recommended": [{"req": "item:Armoury", "text": "Armoury for the best gear"}],
+            "required": ["item:Armoury", ["any", "item:Coins", "item:Recommended equipment for PvM/Magic"],
+                         {"req": "item:Armoury", "text": "Weight-reducing clothing"},
+                         {"req": "item:Armoury", "text": "Armoury"}],
+            "recommended": [{"req": "item:Armoury", "text": "Hybrid armour recommended (suggested warpriest armour)"}],
         })
 
         # The advice-only requirement is gone, and the group keeps its real option.
@@ -178,9 +180,11 @@ class ResearchTests(unittest.TestCase):
         self.assertEqual(children[0]["children"][0]["itemId"], 995)
         self.assertEqual(requirements["recommended"]["children"], [])
 
-        # Each advice page once, in the guide's order; the Wiki's wording wins.
-        self.assertEqual(requirements["advice"],
-                         ["Armoury", "Recommended equipment for PvM: Magic", "Armoury for the best gear"])
+        # No "See also" links. The guide's own words survive: required ones for
+        # the player to judge, recommended ones as tips.
+        self.assertNotIn("advice", requirements)
+        self.assertEqual(requirements["notes"], ["Weight-reducing clothing"])
+        self.assertEqual(requirements["tips"], [{"text": "Hybrid armour recommended (suggested warpriest armour)"}])
 
     def test_classified_capabilities_say_what_they_are(self):
         requirements = self.convert({"required": ["item:Master camouflage outfit", "item:Something else"]})
@@ -383,3 +387,96 @@ class SpellTests(unittest.TestCase):
         self.assertEqual([child["kind"] for child in spell["children"]], ["quest", "skill"])
 
         catalogue.validate_methods({"schema": 1, "items": ctx.items, "methods": [method]}, {"monsters": []})
+
+
+class FreeTextTests(unittest.TestCase):
+    def test_free_text_is_researched_dropped_or_listed_for_the_player(self):
+        ctx = context(capabilities={
+            "Lunar spellbook active": {"kind": "spell", "requires": ["quest:Lunar Diplomacy"]},
+            "Strategies": {"kind": "noise"},
+        }, quests={"Lunar Diplomacy": "LUNAR_DIPLOMACY"})
+        method = merge_methods.convert_guide(guide(requirements={
+            "required": [{"text": "Lunar spellbook active"}, {"text": "Strategies"}, {"text": "A team of 1-3 other players"}],
+            "recommended": [{"text": "A cannon"}],
+        }), ctx, "pvm")
+        requirements = method["requirements"]
+
+        # Researched words become a real check; noise disappears.
+        lunar, = requirements["access"]["children"]
+        self.assertEqual(lunar["text"], "Lunar spellbook active (Lunar Diplomacy)")
+        self.assertEqual(lunar["children"][0]["kind"], "quest")
+
+        # Required words nobody can check are for the player to judge; recommended
+        # ones are tips as before.
+        self.assertEqual(requirements["notes"], ["A team of 1-3 other players"])
+        self.assertEqual(requirements["tips"], [{"text": "A cannon"}])
+
+        catalogue.validate_methods({"schema": 1, "items": ctx.items, "methods": [method]}, {"monsters": []})
+
+
+
+class TieredGearTests(unittest.TestCase):
+    def labels(self, check):
+        if check["kind"] == "gear":
+            return check["text"]
+
+        return [self.labels(child) for child in check["children"]]
+
+    def test_tier_lines_become_gear_checks_on_the_combat_group(self):
+        weapon = merge_methods.tiered_gear("Tier 90+ magic weapon ( Inquisitor staff is best in slot)")
+
+        self.assertEqual(weapon["kind"], "gear")
+        self.assertEqual((weapon["minimum_tier"], weapon["style"], weapon["slot"]), (90, "magic", "weapon"))
+        self.assertEqual(weapon["equipment_group"], "combat_equipment")
+
+        # Two tiers need both; one tier for "weapon and armour" covers both pieces.
+        self.assertEqual(self.labels(merge_methods.tiered_gear("Tier 90+ weapon and Tier 80+ armour, perked.")),
+                         ["T90+ weapon", "T80+ body armour"])
+        self.assertEqual(self.labels(merge_methods.tiered_gear("Tier 90+ magic weapon and armour")),
+                         ["T90+ magic weapon", "T90+ magic body armour"])
+
+        # Listed styles are alternatives.
+        either = merge_methods.tiered_gear("Tier 90+ melee weapon, ranged weapon or magic weapon")
+        self.assertEqual(either["kind"], "any")
+        self.assertEqual(self.labels(either), ["T90+ melee weapon", "T90+ ranged weapon", "T90+ magic weapon"])
+
+    def test_wiki_armour_links_take_their_style_from_the_page(self):
+        armour = merge_methods.tiered_gear("Armour/Magic armour#High-level equipment (61+)")
+        self.assertEqual((armour["minimum_tier"], armour["style"], armour["slot"]), (61, "magic", "body"))
+        self.assertEqual(armour["text"], "Magic armour: High-level equipment (61+)")
+
+        # The Wiki's "High level equipment" section is 61+ even without the number.
+        self.assertEqual(merge_methods.tiered_gear("Necromancy weapons#High level equipment")["minimum_tier"], 61)
+
+        tank = merge_methods.tiered_gear("T90+ magic tank armour, perked")
+        self.assertEqual(tank["armour_type"], "Tank armour")
+
+    def test_tiered_things_that_are_not_gear_are_left_alone(self):
+        for text in ("Tier 4 Luck", "Tier 3 Slayer Lodge recommended", "Tier 80+ pickaxe",
+                     "Tier 7 Reputation for access to the VIP skilling area", "High-level power armour"):
+            self.assertIsNone(merge_methods.tiered_gear(text), text)
+
+    def test_the_group_keeps_weapons_shields_and_bodies_with_their_style(self):
+        ctx = context()
+        group = merge_methods.combat_gear_group([
+            {"name": "Noxious scythe", "item_ids": [31725], "tier": 90, "slot": "2h weapon", "style": "melee"},
+            {"name": "Tectonic robe top", "item_ids": [28608], "tier": 90, "slot": "torso", "style": "magic",
+             "type": "Tank armour"},
+            {"name": "Tectonic mask", "item_ids": [28611], "tier": 90, "slot": "head", "style": "magic"},
+            {"name": "Off-hand drygore", "item_ids": [26580], "tier": 90, "slot": "off-hand weapon", "style": "melee"},
+        ], ctx)
+
+        self.assertEqual([(c["item_id"], c["slot"]) for c in group["candidates"]], [(31725, "weapon"), (28608, "body")])
+        self.assertEqual(group["candidates"][1]["armour_type"], "Tank armour")
+        self.assertEqual(ctx.items["31725"]["name"], "Noxious scythe")
+
+
+    def test_a_tier_line_linked_to_an_advice_page_is_still_a_gear_check(self):
+        ctx = context(capabilities={"Armoury": {"kind": "guidance"}})
+        method = merge_methods.convert_guide(guide(requirements={
+            "required": [{"req": "item:Armoury", "text": "Tier 95+ ranged weapons, perked"}],
+        }), ctx, "pvm")
+        weapon, = method["requirements"]["access"]["children"]
+
+        self.assertEqual((weapon["kind"], weapon["minimum_tier"], weapon["style"]), ("gear", 95, "ranged"))
+        self.assertNotIn("advice", method["requirements"])

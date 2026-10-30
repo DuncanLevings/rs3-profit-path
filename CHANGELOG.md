@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.7-dev — 2026-10-30
+
+- Required lines the Wiki writes as plain words are sorted. Ones with a real check become one: spellbook lines ("Lunar spellbook active") check the quest that unlocks the book, "Prifddinas unlocked" checks Plague's End, Divine Conversion checks its relic, Elite Ardougne and Morytania legs 2 check their diary tiers, and Eclipse of the Heart, Breaking the Seal and Everything Is Oresome check their achievements. Parsing leftovers ("83", "High", "Strategies") are dropped. The rest (gear tiers, team sizes, shop upgrades) are listed under a new "Check yourself" heading on the Requirements tab, one per line, never coloured or counted as unknown (143 lines). Unknown checks fall from 388 to 199.
+- Tiered gear lines are real checks: "Tier 90+ magic weapon", "Tier 90+ weapon and Tier 80+ armour", "T90+ magic tank armour" and the Wiki's "Magic armour: High level equipment (61+)" links. Owning (carried, worn or banked) any weapon, shield or body armour of that tier, style and type meets it; armour is checked by its body piece, and perks aren't checked. The tiers come from the Wiki's equipment data (`wiki_methods.py --equipment`, saved in `research/equipment.json`: 6,295 tier 60+ pieces, about 2,900 of them weapons, shields and bodies). 91 gear checks, including tier lines the Wiki links to its Armoury page (they were shown under "See also"); a line linked to a named item ("Inquisitor staff is best in slot") accepts that item too. the catalogue grows to 1.13 MB. With that many items, ownership reads each container's slots once instead of asking for every item.
+- A gear check with no owned match shows an empty slot whose border gives the verdict (red when missing) instead of the group's coverage note.
+- "Any one" tiered gear (magic, melee, ranged or necromancy armour) shows one slot per option with a short label ("T61+ magic armour"), like the "Any one" item groups, instead of one long line of link text.
+- The "See also on the Wiki" section is gone: bare Wiki page names (Armoury, Spear, Recommended equipment for PvM...) can't be clicked in game and were clutter. Where a guide words its own advice through such a link ("Hybrid armour recommended (suggested warpriest armour)", "Weight-reducing clothing"), that wording is kept as a tip or a "Check yourself" line.
+- A gear check no longer stays "unknown" because of one Wiki item ID the client names differently (a retired or renamed version): such an ID is skipped unless you hold it. A failed name read still counts as "can't tell", never as missing.
+- Validate with 127 Lua behaviour tests and 83 Python tests.
+
 ## 0.8.6-dev — 2026-10-29
 
 - Recommended things the plugin can't check (relics, abilities, diaries, perks, and lines the Wiki words as "recommended" or "optional") are now tips: listed under "Also helps" on the Requirements tab with their icons, never coloured or counted as unknown. Unknown checks fall from 1,039 to 482 (523 tips).

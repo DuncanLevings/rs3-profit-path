@@ -194,6 +194,21 @@ function App.start()
     local needsCombat = false
     local equipment = catalogue.equipment or {}
 
+    -- Each equipment group's candidates by slot, so a weapon check skips armour.
+    for _, group in pairs(equipment) do
+        group.bySlot = {}
+
+        for _, candidate in ipairs(group.candidates) do
+            if candidate.slot then
+                group.bySlot[candidate.slot] = group.bySlot[candidate.slot] or {}
+                table.insert(group.bySlot[candidate.slot], candidate)
+            end
+        end
+    end
+
+    -- Groups whose items are already wanted (many checks share one group).
+    local collectedGroups = {}
+
     -- Include charged/worn IDs as ownership aliases, but keep the display ID stable.
     local function wantItem(itemId)
         local item = catalogue.items[tostring(itemId)]
@@ -220,7 +235,9 @@ function App.start()
             questNames[requirement.quest] = true
         elseif requirement.kind == "item" then
             wantItem(requirement.itemId)
-        elseif requirement.equipment_group then
+        elseif requirement.equipment_group and not collectedGroups[requirement.equipment_group] then
+            collectedGroups[requirement.equipment_group] = true
+
             for _, candidate in ipairs(equipment[requirement.equipment_group].candidates) do
                 wantItem(candidate.item_id)
 
@@ -257,8 +274,9 @@ function App.start()
                 return object and object.name
             end)
 
+            -- A failed read is "can't tell" (nil), not a mismatch (false).
             if not ok or type(name) ~= "string" then
-                return false
+                return nil
             end
 
             nameChecks[itemId] = name:lower() == expected:lower()
@@ -321,6 +339,8 @@ function App.start()
                     local verified = nameMatches(itemId, item.name)
 
                     evidence.items[itemId] = {
+                        -- false when the client's name for this ID isn't the catalogue's.
+                        verified = verified,
                         status = verified and (quantity > 0 or self.ownershipEvidence.complete) and "available" or "unknown",
                         quantity = quantity, savedQuantity = savedQuantity, toolbelt = onToolbelt,
                         complete = verified and self.ownershipEvidence.complete,

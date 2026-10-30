@@ -808,8 +808,8 @@ return function(test, equal, client, pretty)
 
         assert(table.concat(lines, "\n"):find("Usable owned match", 1, true))
 
-        -- A match disappearing removes only its own slot. No requirement ever
-        -- receives a decorative empty inventory box, and returning creates one slot.
+        -- A match disappearing removes only its own slot. The empty place is a
+        -- bordered outline, never a placeholder item, and returning creates one slot.
         local function hatchetSlots()
             local count = 0
 
@@ -832,6 +832,11 @@ return function(test, equal, client, pretty)
         hasHatchet = false
         Event.InventoryUpdated.emit({ inv = config.Inv.INV })
         equal(hatchetSlots(), 0)
+
+        -- No match: no coverage note next to the empty slot.
+        for _, label in ipairs(detail.tabs[1].pages[2]:allTexts()) do
+            assert(not tostring(label.content):find("Checks carried", 1, true), "Coverage note shown")
+        end
         hasHatchet = true
         Event.InventoryUpdated.emit({ inv = config.Inv.INV })
         equal(hatchetSlots(), 1)
