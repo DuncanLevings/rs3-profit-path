@@ -15,6 +15,7 @@ local Requirements = {}
 local function result(requirement, status, reason, evidence, children)
     return {
         text = requirement.text,
+        kind = requirement.kind,
         status = status,
         reason = reason,
         evidence = evidence or {},

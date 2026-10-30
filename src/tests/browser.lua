@@ -1102,6 +1102,65 @@ return function(test, equal, client, pretty)
         end
     end)
 
+    -- An either-or line that isn't met says what each part reads as when hovered.
+    -- The label is only made again when that text changes, not on every refresh.
+    test("an either-or requirement explains its parts on hover", function()
+        client()
+        local library = pretty()
+        local base = require("src/data/method_data").find("smelting-steel-bars.basic")
+        local method = {}
+
+        for key, value in pairs(base) do
+            method[key] = value
+        end
+
+        local line = { kind = "any", text = "Mobile or Shadow's Grace (highly recommended)", children = {
+            { kind = "capability", text = "Mobile" },
+            { kind = "flag", var = "ARCH_RELIC_SHADOWS_GRACE_UNLOCKED", text = "Shadow's Grace" },
+        } }
+        local required = { kind = "all", text = "Required", children = {} }
+        local recommended = { kind = "all", text = "Recommended", children = { line } }
+        method.requirements = { coverage = "partial", access = required, recommended = recommended }
+
+        -- Shadow's Grace isn't unlocked; Mobile can't be checked.
+        local account = { flags = { ARCH_RELIC_SHADOWS_GRACE_UNLOCKED = { status = "available", value = 0 } } }
+        local Requirements = require("src/game/requirements")
+        local calculator = {
+            rate = 2000,
+            result = require("src/methods/income").calculate(base.income, 2000, {}),
+            requirements = function()
+                return Requirements.evaluate(required, account), Requirements.evaluate(recommended, account)
+            end,
+            ownership = function() return { counts = {}, complete = false } end,
+        }
+        local view = library.SimpleView.new({ width = 700, height = 500 }, { width = 700, height = 500 })
+        local refresh = require("src/ui/method_view").mount(view, method, calculator, function(callback) return callback end)
+        settleMethod()
+
+        local function label()
+            for _, text in ipairs(view.tabs[1].pages[2]:allTexts()) do
+                if text.content == "Mobile or Shadow's Grace (highly recommended)" then
+                    return text
+                end
+            end
+        end
+
+        local first = label()
+        equal(first.options.tooltip, "Either one will do. Mobile: can't be checked in game. "
+            .. "Shadow's Grace: not unlocked yet.")
+
+        -- Nothing changed: the same label stays.
+        refresh("quests")
+        equal(label(), first)
+
+        -- Unlocking the relic meets the line, and a met line needs no hover.
+        account.flags.ARCH_RELIC_SHADOWS_GRACE_UNLOCKED.value = 1
+        refresh("quests")
+        assert(first.destroyed, "The old label is gone")
+        equal(label().options.tooltip, nil)
+        view:Destroy()
+    end)
+
     test("standalone item icons share rows while box-and-text requirements keep their own line", function()
         client()
         local library = pretty()

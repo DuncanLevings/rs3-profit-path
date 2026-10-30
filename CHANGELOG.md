@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.14-dev - 2026-10-30
+
+- Hovering an either-or or all-of requirement line that isn't met says what each part reads as, e.g. "Either one will do. Mobile: can't be checked in game. Shadow's Grace: not unlocked yet." A line like "Mobile or Shadow's Grace" stays neutral rather than red when the relic isn't unlocked, because the Mobile perk can't be checked; the hover now says so. The label is made again only when that text changes, at most four lines in any method.
+
 ## 0.8.13-dev - 2026-10-30
 
 - 21 Wiki guides that choose from GE prices now make those choices from live prices instead of keeping the Wiki's answer from import day. Shop runs (Buying runes, Mega shop run daily and weekly, Buying feathers, farm shops, vials of water, yak-hide and the Stonemason) buy each item only while the GE pays more after tax than the shop charges; the Coins supply now adds up the shop price of whichever items are bought, and each item's hover shows its shop price. Bones to Bananas, Casting fruitfall, the Anachronia agility codexes, Cutting willow logs and six potion guides (3-dose or 4-dose) pick whichever option pays more. Options that aren't used stay listed at 0, and hovering a row says whether it's used and why. Before, Buying runes showed air, mind, earth, death and blood runes at 0 forever.

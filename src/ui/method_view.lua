@@ -156,6 +156,39 @@ local function requirementText(text)
     return cleaned
 end
 
+-- The hover for an "any"/"all" line that isn't met: what each part reads as,
+-- e.g. "Either one will do. Mobile: can't be checked in game. Shadow's Grace:
+-- not unlocked yet." Without it, a neutral line doesn't say why it's neutral.
+-- A met line needs no explaining, so it gets nil.
+local function partsTooltip(checked)
+    if checked.status == "met" or not checked.children then
+        return nil
+    end
+
+    local parts = {}
+    local plain = { met = "met", unmet = "not met", unknown = "needs checking" }
+
+    for _, child in ipairs(checked.children) do
+        local reads
+
+        if child.children then
+            -- A nested group: just its verdict, or the hover gets very long.
+            reads = plain[child.status]
+        elseif child.kind == "capability" then
+            reads = "can't be checked in game"
+        else
+            -- The check's own reason, as part of a sentence ("not unlocked yet").
+            reads = child.reason:gsub("^%u", string.lower):gsub("%.$", "")
+        end
+
+        parts[#parts + 1] = requirementText(child.text or "") .. ": " .. reads
+    end
+
+    local heading = checked.kind == "any" and "Either one will do. " or "All of these are needed. "
+
+    return heading .. table.concat(parts, ". ") .. "."
+end
+
 -- Builds matching Required/Recommended pairs for skills, items, quests and other
 -- checks. Each pair owns its controls; refreshing changes only their verdicts.
 local function mountRequirements(parent, method, calculator, fitter)
@@ -354,9 +387,18 @@ local function mountRequirements(parent, method, calculator, fitter)
                 end
 
                 local x = requirement.equipment_group and 62 or (12 + #iconNames * 26)
-                local label = section:AddText({ text = requirementText(requirement.text), x = x, y = y, width = -x - 16, widthAnchor = 1, height = entry.matchHeight or entry.textHeight, colour = Style.text })
+                local labelOptions = { text = requirementText(requirement.text), x = x, y = y, width = -x - 16, widthAnchor = 1, height = entry.matchHeight or entry.textHeight, colour = Style.text }
+                local label = section:AddText(labelOptions)
 
                 local update = { label = label, index = entry.index, recommended = entry.recommended }
+
+                -- An "any"/"all" line explains its parts when hovered. PrettyUI
+                -- sets a tooltip only when a label is made, so the refresh makes
+                -- this label again, but only when the hover text changes.
+                if requirement.children and not requirement.equipment_group then
+                    update.section = section
+                    update.labelOptions = labelOptions
+                end
 
                 if requirement.equipment_group then
                     -- Show an owned match or an explicitly named minimum. With
@@ -393,6 +435,23 @@ local function mountRequirements(parent, method, calculator, fitter)
             -- One option of an "any one" gear group has its own result.
             if update.childIndex then
                 checked = checked.children[update.childIndex]
+            end
+
+            if update.labelOptions then
+                local tooltip = partsTooltip(checked)
+
+                if tooltip ~= update.tooltip then
+                    local options = {}
+
+                    for key, value in pairs(update.labelOptions) do
+                        options[key] = value
+                    end
+
+                    options.tooltip = tooltip
+                    update.label:Destroy()
+                    update.label = update.section:AddText(options)
+                    update.tooltip = tooltip
+                end
             end
 
             if update.label then
