@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "about": "Methods done as a group, one entry per Wiki guide version, with the team the guide assumes. Any method not listed is done solo. Group size is independent of category (Croesus is a group skilling boss). Found by checking every guide's version names and requirement text for team sizes on 30 October 2026; a guide that only says a boss \"scales\" with players (Solak) is still a solo guide.",
+  "teams": [
+    {
+      "page": "Money making guide/Completing Barrows: Rise of the Six",
+      "version": "",
+      "team": "2-4 players",
+      "evidence": "The guide's requirements list \"A team of 1-3 other players\"."
+    },
+    {
+      "page": "Money making guide/Completing ED2 - Dragonkin Laboratory",
+      "version": "Duo",
+      "team": "Duo",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Completing ED2 - Dragonkin Laboratory",
+      "version": "Trio",
+      "team": "Trio",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Completing ED3 - Shadow Reef",
+      "version": "Duo",
+      "team": "Duo",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Completing ED3 - Shadow Reef",
+      "version": "Trio",
+      "team": "Trio",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Defeating Croesus",
+      "version": "4-person",
+      "team": "4 players",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Defeating Croesus",
+      "version": "Duo",
+      "team": "Duo",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Killing Beastmaster Durzag",
+      "version": "",
+      "team": "Raid team",
+      "evidence": "The guide names no team; gameplay review (30 October 2026): Beastmaster is part of a group raid and solo isn't feasible."
+    },
+    {
+      "page": "Money making guide/Killing Kerapac, the bound",
+      "version": "Duo hard mode",
+      "team": "Duo",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Killing Kerapac, the bound",
+      "version": "Trio hard mode",
+      "team": "Trio",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Killing Nex, Angel of Death",
+      "version": "4-player",
+      "team": "4 players",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Killing Nex, Angel of Death",
+      "version": "7-player",
+      "team": "7 players",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Killing Nex, Angel of Death",
+      "version": "Duo",
+      "team": "Duo",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Killing Vorago",
+      "version": "Duo",
+      "team": "Duo",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Killing Vorago",
+      "version": "Trio",
+      "team": "Trio",
+      "evidence": "The guide version is named for its team size."
+    },
+    {
+      "page": "Money making guide/Killing the Kalphite King",
+      "version": "Duo",
+      "team": "Duo",
+      "evidence": "The guide version is named for its team size."
+    }
+  ]
+}

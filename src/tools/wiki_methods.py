@@ -16,6 +16,8 @@ the catalogue needs refreshing; the plugin never talks to the Wiki.
 #   prop=revisions              each guide page's current revision number, so every
 #                               line says exactly which page version it came from
 #   infobox_item bucket         item names -> item IDs, which GEPL needs for prices
+#   {{MMGWarning}} (--warnings) the Wiki's risk warning on some guides, read from
+#                               each guide's snapshot revision into warnings.json
 #
 # Everything fetched is treated as untrusted data: it's parsed as JSON or HTML,
 # checked for the shapes we expect, and nothing in it is ever run.
@@ -56,6 +58,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "catalogue-source" / "wiki"
 GUIDES = OUTPUT / "guides.jsonl"
 META = OUTPUT / "meta.json"
+WARNINGS = OUTPUT / "warnings.json"
 
 # Research inputs and outputs for the outfit pass (see import_outfits below).
 CAPABILITIES = ROOT / "catalogue-source" / "research" / "capabilities.json"
@@ -67,6 +70,7 @@ PICKAXES = ROOT / "catalogue-source" / "research" / "pickaxes.json"
 # Price-dependent choices (see wiki_choices.py). Their items need IDs too, even
 # the ones the guide didn't pick on the day we imported it.
 CHOICES = ROOT / "catalogue-source" / "research" / "income-choices.json"
+ACCESS = ROOT / "catalogue-source" / "research" / "access-requirements.json"
 
 API = "https://runescape.wiki/api.php"
 
@@ -663,12 +667,18 @@ def build(rows, revisions, item_ids, retrieved, families=None, item_names=None, 
 
 
 def choice_names():
-    """Every item named in the income choices research, e.g. Big bones as well as
-    the Bones a guide picked on import day."""
-    if not CHOICES.exists():
-        return set()
-
+    """Every item our research names: the income choices (Big bones as well as the
+    Bones a guide picked on import day), and items that access research turns into
+    real checks (a guide's plain "Rune ore box" becomes "item:Rune ore box")."""
     names = set()
+
+    if ACCESS.exists():
+        for entry in json.loads(ACCESS.read_text(encoding="utf-8"))["guides"]:
+            for requirement in entry.get("required", []) + entry["additional_required"]:
+                names.update(requirement_items(requirement))
+
+    if not CHOICES.exists():
+        return names
 
     for entry in json.loads(CHOICES.read_text(encoding="utf-8"))["guides"]:
         names.update(item["name"] for item in entry.get("shops", []))
@@ -1065,6 +1075,107 @@ def import_pickaxes():
     return pieces, missing
 
 
+# ---- Risk warnings ------------------------------------------------------------
+#
+# Some guides open with {{MMGWarning|reason}}: a box saying the method "may involve
+# considerable risks" (price swings, low GE volume...), with the editors' reason.
+# The plugin shows the same warning, so we keep each guide page's reason, read
+# from the exact revision the snapshot used. A warning sits at the top of the page,
+# before any version tabs, so it covers every version of that guide.
+
+WARNING = re.compile(r"\{\{\s*MMGWarning\s*(?:\|((?:[^{}]|\{\{[^{}]*\}\})*))?\}\}", re.IGNORECASE)
+
+
+def page_warning(wikitext):
+    """The warning's reason as plain text, "" for a warning with no reason, or None
+    when the page has no warning. Refuses a page whose warning isn't at the top
+    (it might belong to one version only), or that has more than one."""
+    found = list(WARNING.finditer(wikitext or ""))
+
+    if not found:
+        return None
+
+    if len(found) > 1:
+        raise ValueError("A guide page has more than one MMGWarning")
+
+    starts = [wikitext.find(marker) for marker in ("{{Mmgtable", "{{mmgtable", "<tabber>", "{{Tabber")]
+
+    if any(0 <= start < found[0].start() for start in starts):
+        raise ValueError("An MMGWarning sits below a guide table or version tab")
+
+    reason = re.sub(r"^\s*1\s*=", "", found[0].group(1) or "")
+    return plain(reason)
+
+
+def import_warnings():
+    """Writes warnings.json: the {{MMGWarning}} reason of every snapshot guide page
+    that has one, at the snapshot's revision. Returns the entries."""
+    guides = [json.loads(line) for line in GUIDES.read_text(encoding="utf-8").splitlines()]
+    revisions = {guide["page"]: guide["revision"] for guide in guides}
+
+    # Pages that use the template today. A page that dropped it since the snapshot
+    # is still checked at its snapshot revision below, so it's simply not found.
+    users, params = set(), {"action": "query", "list": "embeddedin", "eititle": "Template:MMGWarning",
+                            "eilimit": 500, "einamespace": 0}
+
+    while True:
+        data = get(params)
+        users |= {page["title"] for page in data["query"]["embeddedin"]}
+
+        if "continue" not in data:
+            break
+
+        params = {**params, **data["continue"]}
+
+    entries = []
+
+    for group in batches([page for page in users if page in revisions], TITLES_PER_QUERY):
+        data = get({"action": "query", "prop": "revisions", "rvprop": "ids|content", "rvslots": "main",
+                    "revids": "|".join(str(revisions[page]) for page in group), "formatversion": 2})
+
+        for page in data["query"]["pages"]:
+            revision = page["revisions"][0]
+
+            if revision["revid"] != revisions[page["title"]]:
+                raise ValueError(f"Wrong revision back for {page['title']}")
+
+            reason = page_warning(revision["slots"]["main"]["content"])
+
+            if reason is not None:
+                entries.append({"page": page["title"], "revision": revision["revid"], "reason": reason})
+
+    entries.sort(key=lambda entry: entry["page"])
+    document = {
+        "schema": 1,
+        "retrieved": datetime.date.today().isoformat(),
+        "about": ("The RuneScape Wiki's {{MMGWarning}} on money making guides: \"The methods described in this guide "
+                  "may involve considerable risks, including (but not limited to): loss of money and goods, price "
+                  "volatility, and low GE sales volume.\" Each entry is a guide page's reason, read from the revision "
+                  "in guides.jsonl; an empty reason means the Wiki gives none. It covers every version on the page."),
+        "warnings": entries,
+    }
+
+    WARNINGS.write_text(json.dumps(document, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+    return entries
+
+
+def verify_warnings(guides):
+    """Every warning is for a snapshot page at the snapshot's revision, once."""
+    if not WARNINGS.exists():
+        return
+
+    document = json.loads(WARNINGS.read_text(encoding="utf-8"))
+    revisions = {guide["page"]: guide["revision"] for guide in guides}
+    pages = [entry["page"] for entry in document.get("warnings", [])]
+
+    if document.get("schema") != 1 or pages != sorted(set(pages)):
+        raise ValueError("warnings.json must be schema 1, sorted by page, with no duplicates")
+
+    for entry in document["warnings"]:
+        if revisions.get(entry["page"]) != entry["revision"] or not isinstance(entry.get("reason"), str):
+            raise ValueError(f"warnings.json is out of date for {entry['page']}; re-run with --warnings")
+
+
 def verify_snapshot():
     """Checks the files on disk: every line a valid guide, sorted, no duplicates,
     and meta.json's counts and item table agreeing with them. Run by test.py, so a
@@ -1093,6 +1204,8 @@ def verify_snapshot():
     if names != listed:
         raise ValueError("meta.json's item names don't match guides.jsonl's income rows and requirements")
 
+    verify_warnings(guides)
+
     return len(guides)
 
 
@@ -1110,7 +1223,14 @@ def main():
                         help="instead of the guides, import every pickaxe and its Mining level")
     parser.add_argument("--items", action="store_true",
                         help="look up item IDs again for the saved guides, leaving the guides unchanged")
+    parser.add_argument("--warnings", action="store_true",
+                        help="read each saved guide's {{MMGWarning}} reason (at its snapshot revision) into warnings.json")
     args = parser.parse_args()
+
+    if args.warnings:
+        entries = import_warnings()
+        print(f"Wrote {len(entries)} guide warnings to {WARNINGS.relative_to(ROOT)}.")
+        return
 
     if args.items:
         old, new = refresh_items()

@@ -104,7 +104,7 @@ return function(test, equal, client, pretty)
         local rows = {}
 
         for _, view in ipairs(prettyui.allViews) do
-            if not view.destroyed and view.buttons["View method"] then
+            if not view.destroyed and view.buttons["View activity"] then
                 rows[#rows + 1] = view
             end
         end
@@ -470,7 +470,7 @@ return function(test, equal, client, pretty)
         local rowTexts = {}
 
         for _, view in ipairs(prettyui.allViews) do
-            if not view.destroyed and view.buttons["View method"] then
+            if not view.destroyed and view.buttons["View activity"] then
                 for _, label in ipairs(view.texts) do
                     rowTexts[#rowTexts + 1] = tostring(label.content)
                 end
@@ -489,7 +489,7 @@ return function(test, equal, client, pretty)
         local shown = 0
 
         for _, view in ipairs(prettyui.allViews) do
-            if not view.destroyed and view.buttons["View method"] then
+            if not view.destroyed and view.buttons["View activity"] then
                 shown = shown + 1
             end
         end
@@ -516,6 +516,68 @@ return function(test, equal, client, pretty)
         assert(all:find("Yield (% of guide)", 1, true), "Yield label")
         assert(all:find("Per run", 1, true), "Per-run column")
         assert(all:find("Can be done every", 1, true), "Cycle note")
+
+        PluginShutdown()
+    end)
+
+    -- Mega shop run is left out on purpose (see LEFT_OUT in merge_methods.py).
+    test("guides left out of the catalogue stay out", function()
+        for _, method in ipairs(catalogue.methods) do
+            assert(method.source.title ~= "Money making guide/Mega shop run", method.id)
+        end
+    end)
+
+    -- Guides the Wiki marks with {{MMGWarning}} carry its reason to every
+    -- version, and the player sees it on the row and at the top of Income.
+    test("wiki risk warnings reach every version and show on the row and the activity page", function()
+        client()
+        prettyui = pretty()
+        gepl = countingLibrary()
+
+        local warned, versions = 0, 0
+
+        for _, method in ipairs(catalogue.methods) do
+            if method.warning then
+                warned = warned + 1
+            end
+
+            if method.source.title == "Money making guide/Tanning hides" then
+                versions = versions + 1
+                assert(method.warning and method.warning:find("Prices can be unstable", 1, true), method.id)
+            end
+        end
+
+        assert(warned >= 41, "Every warned guide page has at least one method")
+        assert(versions > 1, "Tanning hides has several versions, all warned")
+
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
+        prettyui:findButton("Open Profit Path")()
+        prettyui.views[#prettyui.views].children[2].fields[1]:SetText("Smelting primal bars", true)
+        settleSearch()
+
+        local rowTexts = {}
+
+        for _, view in ipairs(prettyui.allViews) do
+            if not view.destroyed and view.buttons["View activity"] then
+                for _, label in ipairs(view.texts) do
+                    rowTexts[#rowTexts + 1] = tostring(label.content)
+                end
+            end
+        end
+
+        assert(table.concat(rowTexts, " / "):find("Wiki warning", 1, true), "The row says it has a warning")
+
+        prettyui:findMethod("Smelting primal bars")()
+        local texts = {}
+
+        for _, label in ipairs(prettyui.views[#prettyui.views].tabs[1].pages[1]:allTexts()) do
+            texts[#texts + 1] = tostring(label.content)
+        end
+
+        local all = table.concat(texts, " / ")
+        assert(all:find("Warning from the Wiki", 1, true), "The Wiki's warning")
+        assert(all:find("Reason: Fluctuating ore prices", 1, true), "Its reason")
 
         PluginShutdown()
     end)

@@ -758,17 +758,47 @@ class ChoiceTests(unittest.TestCase):
             merge_methods.convert_guide(bananas, ctx, "production")
 
 
+class WarningTests(unittest.TestCase):
+    """The Wiki's risk warning follows its guide page onto every method from it."""
+
+    def test_a_page_warning_reaches_its_methods_only(self):
+        warnings, used = {"Money making guide/Fixture": "Low trading volumes"}, set()
+
+        warned = {"id": "fixture.a"}
+        merge_methods.apply_warning(warned, "Money making guide/Fixture", warnings, used)
+        self.assertEqual(warned["warning"], "Low trading volumes")
+
+        other = {"id": "other"}
+        merge_methods.apply_warning(other, "Money making guide/Other", warnings, used)
+        self.assertNotIn("warning", other)
+        self.assertEqual(used, {"Money making guide/Fixture"})
+
+    def test_the_saved_warnings_have_reasons(self):
+        warnings = merge_methods.load_warnings()
+        self.assertIn("Money making guide/Smelting primal bars", warnings)
+        self.assertTrue(all(reason.strip() for reason in warnings.values()))
+
+
 class DifficultyTests(unittest.TestCase):
     """PvM methods take their researched difficulty; nothing else is rated."""
 
     def test_a_pvm_method_takes_its_rating_and_others_are_left_alone(self):
-        ratings = {("Money making guide/Fixture", "solo"): "Hard"}
+        ratings = {
+            ("Money making guide/Fixture", "solo"): {"difficulty": "Hard", "level": 6, "farm": 4},
+            ("Money making guide/Fixture", "duo"): {"difficulty": "Medium"},
+        }
         used = set()
 
         boss = {"id": "fixture.solo", "category": "pvm"}
         merge_methods.apply_difficulty(boss, "Money making guide/Fixture", "Solo", ratings, used)
-        self.assertEqual(boss["difficulty"], "Hard")
+        self.assertEqual((boss["difficulty"], boss["difficulty_level"], boss["farm_level"]), ("Hard", 6, 4))
         self.assertEqual(used, {("Money making guide/Fixture", "solo")})
+
+        # Not on the 1-10 ladder yet: just the band, no invented level.
+        duo = {"id": "fixture.duo", "category": "pvm"}
+        merge_methods.apply_difficulty(duo, "Money making guide/Fixture", "Duo", ratings, set())
+        self.assertEqual(duo["difficulty"], "Medium")
+        self.assertNotIn("difficulty_level", duo)
 
         # Skilling is never rated, even when a rating exists for its page.
         skilling = {"id": "fixture.solo", "category": "skilling"}
@@ -783,4 +813,13 @@ class DifficultyTests(unittest.TestCase):
     def test_the_research_file_uses_the_scale_and_explains_every_rating(self):
         ratings = merge_methods.load_difficulty()
         self.assertTrue(ratings)
-        self.assertLessEqual(set(ratings.values()), set(merge_methods.DIFFICULTY_SCALE))
+        self.assertLessEqual({rating["difficulty"] for rating in ratings.values()}, set(merge_methods.DIFFICULTY_SCALE))
+
+        # A laddered rating's band is always the one its level falls in.
+        for rating in ratings.values():
+            if "level" in rating:
+                self.assertEqual(rating["difficulty"], merge_methods.difficulty_band(rating["level"]))
+                self.assertLessEqual(rating["farm"], rating["level"])
+
+        self.assertEqual([merge_methods.difficulty_band(level) for level in (1, 2, 3, 4, 5, 7, 8, 10)],
+                         ["Easy", "Easy", "Medium", "Medium", "Hard", "Hard", "Elite", "Elite"])

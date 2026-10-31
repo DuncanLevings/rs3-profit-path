@@ -1,5 +1,7 @@
 -- Saves only catalogue-relevant item counts, separately for backpack, worn gear
--- and bank. Saved data is historical evidence, never a claim of current ownership.
+-- and bank. The saved bank stands in for the bank whenever it's closed (the game
+-- only sends it while open; see readOwnership in account.lua). The saved backpack
+-- and worn gear are only last-seen hints: those are always readable live.
 -- This object owns the loaded profile record and a dirty flag, not native proxies.
 local Snapshot = {}
 local containers = { "INV", "WORN", "BANK" }

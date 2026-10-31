@@ -837,6 +837,18 @@ function MethodView.mount(view, method, calculator, guarded, options)
     local render
     local ready = false
 
+    -- The Wiki's risk warning comes first when the guide has one, in the Wiki's
+    -- own words ({{MMGWarning}}), with the editors' reason underneath.
+    if method.warning then
+        income:AddText({
+            text = "Warning from the Wiki: the methods in this guide may involve considerable risks, including "
+                .. "(but not limited to) loss of money and goods, price volatility, and low GE sales volume.",
+            colour = Style.bad, marginTop = 4,
+        })
+
+        income:AddText({ text = "Reason: " .. method.warning, colour = Style.gold, marginBottom = 4 })
+    end
+
     -- Top row: a small rate panel on the left, the profit panel filling the rest.
     -- The rate sits beside the number it changes, so editing it and watching the
     -- profit move happen in one place.
@@ -995,7 +1007,7 @@ function MethodView.mount(view, method, calculator, guarded, options)
         buildTab[3] = nil
 
         local instructions = tabs:GetPage(3)
-        instructions:AddTitle("Method steps")
+        instructions:AddTitle("Activity steps")
 
         for index, step in ipairs(method.instructions) do
             instructions:AddText({ text = index .. ". " .. step, marginTop = 10, marginBottom = 12 })
@@ -1003,7 +1015,7 @@ function MethodView.mount(view, method, calculator, guarded, options)
 
         -- Imported methods don't have our own steps yet; point at the Wiki guide.
         if #method.instructions == 0 then
-            instructions:AddText({ text = "Steps haven't been written for this method yet. The Wiki guide \""
+            instructions:AddText({ text = "Steps haven't been written for this activity yet. The Wiki guide \""
                 .. method.source.title .. "\" explains how to do it.", colour = Style.muted })
         end
     end
@@ -1035,7 +1047,7 @@ function MethodView.mount(view, method, calculator, guarded, options)
         end
 
         if method.location.coverage ~= "complete" then
-            travel:AddText({ text = "Travel details are still being prepared for this method.", colour = Style.muted })
+            travel:AddText({ text = "Travel details are still being prepared for this activity.", colour = Style.muted })
         end
     end
 

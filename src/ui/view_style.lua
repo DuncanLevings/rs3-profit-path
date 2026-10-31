@@ -281,16 +281,20 @@ function Style.coins(parent, options)
     return (rsprite.Draw(parent.content, iconNames.coins, drawOptions))
 end
 
--- Switches a text label to a named client font (e.g. Style.HEADLINE_FONT). If this
--- client build doesn't have that font, the label just keeps PrettyUI's default,
--- so the number still shows, only smaller.
-function Style.setFont(label, name)
-    local ok, font = pcall(function()
-        return id.Font[name]
-    end)
+-- Switches a text label to a named client font (e.g. Style.HEADLINE_FONT). Give
+-- more names to fall back through, biggest first. If this client build has none
+-- of them, the label just keeps PrettyUI's default, so the text still shows,
+-- only smaller.
+function Style.setFont(label, ...)
+    for _, name in ipairs({ ... }) do
+        local ok, font = pcall(function()
+            return id.Font[name]
+        end)
 
-    if ok and font ~= nil then
-        label.font = font
+        if ok and font ~= nil then
+            label.font = font
+            return label
+        end
     end
 
     return label

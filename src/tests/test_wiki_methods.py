@@ -262,5 +262,25 @@ class OutfitTests(unittest.TestCase):
         self.assertEqual(wiki_methods.set_pieces(None), [])
 
 
+
+class WarningTests(unittest.TestCase):
+    """{{MMGWarning}} reasons: plain text, page-wide, and only from the top."""
+
+    def test_the_reason_becomes_plain_text(self):
+        text = "{{MMGWarning|Due to [[Grand exchange]] values for [[Vorkath's spike|spikes]], '''use caution'''.}}\n{{Mmgtable\n}}"
+        self.assertEqual(wiki_methods.page_warning(text), "Due to Grand exchange values for spikes, use caution.")
+
+    def test_no_warning_and_no_reason_are_told_apart(self):
+        self.assertIsNone(wiki_methods.page_warning("{{Mmgtable\n}}"))
+        self.assertEqual(wiki_methods.page_warning("{{MMGWarning}}\n{{Mmgtable}}"), "")
+
+    def test_a_warning_inside_the_versions_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "below a guide table"):
+            wiki_methods.page_warning("<tabber>\nA=\n{{MMGWarning|Only this one}}\n</tabber>")
+
+        with self.assertRaisesRegex(ValueError, "more than one"):
+            wiki_methods.page_warning("{{MMGWarning|a}}{{MMGWarning|b}}")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,7 @@
 -- The browser's state and ordering, with no native UI objects in here. It owns
 -- the current filters, the return-to-list position and estimates for this window.
 -- Opening/reopening captures prices; filtering never fetches prices.
+local Recommendations = require("src/methods/recommendations")
 local Browser = {}
 
 -- Filter levels for the Intensity and Difficulty dropdowns. The source says both
@@ -259,6 +260,10 @@ function Browser.new(methods, preferences, estimateMethod)
 
     self:loadFavourites()
     self.message = self.message or warning
+
+    -- Recommend for me's state lives here too, so a trip to a method page and
+    -- Back (which rebuilds the screen) keeps the same suggestion on show.
+    self.recommendations = Recommendations.new(methods, self, preferences)
 
     return self
 end

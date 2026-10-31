@@ -268,7 +268,7 @@ return function(test, equal, client, pretty)
 
         local detail = prettyui.views[3]
         prettyui:findButton("Add favourite")()
-        detail.buttons["Back to methods"]()
+        detail.buttons["Back to activities"]()
 
         local returned = prettyui.views[4]
         equal(returned.children[2].fields[1]:GetText(), "steel")
@@ -351,14 +351,14 @@ return function(test, equal, client, pretty)
         -- The method page has no such button: that's for recommendations.
         prettyui:findMethod("Smelting steel bars")()
         equal(prettyui.views[3].buttons["Don't recommend"], nil)
-        prettyui.views[3].buttons["Back to methods"]()
+        prettyui.views[3].buttons["Back to activities"]()
         returned = prettyui.views[4]
 
         local function row(title)
             for index = #prettyui.allViews, 1, -1 do
                 local candidate = prettyui.allViews[index]
 
-                if not candidate.destroyed and candidate.buttons["View method"] then
+                if not candidate.destroyed and candidate.buttons["View activity"] then
                     for _, label in ipairs(candidate.texts) do
                         if label.content == title then
                             return candidate
@@ -389,7 +389,7 @@ return function(test, equal, client, pretty)
 
         local account = list(returned)
         assert(says(account, "My account"))
-        account.children[1].buttons["Recommend again"]()
+        prettyui:findButton("Recommend again")()
         assert(says(list(returned), "Nothing here"), "Recommended again, so the list is empty")
 
         -- An activity from My account opens Browse, with a new header.
@@ -405,7 +405,7 @@ return function(test, equal, client, pretty)
 
         prettyui:findButton("Skilling")()
         assert(liveHeader(), "The search box is back")
-        equal(liveHeader().texts[1].content, "Browse methods")
+        equal(liveHeader().texts[1].content, "Browse activities")
 
         -- Back in Browse, the steel row has no eye again.
         prettyui:findButton("All activities")()
@@ -510,7 +510,7 @@ return function(test, equal, client, pretty)
 
         local detail = prettyui.views[3]
         detail.tabs[1].pages[1]:allFields()[1]:SetText("1000", true)
-        detail.buttons["Back to methods"]()
+        detail.buttons["Back to activities"]()
         equal(calls, 33)
 
         -- An unsaved draft must not leak into saved-rate list comparisons.
@@ -616,28 +616,56 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
-    test("sidebar highlights match the active section and category independently", function()
+    -- Only the page gets the gold frame; the activity filter is marked by colour
+    -- and a lit bar on its left edge (muted and unlit otherwise), so it never
+    -- looks like a second page.
+    test("sidebar frames the active section and colours the chosen activity", function()
         client()
         prettyui = pretty()
         gepl = nil
 
+        local Style = require("src/ui/view_style")
         dofile("main.lua")
 
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui:findButton("Open Profit Path")()
 
         local sidebar = prettyui.views[2].children[1]
-        assert(sidebar.buttonControls.Browse.active)
-        assert(sidebar.buttonControls["All activities"].active)
+        local buttons = sidebar.buttonControls
+        assert(buttons.Browse.active)
+        assert(not buttons["All activities"].active)
+        equal(buttons["All activities"].textColour, Style.text)
+        equal(buttons.Skilling.textColour, Style.muted)
+
+        -- One bar per activity, in sidebar order; only the chosen one is lit
+        -- (a see-through bar has alpha 0).
+        local bars = sidebar.rectangles
+        local lit = function()
+            local on = {}
+
+            for index, bar in ipairs(bars) do
+                if bar.rgba & 0xFF ~= 0 then
+                    on[#on + 1] = index
+                end
+            end
+
+            return table.concat(on, ",")
+        end
+
+        equal(#bars, 5, "A bar for each activity")
+        equal(lit(), "1", "All activities is lit")
 
         sidebar.buttons.Skilling()
-        assert(sidebar.buttonControls.Skilling.active)
-        assert(not sidebar.buttonControls["All activities"].active)
+        assert(not buttons.Skilling.active)
+        equal(buttons.Skilling.textColour, Style.categories.skilling)
+        equal(buttons["All activities"].textColour, Style.muted)
+        equal(lit(), "3", "Only Skilling is lit")
+        equal(bars[3].rgba, Style.categories.skilling)
 
         sidebar.buttons.Favourites()
-        assert(sidebar.buttonControls.Favourites.active)
-        assert(not sidebar.buttonControls.Browse.active)
-        assert(sidebar.buttonControls.Skilling.active)
+        assert(buttons.Favourites.active)
+        assert(not buttons.Browse.active)
+        equal(buttons.Skilling.textColour, Style.categories.skilling)
 
         PluginShutdown()
     end)
@@ -685,7 +713,7 @@ return function(test, equal, client, pretty)
         local rows = 0
 
         for _, row in ipairs(prettyui.allViews) do
-            if not row.destroyed and row.buttons["View method"] then
+            if not row.destroyed and row.buttons["View activity"] then
                 local fill, accent = row.rectangles[1], row.rectangles[2]
                 local title
 
@@ -797,7 +825,7 @@ return function(test, equal, client, pretty)
         local rows = 0
 
         for _, row in ipairs(prettyui.allViews) do
-            if not row.destroyed and row.buttons["View method"] then
+            if not row.destroyed and row.buttons["View activity"] then
                 equal(row.size.width, 580)
                 equal(row.size.height, 96)
                 rows = rows + 1
@@ -855,7 +883,7 @@ return function(test, equal, client, pretty)
         prettyui:findMethod("Smelting steel bars")()
         local steel = prettyui.views[#prettyui.views]
         equal(steel.nativeLists, nil)
-        steel.buttons["Back to methods"]()
+        steel.buttons["Back to activities"]()
 
         -- Elder logs has two versions. Open the one without spirits.
         prettyui:findMethod("Without wood spirits")()
@@ -945,7 +973,7 @@ return function(test, equal, client, pretty)
         equal(rebuilt.tabs[1].pages[1]:allFields()[1]:GetText(), "1500", "Draft rate survives")
 
         -- Opening a different method starts on Income again.
-        rebuilt.buttons["Back to methods"]()
+        rebuilt.buttons["Back to activities"]()
         prettyui:findMethod("Cutting elder logs")()
         equal(prettyui.views[#prettyui.views].tabs[1].activeIndex, 1)
 
@@ -1019,14 +1047,14 @@ return function(test, equal, client, pretty)
         equal(state.db["profit-path.browser.v1"].sort, "roi")
         equal(state.db["profit-path.browser.v1"].descending, false)
 
-        -- Only Profit and ROI to sort by; difficulty and intensity are their own
-        -- filter dropdowns. Entry 3 under difficulty is "Hard" (IDs count from 0), and none of the
+        -- Only Profit and ROI to sort by; intensity, requirements and difficulty
+        -- (last) are their own filter dropdowns. Entry 3 under difficulty is "Hard" (IDs count from 0), and none of the
         -- bundled methods has a difficulty rating, so the list empties.
         equal(#header.nativeLists, 5)
         equal(sort.entries.Difficulty, nil)
         equal(sort.entries.ROI, 1)
 
-        local difficulty = header.nativeLists[3]
+        local difficulty = header.nativeLists[5]
         equal(difficulty.entries.Any, 0)
         equal(difficulty.selectedID, 0, "Filters start on Any")
         equal(header.nativeLists[4].selectedID, 0)
@@ -1049,11 +1077,12 @@ return function(test, equal, client, pretty)
 
         difficulty:SetEntrySelected(3, true)
         Event.Logic.emit({})
-        assert(shownText():find("0 matching methods", 1, true), "Hard should filter out every unrated method")
+        assert(shownText():find("0 matching activities", 1, true), "Hard should filter out every unrated method")
 
         difficulty:SetEntrySelected(0, true)
         Event.Logic.emit({})
-        assert(not shownText():find("0 matching methods", 1, true), "Any brings them back")
+        assert(not shownText():find("0 matching activities", 1, true), "Any brings them back")
+
 
         local afterClick = sort.selectionWrites
         sort.callback(sort, 1, ui.SelectionChangeEvent.SELECTED)
@@ -1072,6 +1101,29 @@ return function(test, equal, client, pretty)
         equal(state.db["profit-path.browser.v1"].sort, "roi")
 
         state.failWrite = false
+
+        -- Difficulty only rates PvM: it's last, and only on All activities and
+        -- PvM. Leaving for Skilling drops it, and the picked difficulty with it.
+        local function liveFilters()
+            for _, child in ipairs(prettyui.views[2].children) do
+                if not child.destroyed and child.nativeLists and #child.nativeLists > 0 then
+                    return child
+                end
+            end
+        end
+
+        difficulty:SetEntrySelected(3, true)
+        Event.Logic.emit({})
+        prettyui:findButton("Skilling")()
+        equal(#liveFilters().nativeLists, 4)
+        assert(not shownText():find("DIFFICULTY", 1, true), "No Difficulty caption on Skilling")
+        assert(not shownText():find("0 matching activities", 1, true), "The hidden difficulty doesn't filter Skilling")
+
+        prettyui:findButton("PvM")()
+        equal(#liveFilters().nativeLists, 5)
+        equal(liveFilters().nativeLists[5].selectedID, 0, "Back to Any")
+        prettyui:findButton("All activities")()
+
         PluginShutdown()
         sort.callback(sort, 3, ui.SelectionChangeEvent.SELECTED)
         equal(state.db["profit-path.browser.v1"].sort, "roi", "Discard late native selection callbacks")
@@ -1449,7 +1501,7 @@ return function(test, equal, client, pretty)
         assert(type(ratePanel.buttonControls["Reset to source rate"].sprite) == "number")
 
         income:allFields()[1]:SetText("200", true)
-        detail.buttons["Back to methods"]()
+        detail.buttons["Back to activities"]()
         save()
         equal(preferences:loadRate(method), 100)
         PluginShutdown()
@@ -1531,9 +1583,9 @@ return function(test, equal, client, pretty)
         equal(Event.Logic.count(), 1)
 
         -- Leaving before it's done stops the drawing.
-        prettyui.views[#prettyui.views].buttons["Back to methods"]()
+        prettyui.views[#prettyui.views].buttons["Back to activities"]()
         prettyui:findMethod("Killing abyssal demons")()
-        prettyui.views[#prettyui.views].buttons["Back to methods"]()
+        prettyui.views[#prettyui.views].buttons["Back to activities"]()
         equal(Event.Logic.count(), 1)
 
         PluginShutdown()
@@ -1699,7 +1751,7 @@ return function(test, equal, client, pretty)
         for index = #prettyui.allViews, 1, -1 do
             local row = prettyui.allViews[index]
 
-            if not row.destroyed and row.buttons["View method"] then
+            if not row.destroyed and row.buttons["View activity"] then
                 local isDemons = false
 
                 for _, label in ipairs(row.texts) do

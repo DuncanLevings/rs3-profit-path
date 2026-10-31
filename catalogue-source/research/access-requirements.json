@@ -232,6 +232,56 @@
    "sources": [],
    "review": "The pinned guide explicitly states Skill None and Quest None. Wool is the priced input and the spinning wheel is a public workstation; the cash recommendation is not an unlock. This reviewed empty access list may pass.",
    "requirement_free": true
+  },
+  {
+   "id": "collecting-honeycomb.standard",
+   "page": "Money making guide/Collecting honeycomb",
+   "version": "",
+   "revision": 36473406,
+   "required": [
+    "item:Insect repellent"
+   ],
+   "additional_required": [],
+   "notes": [],
+   "sources": [],
+   "review": "The guide's plain \"Insect repellent\" is the single item Insect repellent (ID 28) (RuneScape Wiki item lookup, 30 October 2026)."
+  },
+  {
+   "id": "killing-red-dragons.standard",
+   "page": "Money making guide/Killing red dragons",
+   "version": "",
+   "revision": 36806824,
+   "required": [
+    "skill:AGILITY:30",
+    "item:Recommended equipment for PvM/Ranged",
+    "item:Recommended equipment for PvM/Ranged",
+    {
+     "req": [
+      "any",
+      "item:TokKul-Zo (Charged)",
+      "item:TokKul-Zo (Uncharged)"
+     ],
+     "text": "TokKul-Zo"
+    }
+   ],
+   "additional_required": [],
+   "notes": [],
+   "sources": [],
+   "review": "TokKul-Zo has charged (23643) and uncharged (23644) versions; owning either counts (RuneScape Wiki item lookup, 30 October 2026)."
+  },
+  {
+   "id": "mining-runite-ore.free-to-play",
+   "page": "Money making guide/Mining runite ore",
+   "version": "Free to play",
+   "revision": 37010989,
+   "required": [
+    "skill:MINING:50",
+    "item:Rune ore box"
+   ],
+   "additional_required": [],
+   "notes": [],
+   "sources": [],
+   "review": "The guide's plain \"Rune ore box\" is the single item Rune ore box (ID 44789) (RuneScape Wiki item lookup, 30 October 2026)."
   }
  ]
 }

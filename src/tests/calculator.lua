@@ -819,7 +819,7 @@ return function(test, equal, client, pretty)
         end
 
         -- After Back, the old screen is destroyed and its controls must do nothing.
-        detail.buttons["Back to methods"]()
+        detail.buttons["Back to activities"]()
         assert(detail.destroyed and income.destroyed)
 
         rate:SetText("5", true)
@@ -901,7 +901,7 @@ return function(test, equal, client, pretty)
         assert(found)
 
         -- Navigating swaps the content but keeps the same window.
-        detail.buttons["Back to methods"]()
+        detail.buttons["Back to activities"]()
 
         equal(#prettyui.windows, 1)
         assert(not window.destroyed)

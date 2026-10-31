@@ -365,7 +365,8 @@ function App.start()
         end
     end
 
-    -- The UI reads the same evidence used by Browse. A saved bank hint isn't added
+    -- The UI reads the same evidence used by Browse. (A closed bank counts as it
+    -- was last seen open; see readOwnership.) A saved backpack hint isn't added
     -- to live counts and can never turn an unknown requirement into a pass.
     function calculator:ownership()
         local result = self.ownershipEvidence or { counts = {}, complete = false }

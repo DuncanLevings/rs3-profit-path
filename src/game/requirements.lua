@@ -8,6 +8,12 @@
 --   "unmet"   - we have evidence they don't
 --   "unknown" - we can't tell (logged out, data missing, check not built yet...)
 -- The golden rule: missing data is "unknown", never quietly "unmet" or "met".
+--
+-- Some checks the game can never answer for a plugin: perks, unlocks with no
+-- readable game value, "be skulled", "a light source". Those are marked
+-- `ignored`: the method page still lists them (neutral, for the player to check
+-- themselves), but they're left out of a method's overall Met/Missing, so they
+-- can't keep a method out of Browse's Met filter or out of recommendations.
 local Requirements = {}
 
 -- Builds the result table every check returns, keeping the original wording so the
@@ -42,13 +48,16 @@ function Requirements.evaluate(requirement, account)
     -- Groups: check every child first, then combine their answers.
     if kind == "all" or kind == "any" then
         local children = {}
-        local met, unmet, unknown = 0, 0, 0
+        local met, unmet, unknown, ignored = 0, 0, 0, 0
 
         for index, child in ipairs(requirement.children) do
             local checked = Requirements.evaluate(child, account)
             children[index] = checked
 
-            if checked.status == "met" then
+            -- Left out of the count (see the top of this file).
+            if checked.ignored then
+                ignored = ignored + 1
+            elseif checked.status == "met" then
                 met = met + 1
             elseif checked.status == "unmet" then
                 unmet = unmet + 1
@@ -62,6 +71,13 @@ function Requirements.evaluate(requirement, account)
         -- Otherwise any unknown child makes the whole group unknown.
         local status
         local reason
+
+        -- Nothing in the group can be checked: the whole group is ignored too.
+        if ignored > 0 and ignored == #children then
+            local checked = result(requirement, "unknown", "Check this yourself; the game doesn't tell plugins.", nil, children)
+            checked.ignored = true
+            return checked
+        end
 
         if kind == "all" then
             reason = "All listed requirements must be met."
@@ -77,8 +93,14 @@ function Requirements.evaluate(requirement, account)
             reason = "One listed alternative must be met."
 
             -- An empty ANY has no alternatives to pass, which tells us nothing.
+            -- An alternative we can't check might be the one the player has, so
+            -- it stops the group from being Missing.
             if met > 0 then
                 status = "met"
+            elseif ignored > 0 then
+                local checked = result(requirement, "unknown", "Check this yourself; the game doesn't tell plugins.", nil, children)
+                checked.ignored = true
+                return checked
             elseif unknown > 0 or #children == 0 then
                 status = "unknown"
             else
@@ -249,12 +271,11 @@ function Requirements.evaluate(requirement, account)
 
         local checked
 
-        -- Some low-tier item IDs couldn't be resolved in the source. An owned
-        -- match still passes above; their absence cannot prove a low-tier failure.
-        local belowCoverage = (requirement.minimum_tier or 0) < (group.minimum_complete_tier or 0)
-
-        if uncertain or not group.complete or belowCoverage then
-            checked = result(requirement, "unknown", group.note or "Equipment coverage is incomplete.")
+        -- Every place was read and none of the listed items is there: Missing.
+        -- (The lists cover the items players really use; a rare variant we
+        -- don't list would show as Missing, which is the safe way round.)
+        if uncertain then
+            checked = result(requirement, "unknown", "Some of your items haven't been read yet; open your bank once.")
         else
             checked = result(requirement, "unmet", "No usable matching equipment was found in checked storage.")
         end
@@ -293,27 +314,24 @@ function Requirements.evaluate(requirement, account)
         return result(requirement, "unmet", "Owned quantity is below the requirement.", evidence)
     end
 
-    -- Unmapped gear or unlocks like prayers need verified client mappings first,
-    -- so for now we're honest and say "unknown".
-    return result(requirement, "unknown", "This requirement is not supported yet.")
+    -- Unlocks the game doesn't tell plugins about (perks, places, upgrades):
+    -- listed for the player to check, and left out of Met/Missing.
+    local checked = result(requirement, "unknown", "Check this yourself; the game doesn't tell plugins.")
+    checked.ignored = true
+    return checked
 end
 
--- Checks listed access requirements without treating an incomplete empty list
--- as proof that a method has no requirements. Plain required notes also need the
--- player's judgement; they aren't passes just because we can't evaluate them.
+-- A method's overall verdict from its Required list. A guide that lists nothing
+-- required is Met. Checks only the player can judge (plain notes like "Combat
+-- equipment", and anything ignored above) are left out, so a method whose only
+-- requirements are those is Met too: the method page still lists them.
 function Requirements.evaluateAccess(requirements, account)
     local checked = Requirements.evaluate(requirements.access, account)
 
-    if checked.status ~= "met" then
-        return checked
-    end
-
-    local emptyIncomplete = #requirements.access.children == 0 and requirements.coverage ~= "complete"
-    local unchecked = #(requirements.notes or {}) > 0 or #(requirements.unresolved or {}) > 0
-
-    if emptyIncomplete or unchecked then
-        checked.status = "unknown"
-        checked.reason = "Required information is incomplete or needs your judgement."
+    if checked.ignored then
+        checked.status = "met"
+        checked.ignored = nil
+        checked.reason = "Nothing the game can check is missing."
     end
 
     return checked

@@ -48,7 +48,10 @@ function UI.new(library, account, calculator, browser)
 
         if self.methodRefresh then
             self.methodRefresh(reason)
-        elseif self.browseRefresh and browser.availability ~= "any" and calculator.accessChanged then
+        elseif self.browseRefresh and calculator.accessChanged
+            and (browser.availability ~= "any" or browser.section == "recommend") then
+            -- A requirement changing can change what's recommended, so the card
+            -- follows account reads too (it keeps its suggestion while that still fits).
             self.browseRefresh()
         end
     end
@@ -171,7 +174,7 @@ function UI.new(library, account, calculator, browser)
                     navigate("method")
                 end)
             else
-                local backOptions = { tooltip = "Back to methods", size = 24 }
+                local backOptions = { tooltip = "Back to activities", size = 24 }
 
                 -- Back shares the title row with the method's name.
                 if self.screen == "method" then
@@ -423,7 +426,7 @@ function UI.new(library, account, calculator, browser)
 
         local ok, failure = pcall(function()
             launcher:AddTitle("Profit Path")
-            launcher:AddText("Browse money-making methods and calculate income in the Profit Path window.")
+            launcher:AddText("Browse money-making activities and calculate income in the Profit Path window.")
 
             -- Shows why opening failed (e.g. not logged in yet); empty otherwise.
             local status = launcher:AddText({ text = "", height = 80 })

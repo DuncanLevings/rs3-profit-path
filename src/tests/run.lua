@@ -417,10 +417,10 @@ local function pretty()
         for index = #self.allViews, 1, -1 do
             local row = self.allViews[index]
 
-            if not row.destroyed and row.buttons["View method"] then
+            if not row.destroyed and row.buttons["View activity"] then
                 for _, label in ipairs(row.texts) do
                     if label.content:find(title, 1, true) then
-                        return row.buttons["View method"]
+                        return row.buttons["View activity"]
                     end
                 end
             end
@@ -467,6 +467,19 @@ local function pretty()
             return label
         end
 
+        -- PrettyUI's spinner animates itself; the fake just records it.
+        function view:AddSpinner(options)
+            local spinner = { options = options }
+            self.spinners = self.spinners or {}
+            self.spinners[#self.spinners + 1] = spinner
+
+            function spinner:Destroy()
+                self.destroyed = true
+            end
+
+            return spinner
+        end
+
         function view:AddSprite(resource, options)
             local sprite = { resource = resource, options = options }
             self.sprites = self.sprites or {}
@@ -489,7 +502,12 @@ local function pretty()
             self.buttons[text] = callback
 
             -- PrettyUI exposes SetText on its button; keep the lookup in sync.
-            local button = { active = options and options.active == true, sprite = sprite }
+            local button = {
+                active = options and options.active == true, sprite = sprite,
+                disabled = options and options.disabled == true,
+                -- PrettyUI's native layer; anything drawn on it belongs to this view.
+                root = { testOwner = self },
+            }
 
             function button:SetActive(active)
                 self.active = active
@@ -1582,12 +1600,71 @@ test("item presence caches requested totals and invalidates the changed containe
     equal(account:readOwnership(wanted).complete, false)
 end)
 
+-- The game only sends the bank while it's open. A closed bank counts as it was
+-- last seen open: from this session, or saved from an earlier one.
+test("a closed bank counts as it was last seen open, this session or saved", function()
+    client()
+    local bankOpen = true
+    local reads = 0
+
+    Inventory.Find = function(definition)
+        if definition.configName == "BANK" and not bankOpen then
+            return nil
+        end
+
+        return {
+            isValid = true,
+            GetTotal = function()
+                reads = reads + 1
+                return 0
+            end,
+        }
+    end
+
+    local account = Account.new(function() end)
+    local wanted = { [43] = true }
+    equal(account:readOwnership(wanted).complete, true)
+    equal(reads, 3)
+
+    -- Closing the bank: no new bank read, and the item is still proven absent.
+    bankOpen = false
+    Event.InventoryRemoved.emit({ inv = config.Inv.BANK })
+    local closed = account:readOwnership(wanted)
+    equal(closed.complete, true)
+    equal(closed.counts[43], 0)
+    equal(closed.sources.BANK, "from your last bank visit")
+    equal(reads, 3)
+
+    -- With nothing saved, a logout leaves the bank unknown until it's opened.
+    Event.GameStateChanged.emit({})
+    local after = account:readOwnership(wanted)
+    equal(after.complete, false)
+    equal(after.sources.BANK, "unavailable")
+    account:destroy()
+
+    -- After a logout, the saved bank (zeros included) does the same job.
+    local saved = { data = { BANK = { [43] = 0, [44] = 2 } } }
+    function saved:observe() end
+    function saved:unbind() end
+
+    local relogged = Account.new(function() end, saved)
+    local fromSave = relogged:readOwnership(wanted)
+    equal(fromSave.complete, true)
+    equal(fromSave.counts[43], 0)
+    equal(fromSave.sources.BANK, "from your last bank visit")
+
+    -- A save that never checked an item can't say it's missing.
+    equal(relogged:readOwnership({ [45] = true }).complete, false)
+    relogged:destroy()
+end)
+
 -- The calculator, saved-rate and window tests live in their own file but share
 -- these helpers.
 dofile("src/tests/calculator.lua")(test, equal, client, pretty)
 dofile("src/tests/browser.lua")(test, equal, client, pretty)
 
 dofile("src/tests/account.lua")(test, equal, client, pretty)
+dofile("src/tests/recommendations.lua")(test, equal, client, pretty)
 
 -- Last: the full shipped catalogue. test.py gave the tests above just our 4
 -- curated methods; forget every loaded plugin module (and that catalogue) so

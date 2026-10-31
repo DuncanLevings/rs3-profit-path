@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.8.26-dev - 2026-10-30
+
+- Removed Mega Shop Run (Daily and Weekly). With 51 shop items per version, its activity page ran out of the client's interface parts ("invalid dynamic ID") when opened. Income rows keep their icons with name tooltips.
+- The chosen activity in the sidebar is easier to spot: besides its colour, it has a matching bar down its left edge. The page you're on keeps the gold frame.
+
+## 0.8.25-dev - 2026-10-30
+
+- The sidebar no longer looks like two items are selected. The page you're on (Browse, Recommend, ...) keeps its frame, and the chosen activity group is shown by its colour alone.
+
+## 0.8.24-dev - 2026-10-30
+
+- Activities the RuneScape Wiki marks as risky now say so, like the Wiki's own warning box. 41 guide pages carry one (e.g. Smelting primal bars, Tanning hides, Telos, Zemouregal & Vorkath), on every version. The activity's Income tab opens with the Wiki's warning about considerable risks (loss of money and goods, price volatility, low GE sales volume) and the guide's own reason; Browse rows add "Wiki warning"; a recommendation card adds a red Warning row.
+
+## 0.8.23-dev - 2026-10-30
+
+- Browse's Difficulty filter is now the last dropdown (after Intensity and Requirements) and only shows on All activities and PvM. Switching to Skilling, Production or Recurring hides it and resets it to Any, so a PvM difficulty never empties those lists.
+- Recommend for me's card no longer has the "1 of N matches" line.
+
+## 0.8.22-dev - 2026-10-30
+
+- 28 more PvM guides have a 1-10 level from the ladder follow-up: the Telos and hard-mode Arch-Glacor 200 killstreaks 9, hard-mode Arch-Glacor streaking 5, Giant Mimic 2-5 by difficulty, and the minor Slayer creatures 1-3 (blood reavers and ravenous ghouls 3, as their guides farm many at once). They show no "once practised" level, as the follow-up gives one number. Only Making sacred oil and Scavenging are still band-only.
+- Beastmaster Durzag is a group raid (solo isn't feasible): it's marked "Raid team" and is level 5, practised 4, from the research's raid DPS row.
+- Giant Mole (free-to-play hard mode) is level 2 (Easy), lowered from the research's 3 in gameplay review.
+
+## 0.8.21-dev - 2026-10-30
+
+- PvM difficulty is now a 1-10 ladder from the October 2026 difficulty research: 152 of the 182 rated guide versions have a level (how hard to learn) and a practised level, with the research row quoted as evidence. Browse keeps its four Difficulty filters, now worked out from the level (1-2 Easy, 3-4 Medium, 5-7 Hard, 8-10 Elite), so some methods move band; rows show the level, e.g. "Hard 6/10". The 30 guides the research doesn't cover keep their earlier band and show no number.
+- Recommend for me's PvM comfort is picked from the ten ladder levels, each with its name and example bosses ("4: Intermediate - Gregorovic, the Magister, rune dragons..."). Learning opportunities are the next level up. A method without a level counts as the hardest level in its band. A comfort saved by an earlier build carries over as the top of its band. The card's Difficulty row reads e.g. "6 of 10: Upper intermediate (4 once practised)".
+
+## 0.8.20-dev - 2026-10-30
+
+- On-screen wording says "activity" instead of "method": Browse activities, Search activities, "N matching activities", FIND AN ACTIVITY, View activity, Back to activities, Activity steps, hidden activities and the Recommend for me texts. PvM, Skilling, Production and Recurring keep their names. Code, data and saved settings are unchanged.
+
+## 0.8.19-dev - 2026-10-30
+
+- Recommend for me's activity heading is now one filled strip: the activity name large in its colour, the settings the suggestion follows as small chips underneath (PvM comfort, learning opportunities, solo/group), and Change activity and a new Preferences button (opens My account) side by side on the right. The old "... Change these in My account." sentence is gone.
+
+## 0.8.18-dev - 2026-10-30
+
+- Recommend for me's activity choice is a 2x2 grid of large tiles (PvM, Skilling, Production, Recurring), and clicking Recommend for me in the sidebar always starts there. Back from a method still returns to the same suggestion.
+- The suggestion card is taller and clearer: the profit is the headline, in the client's largest text with a coin and "profit per hour" (or per run) underneath; the method's name is bigger, with its version on its own line; then Requirements (Met), Difficulty, Group and Intensity as label-and-value rows. "Within your comfort" is gone; only a learning opportunity is labelled.
+- Show another pauses for half a second on a spinner ("Finding another...") before the next suggestion appears.
+
+## 0.8.17-dev - 2026-10-30
+
+- New Recommend for me sidebar section. Pick an activity (PvM, Skilling, Production or Recurring) and get one suggestion at a time, with View method, Show another and Don't recommend (with an immediate Undo). The card says why: whether your requirements are all met or need the bank opened once, the PvM difficulty against your comfort, solo or the group size, and how many methods matched.
+- What's suggested: methods of that activity whose Required checks aren't missing, that don't lose money at today's prices (unpriced ones are allowed, last), and that you haven't said not to recommend. PvM goes up to your comfort level, plus the next level as labelled learning opportunities if you want them. Recommended gear never keeps a method out. Order: within comfort first, solo before groups when solo is preferred, fully met before needs-checking, then most profitable. No scores or success guesses.
+- Variety: methods you haven't been shown come before repeats, a new request never repeats the one just shown when there's another, and the history is saved per character, so it carries on after a reload. Back from a method keeps the same suggestion; a price change doesn't swap it, but one that stops matching is replaced and the screen says so.
+- PvM asks "How much bossing have you done?" the first time you pick it (New to bossing, GWD2-level, Elite dungeon-level or Experienced); nothing else asks. My account now has PvM comfort, harder learning opportunities (Show / Don't show) and Solo and group (Solo preferred, Solo only, or Solo and groups equally), saved per character.
+
+## 0.8.16-dev - 2026-10-30
+
+- A closed bank now counts as it was last seen open. The game only lets plugins read the bank while it's open, so before, closing it put every missing item back to "can't tell" and most methods dropped out of both the Met and Missing filters. Within a login the last read is used; after logging out, the bank saved for that character. Opening the bank replaces it. No extra storage reads: the saved bank is read once when your character is identified, and the check that it covers every catalogue item is cached.
+- Every method now reads as Met or Missing once the bank has been read (216 and 460 of 676 on a simulated mid-level account, none left over). A guide that lists nothing required is Met. Hatchet, pickaxe and gear-tier checks can say Missing when none of the listed items is anywhere. Insect repellent, Rune ore box and TokKul-Zo are real item checks now. Unlocks the game doesn't tell plugins about (perks, places, shop upgrades, "be skulled", "a light source") stay on the method page as neutral lines to check yourself but no longer decide Met or Missing; a method also missing a real check is still Missing, and an either-or with an unreadable option is never Missing.
+- Groundwork for Recommend for me: the 15 group methods (duo/trio/team versions, Rise of the Six, Croesus) carry their team size from `catalogue-source/research/teams.json`, and comfort, solo/group and rotation history can be saved per profile. Nothing shows these yet.
+
 ## 0.8.15-dev - 2026-10-30
 
 - Groundwork for "Don't recommend", which will be on Recommend for me's suggestions: a per-profile list of methods to skip. A listed method stays in Browse and Favourites, where its row reads "Not recommended" with an eye to recommend it again.

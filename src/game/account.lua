@@ -21,6 +21,13 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         -- "BANK"). Each entry is { configId, counts = { [itemId] = total } } and is
         -- thrown away as soon as that container changes. Lives only in memory.
         ownershipCache = {},
+
+        -- The last bank read made while the bank was open, this login session.
+        -- The game only lets us read the bank while it's open, but a bank doesn't
+        -- change while it's closed (bar deposit boxes, familiars and playing on
+        -- another device), so the last read keeps counting after it closes. After
+        -- a logout the saved bank (account_snapshot.lua) takes over the same way.
+        sessionBank = nil,
         snapshot = snapshot,
         questVariables = {},
         toolbeltBindings = toolbeltBindings or {},
@@ -224,9 +231,53 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
                 return { configId = definition.id, counts = counts }
             end)
 
-            if ok and read then
+            -- The bank is closed: use the last time it was open, from this session
+            -- or saved from an earlier one. It must cover every wanted item (zeros
+            -- included), or it can't say what's missing.
+            --
+            -- Checking coverage walks every wanted item (thousands, with the gear
+            -- checks), so the answer is kept until the bank or the wanted set changes.
+            local lastBank
+
+            if not (ok and read) and name == "BANK" then
+                local saved = self.snapshot and self.snapshot.data.BANK
+                local counts = self.sessionBank and self.sessionBank.counts or saved
+                local known = self.bankCoverage
+
+                if counts and not (known and known.counts == counts and known.wanted == wanted) then
+                    local covered = true
+
+                    for itemId in pairs(wanted) do
+                        if counts[itemId] == nil then
+                            covered = false
+                            break
+                        end
+                    end
+
+                    known = { counts = counts, wanted = wanted, covered = covered }
+                    self.bankCoverage = known
+                end
+
+                if counts and known.covered then
+                    lastBank = { counts = counts }
+                end
+            end
+
+            if lastBank then
+                sources[name] = "from your last bank visit"
+                read = lastBank
+
+                for itemId in pairs(wanted) do
+                    totals[itemId] = (totals[itemId] or 0) + read.counts[itemId]
+                    lastKnownAbsent[itemId] = lastKnownAbsent[itemId] and read.counts[itemId] == 0
+                end
+            elseif ok and read then
                 self.ownershipCache[name] = read
                 sources[name] = "live"
+
+                if name == "BANK" then
+                    self.sessionBank = read
+                end
 
                 if self.snapshot then
                     self.snapshot:observe(name, read.counts)
@@ -275,6 +326,7 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
     -- Called only after Preferences has identified and bound the current player.
     function self:bindProfile(profile)
         self.ownershipCache = {}
+        self.sessionBank = nil
         self.questVariables = {}
         self.toolbeltCache = nil
         self.toolbeltVariables = {}
@@ -348,6 +400,7 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
 
         self.active = false
         self.ownershipCache = {}
+        self.sessionBank = nil
         self.toolbeltCache = nil
         self.toolbeltVariables = {}
 
@@ -481,6 +534,7 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         self.toolbeltCache = nil
         self.toolbeltVariables = {}
         self.ownershipCache = {}
+        self.sessionBank = nil
 
         notify("game_state")
     end)

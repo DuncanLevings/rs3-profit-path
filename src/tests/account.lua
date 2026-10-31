@@ -164,7 +164,10 @@ return function(test, equal, client, pretty)
         equal(snapshot.data.BANK, nil)
     end)
 
-    test("saved containers never add to live counts or to each other", function()
+    -- A closed bank counts as it was last seen (the game only sends it while
+    -- it's open). Saved worn gear or backpack are only hints: those are readable
+    -- live whenever the player is logged in.
+    test("a saved bank counts while the bank is closed; other saved containers stay hints", function()
         local state = client()
         local snapshot = Snapshot.new(PersistentDB)
         snapshot:bind("First")
@@ -181,15 +184,16 @@ return function(test, equal, client, pretty)
 
         local account = Account.new(function() end, snapshot)
         local result = account:readOwnership({ [42] = true })
-        equal(result.counts[42], 1)
+        equal(result.counts[42], 4)
         equal(result.savedCounts[42], 3)
         equal(result.complete, false)
-        equal(result.sources.BANK, "saved")
+        equal(result.sources.BANK, "from your last bank visit")
+        equal(result.sources.WORN, "saved")
         equal(result.sources.INV, "live")
         equal(state.db[key("First")], nil)
 
-        -- A live empty bank replaces its old hint. The worn snapshot remains
-        -- historical until that container is read too.
+        -- A live empty bank replaces the saved one. The worn snapshot remains
+        -- a hint until that container is read too.
         live.BANK = {}
         result = account:readOwnership({ [42] = true })
         equal(result.savedCounts[42], 3)
@@ -618,11 +622,17 @@ return function(test, equal, client, pretty)
         evidence.items[2].quantity = 0
         evidence.items[3].quantity = 0
         equal(Requirements.evaluate(check, evidence).status, "unmet")
+
+        -- The listed items are taken as the full list: with every place read and
+        -- none of them there, it's Missing even if the source called its list
+        -- incomplete. Only an unread place keeps it unknown.
         evidence.equipment.test.complete = false
+        equal(Requirements.evaluate(check, evidence).status, "unmet")
+        evidence.items[2].complete = false
         equal(Requirements.evaluate(check, evidence).status, "unknown")
     end)
 
-    test("an incomplete low-tier equipment range cannot prove absence", function()
+    test("a low tier gear check is missing when nothing listed is found anywhere", function()
         local check, evidence = equipmentFixture()
         check.minimum_tier = 20
         evidence.equipment.test.minimum_complete_tier = 60
@@ -631,7 +641,7 @@ return function(test, equal, client, pretty)
             owned.quantity = 0
         end
 
-        equal(Requirements.evaluate(check, evidence).status, "unknown")
+        equal(Requirements.evaluate(check, evidence).status, "unmet")
         evidence.items[2].quantity = 1
         equal(Requirements.evaluate(check, evidence).status, "met")
     end)
@@ -664,7 +674,10 @@ return function(test, equal, client, pretty)
         equal(Requirements.evaluate(alternatives, evidence).status, "met")
     end)
 
-    test("incomplete empty access lists and unchecked required notes cannot prove access", function()
+    -- Nothing listed is Met. Checks only the player can judge (plain notes, and
+    -- unlocks the game doesn't expose) are left out of Met/Missing, but never
+    -- hide a check that really is missing.
+    test("empty lists, notes and unreadable unlocks leave a method's verdict to what can be checked", function()
         local requirements = {
             coverage = "partial",
             access = { kind = "all", children = {} },
@@ -673,16 +686,29 @@ return function(test, equal, client, pretty)
             } },
         }
 
-        equal(Requirements.evaluateAccess(requirements, {}).status, "unknown")
-        requirements.coverage = "complete"
         equal(Requirements.evaluateAccess(requirements, {}).status, "met")
         requirements.notes = { "A required setup only the player can check" }
-        equal(Requirements.evaluateAccess(requirements, {}).status, "unknown")
-        requirements.access.children = {
-            { kind = "skill", skill = "MAGIC", level = 90, text = "90 Magic" },
-        }
+        equal(Requirements.evaluateAccess(requirements, {}).status, "met")
+
+        -- Only an unreadable unlock: Met, and the unlock itself stays neutral.
+        local perk = { kind = "capability", text = "Mobile" }
+        requirements.access.children = { perk }
+        local checked = Requirements.evaluateAccess(requirements, {})
+        equal(checked.status, "met")
+        equal(checked.children[1].status, "unknown")
+
+        -- With a real check that's missing, the method is Missing.
+        local magic = { kind = "skill", skill = "MAGIC", level = 90, text = "90 Magic" }
+        requirements.access.children = { perk, magic }
         local evidence = { skills = { MAGIC = { status = "available", level = 21 } } }
         equal(Requirements.evaluateAccess(requirements, evidence).status, "unmet")
+
+        -- "This or that", where "that" can't be read: it might be the one the
+        -- player has, so it's never Missing.
+        requirements.access.children = { { kind = "any", text = "Either", children = { magic, perk } } }
+        equal(Requirements.evaluateAccess(requirements, evidence).status, "met")
+        evidence.skills.MAGIC.level = 95
+        equal(Requirements.evaluateAccess(requirements, evidence).status, "met")
     end)
 
     test("Met filters listed checks independently of catalogue research coverage", function()
@@ -723,7 +749,7 @@ return function(test, equal, client, pretty)
         dofile("main.lua")
         Event.ContentLayerReady.emit({ component = { width = 1000, height = 740 } })
         prettyui:findButton("Open Profit Path")()
-        local filter = prettyui.views[2].children[2].nativeLists[5]
+        local filter = prettyui.views[2].children[2].nativeLists[4]
         filter:SetEntrySelected(1, true)
         Event.Logic.emit({})
         assert(prettyui:findMethod("Smelting steel bars"))
@@ -771,11 +797,11 @@ return function(test, equal, client, pretty)
         assert(prettyui:findMethod("Cutting elder logs"))
 
         local header = prettyui.views[2].children[2]
-        local requirementsFilter = header.nativeLists[5]
+        local requirementsFilter = header.nativeLists[4]
         equal(requirementsFilter.entries.All, 0)
         equal(requirementsFilter.entries.Met, 1)
-        equal(requirementsFilter.x, header.nativeLists[4].x + 140)
-        equal(requirementsFilter.y, header.nativeLists[4].y)
+        equal(requirementsFilter.x, header.nativeLists[3].x + 140)
+        equal(requirementsFilter.y, header.nativeLists[3].y)
         requirementsFilter:SetEntrySelected(1, true)
         Event.Logic.emit({})
         assert(not prettyui:findMethod("Cutting elder logs"))
@@ -842,7 +868,7 @@ return function(test, equal, client, pretty)
         end
     end)
 
-    test("closing checkpoints bank evidence and reload shows only a historical hint", function()
+    test("closing checkpoints bank evidence and a reload counts the saved bank", function()
         local state = client()
         prettyui = pretty()
         gepl = nil
@@ -861,8 +887,8 @@ return function(test, equal, client, pretty)
         equal(state.db[key("Default")].containers.BANK.counts["1359"], 1)
         PluginShutdown()
 
-        -- Reload with an unreadable bank: do not infer the same hatchet still
-        -- exists there, even though the saved record knows its last location.
+        -- Reload with the bank closed: it counts as it was last seen open, so
+        -- the banked hatchet is still owned.
         local database = state.db
         client(database)
         prettyui = pretty()
@@ -879,13 +905,19 @@ return function(test, equal, client, pretty)
         prettyui:findMethod("Cutting elder logs")()
         settleMethod()
         local requirements = prettyui.views[#prettyui.views].tabs[1].pages[2]
-        local foundHint = false
+        local Style = require("src/ui/view_style")
+        local hatchet
 
         for _, label in ipairs(requirements:allTexts()) do
-            foundHint = foundHint or label.content:find("Saved match - verify in game", 1, true) ~= nil
+            assert(not label.content:find("Saved match - verify in game", 1, true), "The saved bank isn't a mere hint")
+
+            if label.content:lower():find("hatchet", 1, true) then
+                hatchet = label
+            end
         end
 
-        assert(foundHint)
+        assert(hatchet, "The hatchet requirement is listed")
+        equal(hatchet.rgba, Style.good)
         PluginShutdown()
     end)
 

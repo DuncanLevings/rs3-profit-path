@@ -987,6 +987,26 @@ def validate_methods(source, monsters, recipes=None):
             if method["difficulty"] not in {"Easy", "Medium", "Hard", "Elite"} or method.get("category") != "pvm":
                 raise ValueError(f"{method_id}: difficulty is one of Easy/Medium/Hard/Elite, on PvM methods only")
 
+        # The 1-10 ladder levels come as a pair, on a rated method, and the band
+        # has to be the one the level falls in.
+        if "difficulty_level" in method or "farm_level" in method:
+            bands = {"Easy": (1, 2), "Medium": (3, 4), "Hard": (5, 7), "Elite": (8, 10)}
+            level, farm = method.get("difficulty_level"), method.get("farm_level")
+            low, high = bands.get(method.get("difficulty"), (0, -1))
+
+            ok = all(type(value) is int and 1 <= value <= 10 for value in (level, farm))
+
+            if not ok or farm > level or not low <= level <= high:
+                raise ValueError(f"{method_id}: difficulty_level/farm_level are 1-10, farm no harder, inside the band")
+
+        # A group method's team, e.g. "Duo" (see catalogue-source/research/teams.json).
+        if "team" in method:
+            require_text(method["team"], "Method team")
+
+        # The Wiki's risk warning reason (see catalogue-source/wiki/warnings.json).
+        if "warning" in method:
+            require_text(method["warning"], "Method warning")
+
         require_text_list(method.get("instructions"), "Method instructions")
 
         location = require_record(method.get("location"), "Method location")

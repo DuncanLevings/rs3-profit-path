@@ -1,5 +1,6 @@
 -- Everything Profit Path saves: personal rates, favourites, methods hidden from
--- recommendations, which character uses which profile, and the browser's sort choice.
+-- recommendations, Recommend for me's settings and history, which character uses
+-- which profile, and the browser's sort choice.
 --
 -- How profiles work: PersistentDB is shared by every character on this computer,
 -- so saved rates and favourites live under a "profile". When a window opens we
@@ -17,10 +18,35 @@ local BROWSER_KEY = "profit-path.browser.v1"
 local CHARACTERS_KEY = "profit-path.characters.v1"
 local FAVOURITES_KEY = "profit-path.favourites.v1"
 local HIDDEN_KEY = "profit-path.hidden.v1"
+local RECOMMEND_KEY = "profit-path.recommend.v1"
 
 -- Difficulty and intensity used to be sorts too; they're filters now, so an old
 -- saved "difficulty"/"intensity" sort just falls back to the profit default.
 local sortKeys = { profit = true, roi = true }
+
+-- Recommend for me's settings, and what a fresh profile starts with. Comfort is
+-- the hardest PvM level (1-10) the player is happy with (nil until they're
+-- asked); learning shows the next level up as labelled learning opportunities;
+-- group is "solo-preferred" (groups allowed, after solo), "solo-only" or "either".
+local function validComfort(level)
+    -- Stored numbers can come back as floats (4.0), so check the value, not the type.
+    return type(level) == "number" and level == math.floor(level) and level >= 1 and level <= 10
+end
+
+-- Builds before the 1-10 ladder saved one of four bands. Each becomes the top
+-- of its band, so "GWD2-level bosses" still means what the player picked.
+local oldComfort = { Easy = 2, Medium = 4, Hard = 7, Elite = 10 }
+local groupChoices = { ["solo-preferred"] = true, ["solo-only"] = true, either = true }
+local activities = { pvm = true, skilling = true, production = true, recurring = true }
+
+local function recommendDefaults()
+    return { comfort = nil, learning = true, group = "solo-preferred", history = {} }
+end
+
+-- The same rule as favourites use for a stored method ID.
+local function validId(id)
+    return type(id) == "string" and id:match("^[a-z0-9][a-z0-9._-]*$") ~= nil
+end
 
 -- Older builds let players type a profile name, stored at PROFILE_KEY. We only
 -- read it now, so the first character keeps those settings. It was limited to
@@ -92,7 +118,7 @@ function Preferences.new(db)
 
     -- Favourites and hidden methods are both just a set of method IDs, saved as
     -- { schema = 1, ids = { [id] = true } }. These two helpers load and save one.
-    -- `what` names the list in messages ("Favourites", "Hidden methods").
+    -- `what` names the list in messages ("Favourites", "Hidden activities").
     --
     -- Loading keeps valid IDs even if they aren't in this bundle, so an update
     -- won't erase choices. It returns ids, warning, writable. `writable` is false
@@ -367,6 +393,128 @@ function Preferences.new(db)
         return true
     end
 
+    -- Recommend for me's record for this profile: settings plus, per activity,
+    -- the rotation history { shown = { id, ... }, last = id }. "shown" is every
+    -- method suggested in the current cycle, so unseen ones come first; "last" is
+    -- the latest suggestion, so a new request doesn't repeat it straight away.
+    --
+    -- Returns record, warning, writable, like loadIds: valid fields survive a
+    -- partly broken record, and an unreadable one is never written over.
+    function self:loadRecommend()
+        local key = profileKey(RECOMMEND_KEY)
+        local record = recommendDefaults()
+
+        local success, stored, exists = pcall(function()
+            return db:GetStructuredData(key), db:CheckExists(key)
+        end)
+
+        if not success then
+            return record, "Recommendation settings could not be loaded: " .. tostring(stored), false
+        end
+
+        if stored == nil and not exists then
+            return record, nil, true
+        end
+
+        if type(stored) ~= "table" or stored.schema ~= 1 then
+            return record, "Saved recommendation settings have an unsupported format; no changes were made.", false
+        end
+
+        -- Take each field on its own; anything odd falls back to its default.
+        local invalid = false
+
+        if stored.comfort ~= nil then
+            if validComfort(stored.comfort) then
+                record.comfort = math.floor(stored.comfort)
+            elseif oldComfort[stored.comfort] then
+                record.comfort = oldComfort[stored.comfort]
+            else
+                invalid = true
+            end
+        end
+
+        if type(stored.learning) == "boolean" then
+            record.learning = stored.learning
+        elseif stored.learning ~= nil then
+            invalid = true
+        end
+
+        if groupChoices[stored.group] then
+            record.group = stored.group
+        elseif stored.group ~= nil then
+            invalid = true
+        end
+
+        if type(stored.history) == "table" then
+            for activity, entry in pairs(stored.history) do
+                if activities[activity] and type(entry) == "table" and type(entry.shown) == "table" then
+                    local shown = {}
+
+                    for _, id in ipairs(entry.shown) do
+                        if validId(id) then
+                            shown[#shown + 1] = id
+                        else
+                            invalid = true
+                        end
+                    end
+
+                    record.history[activity] = { shown = shown, last = validId(entry.last) and entry.last or nil }
+                else
+                    invalid = true
+                end
+            end
+        elseif stored.history ~= nil then
+            invalid = true
+        end
+
+        if invalid then
+            return record, "Some saved recommendation settings were invalid; valid choices were kept.", true
+        end
+
+        return record, nil, true
+    end
+
+    -- Saves the whole record (the caller passes the full, updated record). Like
+    -- saveId, it re-reads first and refuses to write over a record it couldn't read.
+    function self:saveRecommend(record)
+        assert(record.comfort == nil or validComfort(record.comfort), "Invalid internal comfort")
+        assert(type(record.learning) == "boolean" and groupChoices[record.group], "Invalid internal setting")
+
+        local _, warning, writable = self:loadRecommend()
+
+        if not writable then
+            return false, warning
+        end
+
+        -- Copy just what's stored, so nothing else on the record leaks in.
+        local history = {}
+
+        for activity, entry in pairs(record.history or {}) do
+            assert(activities[activity], "Invalid internal activity")
+
+            local shown = {}
+
+            for index, id in ipairs(entry.shown or {}) do
+                shown[index] = id
+            end
+
+            history[activity] = { shown = shown, last = entry.last }
+        end
+
+        local success, written = pcall(function()
+            return db:SetStructuredData(profileKey(RECOMMEND_KEY), {
+                schema = 1, comfort = record.comfort, learning = record.learning,
+                group = record.group, history = history,
+            })
+        end)
+
+        if not success or written ~= true then
+            return false, "Recommendation settings could not be saved: " .. tostring(written)
+        end
+
+        return true
+    end
+
     -- The current profile's favourite IDs, read without a catalogue scan.
     -- Returns ids, warning, writable (see loadIds).
     function self:loadFavourites()
@@ -381,12 +529,12 @@ function Preferences.new(db)
     -- Methods this profile has hidden from recommendations. Hiding is for that
     -- one method ID only: another version of the same method stays shown.
     function self:loadHidden()
-        return loadIds(HIDDEN_KEY, "Hidden methods")
+        return loadIds(HIDDEN_KEY, "Hidden activities")
     end
 
     -- Hides (hidden = true) or restores one method.
     function self:saveHidden(id, hidden)
-        return saveId(HIDDEN_KEY, "Hidden methods", id, hidden)
+        return saveId(HIDDEN_KEY, "Hidden activities", id, hidden)
     end
 
     return self

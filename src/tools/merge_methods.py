@@ -528,33 +528,64 @@ def load_access_research():
     return records
 
 
-# The PvM difficulty scale, easiest first. The plugin's Difficulty filter uses
-# the same four labels (Browser.difficultyLevels in src/methods/browser.lua).
+# The PvM difficulty bands, easiest first, and the 1-10 ladder levels each one
+# covers. The plugin's Difficulty filter uses the same four labels
+# (Browser.difficultyLevels in src/methods/browser.lua) and the same ranges
+# (Recommendations.bandOf in src/methods/recommendations.lua).
 DIFFICULTY_SCALE = ["Easy", "Medium", "Hard", "Elite"]
+DIFFICULTY_BANDS = {"Easy": [1, 2], "Medium": [3, 4], "Hard": [5, 7], "Elite": [8, 10]}
+
+
+def difficulty_band(level):
+    """The Browse band a 1-10 ladder level falls in, e.g. 6 -> "Hard"."""
+    for band in DIFFICULTY_SCALE:
+        low, high = DIFFICULTY_BANDS[band]
+
+        if low <= level <= high:
+            return band
+
+    raise ValueError(f"Difficulty level out of range: {level}")
 
 
 def load_difficulty():
     """{(page, version folded): rating} from catalogue-source/research/difficulty.json:
-    one researched rating per PvM guide version, with its evidence (PvME's Bossing
-    Path and Slayer guides, the Wiki, or a flagged judgement call)."""
+    one researched rating per PvM guide version, with its evidence. A rating is
+    {"difficulty": band, "level": 1-10, "farm": 1-10} for guides on the 1-10
+    ladder, or just {"difficulty": band} for ones the ladder doesn't cover yet
+    (their level is never guessed)."""
     path = catalogue.ROOT / "catalogue-source" / "research" / "difficulty.json"
     document = json.loads(path.read_text(encoding="utf-8"))
 
-    if document.get("schema") != 1 or document.get("scale") != DIFFICULTY_SCALE:
+    if document.get("schema") != 2 or document.get("bands") != DIFFICULTY_BANDS:
         raise ValueError("Unsupported difficulty research")
 
     ratings = {}
 
     for entry in document["ratings"]:
         key = (entry["page"], entry["version"].casefold())
+        name = f"{entry['page']} {entry['version']}"
 
-        if entry["difficulty"] not in DIFFICULTY_SCALE or key in ratings:
-            raise ValueError(f"Bad or repeated difficulty rating: {entry['page']} {entry['version']}")
+        if key in ratings:
+            raise ValueError(f"Repeated difficulty rating: {name}")
 
         if not entry.get("evidence"):
-            raise ValueError(f"A difficulty rating needs its evidence: {entry['page']} {entry['version']}")
+            raise ValueError(f"A difficulty rating needs its evidence: {name}")
 
-        ratings[key] = entry["difficulty"]
+        if "level" in entry:
+            level, farm = entry["level"], entry.get("farm")
+
+            # Practised is never harder than learning, and a laddered guide's band
+            # always comes from its level, never a separate opinion.
+            ok = all(type(value) is int and 1 <= value <= 10 for value in (level, farm))
+
+            if not ok or farm > level or "difficulty" in entry:
+                raise ValueError(f"Bad difficulty level: {name}")
+
+            ratings[key] = {"difficulty": difficulty_band(level), "level": level, "farm": farm}
+        elif entry.get("difficulty") in DIFFICULTY_SCALE:
+            ratings[key] = {"difficulty": entry["difficulty"]}
+        else:
+            raise ValueError(f"A difficulty rating needs a level or a band: {name}")
 
     return ratings
 
@@ -570,8 +601,74 @@ def apply_difficulty(method, page, version, ratings, used):
     if key not in ratings:
         raise ValueError(f"No difficulty research for PvM method {method['id']}; add it to difficulty.json")
 
-    method["difficulty"] = ratings[key]
+    rating = ratings[key]
+    method["difficulty"] = rating["difficulty"]
+
+    if "level" in rating:
+        method["difficulty_level"] = rating["level"]
+        method["farm_level"] = rating["farm"]
+
     used.add(key)
+
+
+def load_teams():
+    """{(page, version folded): team} from catalogue-source/research/teams.json:
+    the guide versions done as a group, with the team the guide assumes ("Duo",
+    "4 players"). Every other method is solo."""
+    path = catalogue.ROOT / "catalogue-source" / "research" / "teams.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+
+    if document.get("schema") != 1:
+        raise ValueError("Unsupported team research")
+
+    teams = {}
+
+    for entry in document["teams"]:
+        key = (entry["page"], entry["version"].casefold())
+
+        if not isinstance(entry.get("team"), str) or not entry["team"].strip() or key in teams:
+            raise ValueError(f"Bad or repeated team entry: {entry['page']} {entry['version']}")
+
+        if not entry.get("evidence"):
+            raise ValueError(f"A team entry needs its evidence: {entry['page']} {entry['version']}")
+
+        teams[key] = entry["team"]
+
+    return teams
+
+
+def apply_team(method, page, version, teams, used):
+    """Marks a group method with its team. Any category can be a group method
+    (Croesus is a skilling boss); a method with no entry is solo."""
+    key = (page, (version or "").casefold())
+
+    if key in teams:
+        method["team"] = teams[key]
+        used.add(key)
+
+
+def load_warnings():
+    """{guide page: reason} from catalogue-source/wiki/warnings.json: the Wiki's
+    {{MMGWarning}} risk warning (see wiki_methods.py --warnings). It covers every
+    version on the page. The Wiki's own wording stands in for a missing reason."""
+    path = catalogue.ROOT / "catalogue-source" / "wiki" / "warnings.json"
+
+    if not path.exists():
+        return {}
+
+    document = json.loads(path.read_text(encoding="utf-8"))
+
+    if document.get("schema") != 1:
+        raise ValueError("Unsupported guide warnings")
+
+    return {entry["page"]: entry["reason"] or "No reason specified." for entry in document["warnings"]}
+
+
+def apply_warning(method, page, warnings, used):
+    """Carries a guide page's Wiki warning onto the method, curated or not."""
+    if page in warnings:
+        method["warning"] = warnings[page]
+        used.add(page)
 
 
 def load_income_choices():
@@ -1564,6 +1661,11 @@ def research_status(method, curated, drops=None):
     }
 
 
+# Wiki guides we leave out of the catalogue on purpose. Mega shop run lists 51
+# shop items per version, too many rows for its activity page to show well.
+LEFT_OUT = {"Money making guide/Mega shop run"}
+
+
 def merge(recipe_source=None, monsters=None):
     """Returns (catalogue, details). The catalogue holds every method in full; the
     details say where each came from and what was left out. `monsters` is the
@@ -1571,6 +1673,11 @@ def merge(recipe_source=None, monsters=None):
     tables = monster_tables(monsters)
     curated = catalogue.expand_methods(catalogue.load_method_source())
     guides, meta = load_snapshot()
+
+    # Drop the guides we leave out before anything else looks at them.
+    left_out = sorted({guide["page"] for guide in guides if guide["page"] in LEFT_OUT})
+    guides = [guide for guide in guides if guide["page"] not in LEFT_OUT]
+
     recipes = catalogue.choose_recipes(recipe_source) if recipe_source else {}
 
     items = dict(curated["items"])
@@ -1581,6 +1688,10 @@ def merge(recipe_source=None, monsters=None):
     ctx.income_choices = load_income_choices()
     difficulty = load_difficulty()
     rated = set()
+    teams = load_teams()
+    teamed = set()
+    warnings = load_warnings()
+    warned = set()
 
     # Tool tiers, so "Crystal pickaxe or better" knows what "better" is.
     pickaxes = load_pickaxes()
@@ -1616,7 +1727,7 @@ def merge(recipe_source=None, monsters=None):
 
     methods = []
     details = {"curated": len(curated["methods"]), "recurring": [], "unmatched_curated": unmatched,
-               "research": {}, "wiki_profit": {}, "retrieved": ctx.meta.get("retrieved")}
+               "research": {}, "wiki_profit": {}, "retrieved": ctx.meta.get("retrieved"), "left_out": left_out}
 
     for method in curated["methods"]:
         # Keep curated instructions; only fill their unfinished travel section.
@@ -1625,6 +1736,8 @@ def merge(recipe_source=None, monsters=None):
 
         method["research"] = research_status(method, True)
         apply_difficulty(method, method["source"]["title"], method.get("variant"), difficulty, rated)
+        apply_team(method, method["source"]["title"], method.get("variant"), teams, teamed)
+        apply_warning(method, method["source"]["title"], warnings, warned)
         methods.append(method)
         details["research"][method["id"]] = method["research"]
 
@@ -1642,6 +1755,8 @@ def merge(recipe_source=None, monsters=None):
 
         method = convert_guide(guide, ctx, page_categories[guide["page"]].most_common(1)[0][0])
         apply_difficulty(method, guide["page"], guide.get("version"), difficulty, rated)
+        apply_team(method, guide["page"], guide.get("version"), teams, teamed)
+        apply_warning(method, guide["page"], warnings, warned)
         drops = check_drops(guide, tables) if method["category"] == "pvm" else None
         method["research"] = research_status(method, False, drops)
 
@@ -1664,6 +1779,18 @@ def merge(recipe_source=None, monsters=None):
 
     if stale:
         raise ValueError(f"Difficulty research for guides that aren't PvM methods: {stale[:3]}")
+
+    # The same for a team entry whose guide version has gone.
+    stale = [key for key in teams if key not in teamed]
+
+    if stale:
+        raise ValueError(f"Team research for guides that aren't methods: {stale[:3]}")
+
+    # Every Wiki warning lands on at least one method.
+    stale = sorted(set(warnings) - warned)
+
+    if stale:
+        raise ValueError(f"Wiki warnings for guides that aren't methods: {stale[:3]}")
 
     ids = collections.Counter(method["id"] for method in methods)
     duplicates = [method_id for method_id, count in ids.items() if count > 1]
