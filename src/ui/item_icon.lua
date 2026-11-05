@@ -29,11 +29,26 @@ end
 -- identity check, so a stale/bad ID never displays another item's picture.
 -- `name` is optional: what to call a row that has no item at all (the Wiki's
 -- "Rare drop table", say), instead of "Unknown item".
+--
+-- Pass options.tooltip = false for no tooltip, where the item is already named
+-- beside its picture (each tooltip costs native IDs; see README).
 function ItemIcon.add(parent, itemId, options, name)
     local object, expected = ItemIcon.resolve(itemId)
-    options.tooltip = itemId == nil and name or expected
+    local named = options.tooltip == false
 
+    if named then
+        options.tooltip = nil
+    else
+        options.tooltip = itemId == nil and name or expected
+    end
+
+    -- No picture we can trust. The info icon is only there to hover for the
+    -- name, so when the name is already shown, draw nothing.
     if not object then
+        if named then
+            return nil, expected, false
+        end
+
         return parent:AddSpriteButton("INFO", function() end, options), expected, false
     end
 

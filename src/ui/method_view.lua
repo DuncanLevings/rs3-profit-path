@@ -260,6 +260,19 @@ local function mountRequirements(parent, method, calculator, fitter)
                         local textInset = requirement.equipment_group and 62 or (12 + #iconNames * 26)
                         local textWidth = math.max(1, panelWidth - textInset - 16)
                         entry.textHeight = Style.textWidth(requirementText(requirement.text)) <= textWidth and 26 or 42
+
+                        -- A custom activity's item line has the item's 40px picture
+                        -- on its left, so it's always as tall as the picture.
+                        if requirement.picture then
+                            entry.textHeight = 42
+                        end
+
+                        -- A custom item group names all its items (up to 10), so
+                        -- it can need more than two lines: 20 per line.
+                        if requirement.listed then
+                            local lines = math.ceil(Style.textWidth(requirementText(requirement.text)) / textWidth)
+                            entry.textHeight = math.max(entry.textHeight, lines * 20 + 2)
+                        end
                         local height = entry.textHeight + 4
 
                         if requirement.equipment_group then
@@ -370,9 +383,7 @@ local function mountRequirements(parent, method, calculator, fitter)
                     local border = Style.rectangle(section, { x = x, y = iconY, width = 40, height = 40, fill = false, colour = Style.muted })
 
                     -- Some items count under several IDs (charged or worn variants).
-                    -- A custom activity's item may not be in the bundled list at all.
-                    local definition = itemDefinitions[tostring(itemId)]
-                    local aliases = definition and definition.ownership_ids or { itemId }
+                    local aliases = itemDefinitions[tostring(itemId)].ownership_ids or { itemId }
 
                     borders[#borders + 1] = { border = border, aliases = aliases, verified = verified }
                 end
@@ -389,6 +400,13 @@ local function mountRequirements(parent, method, calculator, fitter)
                 end
 
                 local x = requirement.equipment_group and 62 or (12 + #iconNames * 26)
+
+                -- A custom activity's item: its picture, then the line naming it
+                -- (so no tooltip). The line's colour says whether you have it.
+                if requirement.picture then
+                    ItemIcon.add(section, requirement.itemId, { x = 12, y = y, tooltip = false })
+                    x = 56
+                end
                 local labelOptions = { text = requirementText(requirement.text), x = x, y = y, width = -x - 16, widthAnchor = 1, height = entry.matchHeight or entry.textHeight, colour = Style.text }
                 local label = section:AddText(labelOptions)
 
@@ -397,7 +415,7 @@ local function mountRequirements(parent, method, calculator, fitter)
                 -- An "any"/"all" line explains its parts when hovered. PrettyUI
                 -- sets a tooltip only when a label is made, so the refresh makes
                 -- this label again, but only when the hover text changes.
-                if requirement.children and not requirement.equipment_group then
+                if requirement.children and not requirement.equipment_group and not requirement.listed then
                     update.section = section
                     update.labelOptions = labelOptions
                 end

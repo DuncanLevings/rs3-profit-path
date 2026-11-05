@@ -9,13 +9,15 @@
 -- which mounts the whole screen again from `state`. Typing in a box only updates
 -- the draft and the profit band's text, so the box keeps its focus.
 --
--- Searches (items, skills) wait for a short pause in typing, then redraw only
--- their own list of matches, again so the search box keeps its focus.
+-- Searches (items, monsters, thieving targets) wait for a short pause in typing,
+-- then redraw only their own list of matches, again so the search box keeps
+-- its focus.
 --
 -- Native parts: the client shares 4,096 between every plugin, so this screen
--- draws only the open tab and at most ROWS_PER_PAGE rows of it. Tooltips are
--- limited to each row's item icon, remove button and (for drops with a note)
--- On/Off button, plus one column heading (see README "Native dynamic IDs").
+-- draws only the open tab and at most ROWS_PER_PAGE rows of it. Tooltips cost
+-- the most: Outputs/Supplies have one per row's item icon, remove button and
+-- (drops with a note) On/Off button; Requirements has one per skill icon and
+-- per remove button. Tests measure both (see README "Native dynamic IDs").
 local CustomMethods = require("src/methods/custom_methods")
 local Draft = require("src/methods/custom_draft")
 local ItemIcon = require("src/ui/item_icon")

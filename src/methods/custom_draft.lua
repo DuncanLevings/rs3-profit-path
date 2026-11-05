@@ -573,38 +573,22 @@ end
 
 -- ---- What the preview strip says -------------------------------------------------
 
--- Everything the strip shows, from the draft as it stands:
+-- Everything the profit band shows, from the draft as it stands. It runs on
+-- every keystroke, so it only does what the band needs:
 --   result      Income.calculate's result (nil if the draft can't be priced yet)
---   problems    validation problems; Save stays off while there are any
---   counts      { outputs, supplies, requirements } against the limits
---   leftOut     { count, value } for source drops not in the draft
+--   coverage    "complete", or "partial" while a drop still needs a quantity
+--   problems    validation problems; Save explains them while there are any
 function Draft.preview(draft, quotes)
-    local ok, problems = CustomMethods.validate(Draft.withPlaceholderId(draft))
+    local record = Draft.withPlaceholderId(draft)
+    local ok, problems = CustomMethods.validate(record)
     local preview = { problems = ok and {} or problems }
-
-    local requirements = #draft.requirements.required + #draft.requirements.recommended
-
-    preview.counts = {
-        outputs = #draft.outputs, supplies = #draft.supplies, requirements = requirements,
-    }
 
     -- Price only a valid draft: an invalid one has nothing trustworthy to add up.
     if ok then
-        local method = CustomMethods.toMethod(Draft.withPlaceholderId(draft))
+        local method = CustomMethods.toMethod(record)
         preview.result = Income.calculate(method.income, draft.rate.default, quotes or {})
         preview.coverage = method.income.coverage
     end
-
-    local missing = Draft.missingSourceRows(draft)
-    local value = 0
-
-    for _, row in ipairs(missing) do
-        if row.state == "included" then
-            value = value + Draft.valuePerAction(row, quotes)
-        end
-    end
-
-    preview.leftOut = { count = #missing, value = value }
 
     return preview
 end

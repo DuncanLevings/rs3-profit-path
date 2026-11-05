@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.41-dev - 2026-11-05
+
+- Custom activity pages stay within the client's shared native ID budget with a full requirements list. A required item shows its picture beside a line naming it (no tooltip), and an item group lists its items in the line instead of on hover. Before, a full list could add up to 250 tooltipped pictures.
+- The editor's profit preview no longer recomputes left-out drops on every keystroke.
+
 ## 0.8.40-dev - 2026-11-05
 
 - Custom activities' item requirements (and item groups) show the item's picture on the activity page, with a border for whether you have it, like bundled activities.

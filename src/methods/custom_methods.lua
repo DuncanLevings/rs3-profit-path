@@ -552,21 +552,30 @@ local function requirementNode(check)
 
     if check.kind == "item" then
         local text = (check.quantity > 1 and (check.quantity .. " x ") or "") .. check.name
-        -- display_items is what makes the activity page draw the item's picture
-        -- (with a border showing whether you have it) instead of a text line.
-        return { kind = "item", itemId = check.item_id, quantity = check.quantity, text = text, display_items = { check.item_id } }
+        -- `picture` puts the item's picture beside the line on the activity page.
+        -- (Not display_items, the icon grid bundled activities use: every icon
+        -- there has a tooltip, and a custom page at its row limits has no room
+        -- left for 25 more. The line already names the item, so no tooltip.)
+        return { kind = "item", itemId = check.item_id, quantity = check.quantity, text = text, picture = true }
     end
 
     -- A group becomes the same "any"/"all" node bundled activities use.
     if check.kind == "items" then
-        local children, pictures = {}, {}
+        local children, names = {}, {}
 
         for index, item in ipairs(check.items) do
             children[index] = requirementNode({ kind = "item", item_id = item.item_id, name = item.name, quantity = item.quantity })
-            pictures[index] = item.item_id
+            names[index] = children[index].text
         end
 
-        return { kind = check.mode, text = check.name, children = children, display_items = pictures }
+        -- One text line that names every item, e.g. "Pickaxe (any one of: Rune
+        -- pickaxe, Dragon pickaxe)". `listed` tells the activity page the items
+        -- are already in the wording, so it skips the hover list: that's a
+        -- tooltip per line, and a custom page at its limits can't afford 25.
+        local joined = check.mode == "any" and " (any one of: " or " (all of: "
+
+        return { kind = check.mode, text = check.name .. joined .. table.concat(names, ", ") .. ")",
+            children = children, listed = true }
     end
 
     return { kind = "text", text = check.text, ignored = true }

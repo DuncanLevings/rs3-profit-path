@@ -127,10 +127,6 @@ return function(test, equal, client, pretty)
         local missing = Draft.missingSourceRows(draft)
         equal(#missing, #all - 40)
 
-        local preview = Draft.preview(draft, quotes)
-        equal(preview.leftOut.count, #all - 40)
-        equal(preview.counts.outputs, 40)
-
         -- Removing a row puts it back in the missing list.
         table.remove(draft.outputs, 1)
         equal(#Draft.missingSourceRows(draft), #all - 39)
@@ -956,22 +952,26 @@ return function(test, equal, client, pretty)
         prettyui:findMethod("Needs a potion")()
         settleMethod()
 
-        -- It's drawn as the item's picture, like bundled activities' items, and
-        -- its border is green because there's one in the backpack.
+        -- The item's picture sits beside its line. The line names it, so the
+        -- picture has no tooltip (they cost native IDs), and the line is green
+        -- because there's one in the backpack.
         local Style = require("src/ui/view_style")
-        local slot, border
+        local slot
 
         for _, view in ipairs(prettyui.allViews) do
-            for index, item in ipairs(view.items or {}) do
+            for _, item in ipairs(view.items or {}) do
                 if item.object and item.object.id == found.id then
-                    slot, border = item, view.rectangles and view.rectangles[index]
+                    slot = item
                 end
             end
         end
 
         assert(slot, (everything()))
-        equal(slot.tooltip, found.label)
-        equal(border.rgba, Style.good)
+        equal(slot.tooltip, nil)
+
+        local potion = label(found.label)
+        assert(potion, (everything()))
+        equal(potion.rgba, Style.statusColour("met"))
 
         PluginShutdown()
     end)
@@ -980,7 +980,7 @@ return function(test, equal, client, pretty)
 
     -- A custom record with `outputs` outputs and `supplies` supplies, all priced
     -- GE rows, so each one gets the activity page's item icon (and its tooltip).
-    local function sized(outputs, supplies)
+    local function sized(outputs, supplies, withRequirements)
         local record = {
             schema = 1, id = "custom.1", title = "Sized", category = "production", no_requirements = true,
             rate = { unit = "actions/hour", default = 10 },
@@ -994,6 +994,23 @@ return function(test, equal, client, pretty)
 
         for index = 1, supplies do
             record.supplies[index] = { label = "In " .. index, item_id = 440, pricing = "ge", quantity = 1, basis = "action" }
+        end
+
+        -- A full requirements list: item checks (each draws a picture) and the
+        -- rest item groups at their limit.
+        if withRequirements then
+            local group = {}
+            record.no_requirements = nil
+
+            for index = 1, CustomMethods.LIMITS.groupItems do
+                group[index] = { item_id = 440, name = "Iron ore", quantity = 1 }
+            end
+
+            for index = 1, CustomMethods.LIMITS.requirements do
+                record.requirements.required[index] = index % 2 == 0
+                    and { kind = "items", mode = "any", name = "Ore " .. index, items = group }
+                    or { kind = "item", item_id = 2353, name = "Steel bar", quantity = index }
+            end
         end
 
         return record
@@ -1018,7 +1035,7 @@ return function(test, equal, client, pretty)
     end
 
     test("native parts: a custom activity at the limits stays well under Mega Shop Run", function()
-        local atLimits = measurePage(sized(CustomMethods.LIMITS.outputs, CustomMethods.LIMITS.supplies))
+        local atLimits = measurePage(sized(CustomMethods.LIMITS.outputs, CustomMethods.LIMITS.supplies, true))
 
         -- Mega Shop Run had 51 shop items bought and sold per version. Rebuild a
         -- page that size (it's over our limits, so lift them just for this).
@@ -1040,6 +1057,27 @@ return function(test, equal, client, pretty)
         -- than the real bundled page was; it's here as a second yardstick.)
         assert(atLimits.tooltips <= 67, "custom pages at the limits stay under 60% of Mega Shop Run's tooltips")
         assert(atLimits.tooltips * 100 <= mega.tooltips * 60, "and under 60% of a Mega-sized custom page")
+    end)
+
+    test("native parts: the editor's Requirements tab, one short of full", function()
+        -- One short, so the add form (and its skill grid) is drawn too.
+        local record = sized(1, 0, true)
+        table.remove(record.requirements.required)
+        open({ [INDEX] = { schema = 1, next = 2, ids = { "custom.1" } }, ["profit-path.custom.v1/custom.1"] = record })
+        prettyui:findMethod("Sized")()
+        button("Edit this custom activity")()
+
+        local before = prettyui.counted.tooltips
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(4)
+        local used = prettyui.counted.tooltips - before
+
+        print(string.format("[native parts] editor Requirements tab with 24 checks: %d tooltips", used))
+
+        -- 29 skill icons and 24 remove buttons: still under the same budget as
+        -- an activity page at its limits (67, 60% of Mega Shop Run's).
+        assert(used <= 67, "editor Requirements tooltips: " .. used)
+
+        PluginShutdown()
     end)
 
     test("native parts: the editor's busiest tab draws one page of rows", function()
