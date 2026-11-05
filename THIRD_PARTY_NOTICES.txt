@@ -93,6 +93,7 @@ Project: https://github.com/sereselene/rsprite
 Licence: PolyForm Strict 1.0.0, as supplied with rsprite. Its source code is not copied or bundled here.
 The small native sprite-name registry (data/icons.lua and catalogue-source/research/capabilities.json, whose names were matched against rsprite's reference list) references RuneScape game assets, copyright Jagex Ltd.; Profit Path does not distribute these images or rsprite's list.
 Quest config names in catalogue-source/research/quests.json are client identifiers (Jagex Ltd.) read in game by the author's own Skill Tips probe; only the names Profit Path uses are kept.
+catalogue-source/research/quest-list.json keeps every current quest config name and display name from the same probe, for the custom activity editor's quest search (runtime: data/unlocks.lua). The unlocks in data/unlocks.lua (catalogue-source/research/custom-unlocks.json) reuse the requirement research above: unlock flag names read in the client, and achievement IDs and spell/prayer requirements from the RuneScape Wiki, whose contributor attribution and CC BY-NC-SA 3.0 licence apply.
 
 Abyssal demon output reconciliation, 2026-10-29
 Expected quantities checked against Money making guide/Killing abyssal demons revision 37017140. The method keeps references to the shared drop snapshot. Item source revisions are recorded in catalogue-source/methods.json. Salvage valuation is modified to actual high-alchemy proceeds rather than the source table's GE values (6,000 / 8,000 / 8,000 / 32,000 GP); spring inputs are retained.

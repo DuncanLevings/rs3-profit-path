@@ -560,6 +560,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             end
 
             reason(skipped.missing, "need something you don't have yet")
+            reason(skipped.unconfirmed, "are custom activities whose Required checks the game can't confirm yet")
             reason(skipped.comfort, "are harder than your PvM comfort")
             reason(skipped.group, "are group activities (you chose solo only)")
             reason(skipped.unprofitable, "lose money at today's prices")
@@ -609,7 +610,13 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
         if method.warning then
             facts[#facts + 1] = { "Warning", "The Wiki flags risks: read them on the activity's page", Style.bad }
         end
-        facts[#facts + 1] = { "Intensity", method.intensity, Style.text }
+
+        -- A custom activity says so instead of an intensity nobody has rated.
+        if method.origin == "custom" then
+            facts[#facts + 1] = { "Source", "Your custom activity", Style.text }
+        else
+            facts[#facts + 1] = { "Intensity", method.intensity, Style.text }
+        end
 
         local layout = {}
         local y = 14

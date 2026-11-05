@@ -9,7 +9,7 @@ It is a planning tool only. It sends no game inputs, gives no live combat or mov
 The **Open Profit Path** button in the Plugins ribbon opens a separate, resizable window with four sidebar sections and a **Create activity** button (which opens the custom activity editor):
 
 - **Browse**: every activity, bundled and your own custom ones, by group (PvM, Skilling, Production, Recurring), with search, Profit or ROI sort (highest first), Show (All or Custom only), and Intensity, Requirements and Difficulty filters. Ten rows per page.
-- **Recommend for me**: pick a group, get one suggestion at a time with the reasons for it. **Show another** moves on; **Don't recommend** skips that exact activity from now on (with Undo).
+- **Recommend for me**: pick a group, get one suggestion at a time with the reasons for it. **Show another** moves on; **Don't recommend** skips that exact activity from now on (with Undo). Your custom activities are suggested too, once the game confirms every Required check; a custom PvM activity is rated 1-10 in the editor and checked against your PvM comfort like a bundled boss.
 - **Favourites**: the activities you starred, with the same sorting and filters.
 - **My account**: which character and profile your settings belong to, Recommend for me's settings (PvM comfort 1-10, harder "learning" suggestions, solo/group), and the activities you chose not to have recommended.
 
@@ -44,6 +44,7 @@ A game-state change (login, logout, world hop) destroys the window, because its 
 | `src/storage/account_snapshot.lua` | Saved catalogue-relevant item counts per profile (stands in for a closed bank) |
 | `src/data/method_data.lua`, `monster_data.lua` | Readers for the packed generated data in `data/` |
 | `src/data/thieving_data.lua`, `item_names.lua` | Readers for thieving loot (same format as the monster snapshot) and GE item names (the custom activity editor's item search) |
+| `src/data/unlock_data.lua` | Reader for `data/unlocks.lua`: every current quest plus a reviewed list of unlocks (prayers, spellbooks, relics, abilities, diaries), each with the same check bundled activities use, for the custom activity editor's "Quest or unlock" search |
 | `src/ui/workbench.lua` | Launcher, window, navigation and the resize watch |
 | `src/ui/browse_view.lua`, `method_view.lua` | The Browse/Recommend/Favourites/My account screens and the activity tabs |
 | `src/ui/dropdown.lua`, `item_icon.lua`, `view_style.lua` | Dropdown workarounds, validated item icons, shared colours and formatting |
@@ -134,16 +135,16 @@ Written to the section headings of Jagex's submission example (developer.runesca
 | Dependency | Use | Manifest today |
 |---|---|---|
 | PrettyUI 1.2.0 | All UI | Plugin Hub ID 6398181 |
-| GE Prices Library 0.3.1 | Every price | Development folder `gepl` |
+| GE Prices Library | Every price | Plugin Hub ID 6414886 |
 | rsprite 0.1.2 | Icon sprites by name | Development folder `rsprite` (not on the Plugin Hub yet) |
 
-The two development-folder dependencies must become Plugin Hub IDs before submission; `package.py build` lists this.
+rsprite must become a Plugin Hub ID before submission; `package.py build` lists this.
 
 ## Development
 
 ### Setup
 
-Use the RS3 plugin beta. Put this folder in `dev_plugins` as `profit-path`, with GEPL in `dev_plugins/gepl` and rsprite in `dev_plugins/rsprite`, and PrettyUI installed. Enable the dependencies in the client yourself, then reload Profit Path.
+Use the RS3 plugin beta. Put this folder in `dev_plugins` as `profit-path`, with rsprite in `dev_plugins/rsprite`, and PrettyUI and GE Prices Library installed from the Plugin Hub. Enable the dependencies in the client yourself, then reload Profit Path.
 
 ### Tests
 
@@ -177,7 +178,7 @@ python src/tools/catalogue.py report    # coverage and what to research next
 - `catalogue-source/wiki/` is the Wiki guide snapshot (`guides.jsonl`, `meta.json`, `warnings.json`), written by `src/tools/wiki_methods.py`.
 - `catalogue-source/recipes.json` holds creation-cost recipes, written by `wiki_recipes.py`.
 - `catalogue-source/methods.json` holds the hand-curated activities, which replace their Wiki guide.
-- `catalogue-source/research/` holds the hand-checked research: requirement capabilities and unlock flags, quest config names, outfits, gear tiers, PvM difficulty, team sizes, price choices, and guide text overrides.
+- `catalogue-source/research/` holds the hand-checked research: requirement capabilities and unlock flags, quest config names (plus `quest-list.json`, every current quest, and `custom-unlocks.json`, the unlocks the custom activity editor offers; `catalogue.py map-quests` writes both quest files), outfits, gear tiers, PvM difficulty, team sizes, price choices, and guide text overrides.
 - `catalogue-source/monsters.json` is the monster snapshot, imported with `catalogue.py import-monsters --from PATH`.
 - `catalogue-source/ge-items.json` and `thieving.json` hold GE item names and thieving loot, written by `src/tools/wiki_drop_sources.py items` and then `thieving` (in that order: the item list decides which drops are sellable).
 

@@ -10,6 +10,9 @@
 --      above their comfort level, 1-10 (the next level up stays, labelled, if
 --      they want to learn).
 --      Recommended gear never drops anything; it's guidance on the method page.
+--      Custom activities join in too, but only once every Required check is
+--      confirmed met (not just "not missing"). A custom PvM activity's own
+--      1-10 rating is checked against comfort like a bundled boss's.
 --   3. Order what's left: within comfort before learning, solo before group when
 --      solo is preferred, fully met requirements before "needs checking", then
 --      most profitable first (unpriced methods last).
@@ -127,18 +130,22 @@ end
 -- Each entry is { method, learning = bool, unchecked = bool, estimate }.
 function Recommendations.pool(methods, activity, settings, context)
     local pool = {}
-    local skipped = { hidden = 0, missing = 0, comfort = 0, group = 0, unprofitable = 0 }
+    local skipped = { hidden = 0, missing = 0, unconfirmed = 0, comfort = 0, group = 0, unprofitable = 0 }
 
     for _, method in ipairs(methods) do
-        -- Custom activities join recommendations once their requirements are
-        -- watched like the bundled ones (Phase 9, slice 5). Until then their
-        -- readiness is always unknown, so they'd only be noise here.
-        if method.category == activity and method.origin ~= "custom" then
+        if method.category == activity then
             local readiness = context.readiness[method.id]
             local status = readiness and readiness.status or "unknown"
             local estimate = context.estimates[method.id]
             local priced = estimate and estimate.status == "available"
-            local fit = activity ~= "pvm" and "within" or difficultyFit(method, settings)
+
+            -- A custom PvM activity is rated by the player (1-10) and checked
+            -- against comfort like a bundled boss. One saved before ratings
+            -- existed has none, and counts as within comfort (they made it
+            -- for something they do) until it's edited and rated.
+            local custom = method.origin == "custom"
+            local unrated = custom and Recommendations.levelOf(method) == nil
+            local fit = (activity ~= "pvm" or unrated) and "within" or difficultyFit(method, settings)
 
             -- One reason per method, checked in the order the player is most
             -- likely to care about.
@@ -146,6 +153,12 @@ function Recommendations.pool(methods, activity, settings, context)
                 skipped.hidden = skipped.hidden + 1
             elseif status == "unmet" then
                 skipped.missing = skipped.missing + 1
+            elseif custom and status ~= "met" then
+                -- Stricter than bundled ones (agreed in the Phase 9 plan): a
+                -- custom activity is only suggested once the game confirms
+                -- every Required check. Notes are left out of that (as for
+                -- bundled ones), so notes alone don't hold it back.
+                skipped.unconfirmed = skipped.unconfirmed + 1
             elseif not fit then
                 skipped.comfort = skipped.comfort + 1
             elseif method.team and settings.group == "solo-only" then
@@ -257,12 +270,18 @@ end
 function Recommendations.new(methods, browser, preferences)
     local self = { activity = nil, current = {}, notice = nil }
 
-    -- Every method ID per activity, to keep the saved history bounded by the
-    -- catalogue rather than growing forever.
-    local known = {}
+    -- Every method ID's activity, to keep the saved history bounded by the
+    -- catalogue rather than growing forever. Worked out when it's needed, not
+    -- once: `methods` is the shared list, and custom activities are added to
+    -- and removed from it while the window is open.
+    local function known()
+        local categories = {}
 
-    for _, method in ipairs(methods) do
-        known[method.id] = method.category
+        for _, method in ipairs(methods) do
+            categories[method.id] = method.category
+        end
+
+        return categories
     end
 
     -- Loads the current profile's settings. A character switch while the window
@@ -352,10 +371,11 @@ function Recommendations.new(methods, browser, preferences)
         local activity = self.activity
         local stored = self.record.history[activity] or { shown = {} }
         local history = { shown = {}, last = stored.last }
+        local categories = known()
 
         -- Copy, dropping IDs this catalogue no longer has for this activity.
         for _, id in ipairs(stored.shown) do
-            if known[id] == activity then
+            if categories[id] == activity then
                 history.shown[#history.shown + 1] = id
             end
         end

@@ -23,6 +23,8 @@ local Draft = require("src/methods/custom_draft")
 local Income = require("src/methods/income")
 local ItemIcon = require("src/ui/item_icon")
 local ItemNames = require("src/data/item_names")
+local Recommendations = require("src/methods/recommendations")
+local UnlockData = require("src/data/unlock_data")
 local Style = require("src/ui/view_style")
 
 local MethodEditor = {}
@@ -124,7 +126,7 @@ function MethodEditor.state(options)
 
         -- Each tab's scroll position, so a redraw keeps your place.
         scroll = {},
-        search = { outputs = "", supplies = "", requirement = "" },
+        search = { outputs = "", supplies = "", requirement = "", unlock = "" },
         target = "required",
         quotes = {},
         message = nil,
@@ -901,14 +903,20 @@ end
 -- A Grand Exchange item search: a field, its results box, and `pick(item)` for
 -- a clicked match. `key` is where state.search keeps the typed text across
 -- redraws. Returns the field.
+--
+-- The quest and unlock search uses it too: options.search swaps in another
+-- list's search (same results shape: { label, ... } plus a total), and
+-- options.none says what was searched when nothing matches.
 itemSearch = function(page, state, tools, key, options)
     local box
     local field
+    local search = options.search or ItemNames.search
+    local none = options.none or "No Grand Exchange item matches"
 
     -- Draws the matches for whatever's typed now.
     local function settle()
         local query = state.search[key]
-        local results, total = ItemNames.search(query, SEARCH_SHOWN)
+        local results, total = search(query, SEARCH_SHOWN)
         local entries = {}
 
         for _, item in ipairs(results) do
@@ -924,7 +932,7 @@ itemSearch = function(page, state, tools, key, options)
         if not query:find("%S") then
             box:show(entries, options.hint)
         elseif total == 0 then
-            box:show(entries, "No Grand Exchange item matches \"" .. query .. "\".")
+            box:show(entries, none .. " \"" .. query .. "\".")
         elseif total > #entries then
             box:show(entries, #entries .. " of " .. total .. " matches. Type more to narrow it down.")
         else
@@ -1008,11 +1016,15 @@ function MethodEditor.income(page, state, tools)
 
     for index, category in ipairs(CATEGORIES) do
         local redraw = change(function()
+            local recurringChange = draft.category == "recurring" or category.id == "recurring"
             Draft.setCategory(draft, category.id)
 
             -- Daily/weekly has no trips (setCategory clears them), so ask
-            -- again from what the draft now has.
-            state.trips = nil
+            -- again from what the draft now has. Going to or from PvM keeps
+            -- the player's trips answer.
+            if recurringChange then
+                state.trips = nil
+            end
         end)
 
         categoryButtons[category.id] = page:AddSimpleButton(category.label, guarded(function(...)
@@ -1020,7 +1032,11 @@ function MethodEditor.income(page, state, tools)
                 return
             end
 
-            if draft.category == "recurring" or category.id == "recurring" then
+            -- PvM has the difficulty picker below too, so it redraws as well.
+            local boxesChange = draft.category == "recurring" or category.id == "recurring"
+                or draft.category == "pvm" or category.id == "pvm"
+
+            if boxesChange then
                 redraw(...)
                 return
             end
@@ -1029,6 +1045,44 @@ function MethodEditor.income(page, state, tools)
             light()
             updatePreview()
         end), { width = 130, height = 30, inline = index > 1, active = draft.category == category.id })
+    end
+
+    -- How hard a PvM activity is, on the same 1-10 ladder as bundled bosses
+    -- (Recommend for me compares it with the player's PvM comfort). Picking a
+    -- level only lights its button and updates the line under it, in place.
+    if draft.category == "pvm" then
+        page:AddText({ text = "How hard is it? (1 to 10)", colour = Style.gold, marginTop = 6 })
+        page:AddText({ text = "The same scale as the bundled bosses and Recommend for me's PvM comfort.", colour = Style.muted })
+
+        local levelButtons = {}
+        local aboutLabel
+
+        -- "4: Intermediate - Gregorovic, The Magister, ..." for the level picked.
+        local function aboutText()
+            local level = draft.difficulty_level
+
+            if not level then
+                return "Not picked yet."
+            end
+
+            return Recommendations.comfortName(level) .. " - like " .. Recommendations.comfortAbout[level]
+        end
+
+        for _, level in ipairs(Recommendations.comfortLevels) do
+            levelButtons[level] = page:AddSimpleButton(tostring(level), guarded(function()
+                draft.difficulty_level = level
+
+                for other, levelButton in pairs(levelButtons) do
+                    levelButton:SetActive(other == level)
+                end
+
+                aboutLabel.content = aboutText()
+                aboutLabel.rgba = Style.text
+                updatePreview()
+            end), { width = 40, height = 30, inline = level > 1, active = draft.difficulty_level == level })
+        end
+
+        aboutLabel = page:AddText({ text = aboutText(), colour = draft.difficulty_level and Style.text or Style.muted })
     end
 
     -- A daily or weekly activity counts per run, so it has a how-often instead
@@ -1547,6 +1601,11 @@ local function checkText(check)
         return "Combat level " .. check.level
     elseif check.kind == "quest" then
         return "Quest: " .. check.name
+    elseif check.kind == "unlock" then
+        -- The same wording the activity page uses, e.g. "Soul Split (The
+        -- Temple at Senntisten, 92 Prayer)", so it's clear what gets checked.
+        local unlock = UnlockData.unlock(check.unlock)
+        return unlock and unlock.check.text or check.name
     elseif check.kind == "item" then
         return (check.quantity > 1 and (Style.number(check.quantity) .. " x ") or "") .. check.name
     elseif check.kind == "items" then
@@ -1571,8 +1630,8 @@ function MethodEditor.requirements(page, state, tools)
 
     page:AddText({
         text = optional
-            and "Production and daily/weekly activities need a Required level, quest or item, or \"No requirements needed\"."
-            or "PvM and Skilling activities need at least one Required level, quest or item. Notes don't count: the game can't check them.",
+            and "Production and daily/weekly activities need a Required level, quest, unlock or item, or \"No requirements needed\"."
+            or "PvM and Skilling activities need at least one Required level, quest, unlock or item. Notes don't count: the game can't check them.",
         colour = Style.muted,
     })
 
@@ -1677,6 +1736,24 @@ function MethodEditor.requirements(page, state, tools)
                 state.message = "Enter a combat level from 3 to 152."
             end
         end), { width = 160, height = 28, inline = true })
+
+        -- A quest or unlock (prayer, spellbook, relic, ability, diary...) from
+        -- the bundled list, so the game can check it. Anything not in the list
+        -- can still go in as a note below.
+        page:AddText({ text = "Quest or unlock (prayers, spellbooks, relics, abilities, diaries)", colour = Style.gold, marginTop = 6 })
+
+        itemSearch(page, state, tools, "unlock", {
+            placeholder = "Search quests and unlocks", width = 300,
+            search = UnlockData.search, none = "No quest or unlock matches",
+            hint = "Type a name, then pick it here to add it. Not listed? Add it as a note.",
+            pick = function(entry)
+                if entry.kind == "quest" then
+                    add({ kind = "quest", quest = entry.quest, name = entry.name })
+                else
+                    add({ kind = "unlock", unlock = entry.key, name = entry.name })
+                end
+            end,
+        })
 
         -- An item to have: set how many, then pick the item from the search.
         page:AddText({ text = "Item (set how many, then pick the item)", colour = Style.gold, marginTop = 6 })

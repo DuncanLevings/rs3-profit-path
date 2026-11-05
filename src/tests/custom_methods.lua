@@ -18,6 +18,7 @@ return function(test, equal, client, pretty)
             id = "custom.1",
             title = "Fixture monster",
             category = "pvm",
+            difficulty_level = 3,
             rate = { unit = "kills/hour", default = 30 },
             actions_per_trip = 10,
             outputs = {
@@ -36,6 +37,12 @@ return function(test, equal, client, pretty)
 
         for key, value in pairs(fields or {}) do
             base[key] = value
+        end
+
+        -- Only PvM has a difficulty, so another category drops the fixture's
+        -- one (unless the test set it on purpose).
+        if base.category ~= "pvm" and (fields or {}).difficulty_level == nil then
+            base.difficulty_level = nil
         end
 
         return base
@@ -64,6 +71,67 @@ return function(test, equal, client, pretty)
 
     test("custom records: a complete PvM record is accepted", function()
         equal(CustomMethods.validate(record()), true)
+    end)
+
+    -- PvM difficulty: 1-10, PvM only, and needed to save (but an older save
+    -- without one still loads).
+    test("custom records: a PvM difficulty is 1 to 10 and needed to save", function()
+        rejected({ difficulty_level = 0 }, "from 1 to 10")
+        rejected({ difficulty_level = 11 }, "from 1 to 10")
+        rejected({ difficulty_level = 2.5 }, "from 1 to 10")
+        rejected({ category = "skilling", rate = { unit = "actions/hour", default = 30 }, difficulty_level = 3 },
+            "Only PvM activities have a difficulty")
+
+        -- Loading an older save: fine without one. Saving: not.
+        local unrated = record({ difficulty_level = false })
+        unrated.difficulty_level = nil
+        equal(CustomMethods.validate(unrated), true)
+
+        local ok, problems = CustomMethods.validate(unrated, { saving = true })
+        equal(ok, false)
+        assert(mentions(problems, "Pick how hard it is"), table.concat(problems, " | "))
+
+        -- Skilling never needs one.
+        equal(CustomMethods.validate(record({ category = "skilling", rate = { unit = "actions/hour", default = 30 } }),
+            { saving = true }), true)
+
+        -- On the activity: the level, the same once practised, and Browse's band.
+        local method = CustomMethods.toMethod(record({ difficulty_level = 6 }))
+        equal(method.difficulty_level, 6)
+        equal(method.farm_level, 6)
+        equal(method.difficulty, "Hard")
+
+        for level, band in pairs({ [1] = "Easy", [2] = "Easy", [3] = "Medium", [4] = "Medium", [5] = "Hard",
+            [7] = "Hard", [8] = "Elite", [10] = "Elite" }) do
+            equal(CustomMethods.difficultyBand(level), band)
+        end
+
+        equal(CustomMethods.toMethod(unrated).difficulty, nil)
+    end)
+
+    test("drafts: only PvM keeps a difficulty, and Duplicate brings a boss's along", function()
+        local Draft = require("src/methods/custom_draft")
+        local draft = Draft.blank("pvm")
+        draft.difficulty_level = 5
+
+        Draft.setCategory(draft, "skilling")
+        equal(draft.difficulty_level, nil)
+
+        local function boss(fields)
+            local method = { title = "Boss", category = "pvm", income = { rate = { default = 10 }, inputs = {}, outputs = {} },
+                requirements = { access = { kind = "all", children = {} }, recommended = { kind = "all", children = {} } } }
+
+            for key, value in pairs(fields) do
+                method[key] = value
+            end
+
+            return method
+        end
+
+        equal(Draft.fromMethod(boss({ difficulty_level = 6, difficulty = "Hard" })).difficulty_level, 6)
+
+        -- Only a band: the hardest level in it, never easier.
+        equal(Draft.fromMethod(boss({ difficulty = "Medium" })).difficulty_level, 4)
     end)
 
     test("custom records: anything malformed is rejected with a reason", function()
@@ -431,7 +499,7 @@ return function(test, equal, client, pretty)
 
     -- Where custom activities show ------------------------------------------------
 
-    test("custom activities stay out of Browse and recommendations, but not Favourites", function()
+    test("custom activities show in Browse, Favourites and recommendations", function()
         client()
 
         local custom = CustomMethods.toMethod(record())
@@ -473,8 +541,10 @@ return function(test, equal, client, pretty)
             hidden = {},
         })
 
-        equal(#pool, 1)
-        equal(pool[1].method.id, "bundled")
+        -- Its Required checks are met, so it's suggested, most profitable first.
+        equal(#pool, 2)
+        equal(pool[1].method.id, "custom.1")
+        equal(pool[2].method.id, "bundled")
     end)
 
     -- The sidebar section (slice 3) -------------------------------------------------

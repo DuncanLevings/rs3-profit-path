@@ -88,6 +88,10 @@ catalogue.verify_methods(monsters, recipes)
 # yet, but their packed files must match their sources and read back exactly.
 catalogue.verify_drop_sources()
 
+# Quests and unlocks for the custom activity editor's requirement search: the
+# packed file matches its research, and every unlock is something the game checks.
+catalogue.verify_unlocks()
+
 # The Wiki guide snapshot (catalogue-source/wiki) isn't used by the plugin yet, but
 # it must stay a clean, consistent import until it is.
 import wiki_methods

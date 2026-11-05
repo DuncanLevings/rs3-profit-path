@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.48-dev - 2026-11-05
+
+- GE Prices Library is now the released Plugin Hub version (ID 6414886) instead of a development folder.
+
+## 0.8.47-dev - 2026-11-05
+
+- Recommend for me suggests custom activities too, once the game confirms every Required check. The card says "Your custom activity", and when nothing matches it says how many custom activities are waiting on checks the game can't confirm yet.
+- Custom PvM activities have a difficulty from 1 to 10 (the same ladder as bundled bosses), picked on the editor's Income tab and needed to save. Browse's Difficulty filter and Recommend for me's PvM comfort use it. Older saves without one still load and count as within comfort until rated. Duplicate as custom brings a boss's rating along.
+- Fixed: a custom activity saved while the window was open could repeat in Recommend for me's rotation.
+- Custom activity editor: switching category to or from PvM keeps your "bank between trips" answer.
+
+## 0.8.46-dev - 2026-11-05
+
+- Custom activity editor: the Requirements tab has a Quest or unlock search. It lists every current quest (miniquests included) and 86 unlocks: the main prayers, spellbooks and spells, Archaeology relics, abilities, a few places, diary tiers and achievements. Each is checked the same way bundled activities check it, and counts as a Required check.
+- Duplicate as custom keeps a bundled activity's listed relics and diaries as unlocks instead of notes.
+- The activity page's Income tab only shows the Notes heading when there are notes under it.
+
 ## 0.8.45-dev - 2026-11-05
 
 - The activity page's favourite star uses PrettyUI's silver and gold stars inside its box. The empty star drew as black in game.

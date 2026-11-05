@@ -559,11 +559,17 @@ return function(test, equal, client, pretty)
 
         prettyui.views[#prettyui.views].tabs[1]:SetActive(1)
         field("e.g. 25"):SetText("10", true)
+
+        -- PvM also needs its difficulty before it saves.
+        button("Save")()
+        assert(shows("Pick how hard it is"), (everything()))
+        button("5")()
         button("Save")()
 
         local saved = state.db["profit-path.custom.v1/custom.1"]
         equal(saved.outputs[8].basis, "trip")
         equal(saved.actions_per_trip, 10)
+        equal(saved.difficulty_level, 5)
         equal(saved.requirements.required[1].level, 85)
 
         PluginShutdown()
@@ -826,6 +832,15 @@ return function(test, equal, client, pretty)
         equal(saved.getting_there[1], "Teleport to Lumbridge")
         assert(shows("Buy flax in bulk"), (everything()))
 
+        -- With a note there's a Notes heading above it.
+        local hasHeading = false
+
+        for _, text in ipairs(prettyui.views[#prettyui.views].tabs[1].pages[1].texts) do
+            hasHeading = hasHeading or text.content == "Notes"
+        end
+
+        assert(hasHeading, (everything()))
+
         settleMethod()
         assert(shows("1. Teleport to Lumbridge"), (everything()))
 
@@ -865,17 +880,29 @@ return function(test, equal, client, pretty)
         assert(not shows("Throughput"), (everything()))
         assert(not shows("Default rate"), (everything()))
 
-        -- In place, with trips on: both the question and the per-trip label change.
+        -- PvM asks how hard it is; picking a level updates the line in place.
+        assert(shows("How hard is it? (1 to 10)"), (everything()))
+        assert(shows("Not picked yet."), (everything()))
+
+        local before = prettyui.counted.parts
+        button("4")()
+        equal(prettyui.counted.parts, before, "no redraw")
+        assert(shows("4: Intermediate - like Gregorovic"), (everything()))
+
+        -- Leaving PvM redraws (the difficulty goes), with trips on: both the
+        -- question and the per-trip label change.
         button("Yes")()
         assert(shows("Kills per trip"), (everything()))
 
-        local before = prettyui.counted.parts
         button("Skilling")()
-        equal(prettyui.counted.parts, before, "no redraw")
+        assert(not shows("How hard is it?"), (everything()))
         assert(shows("About how many actions an hour?"), (everything()))
         assert(shows("Actions per trip"), (everything()))
 
+        -- Between the other hourly categories it's in place.
+        before = prettyui.counted.parts
         button("Production")()
+        equal(prettyui.counted.parts, before, "no redraw")
         assert(shows("About how many actions an hour?"), (everything()))
 
         PluginShutdown()
@@ -1027,17 +1054,23 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
-    test("editor: switching between PvM, Skilling and Production redraws nothing", function()
+    test("editor: switching between Skilling and Production redraws nothing", function()
         open()
 
         button("Create activity")()
-        button("PvM")()
+        button("Skilling")()
 
         local before = prettyui.counted.parts
-        button("Skilling")()
+        button("Production")()
         equal(prettyui.counted.parts, before, "no redraw")
 
-        -- Daily/weekly has different boxes, so that one does redraw.
+        -- PvM adds its difficulty picker and Daily/weekly has different boxes,
+        -- so those do redraw.
+        button("PvM")()
+        assert(prettyui.counted.parts > before)
+        assert(shows("How hard is it?"), (everything()))
+
+        before = prettyui.counted.parts
         button("Daily / weekly")()
         assert(prettyui.counted.parts > before)
         assert(shows("How often"), (everything()))
@@ -1161,6 +1194,11 @@ return function(test, equal, client, pretty)
         local income = prettyui.views[#prettyui.views].tabs[1].pages[1]
         equal(income.buttons["Edit this custom activity"], nil)
 
+        -- This activity has no notes, so the Income tab has no Notes heading.
+        for _, text in ipairs(income.texts) do
+            assert(text.content ~= "Notes", "no Notes heading without notes")
+        end
+
         -- One click only asks, in the title (so it shows on any tab).
         button("Delete this custom activity")()
         assert(state.db["profit-path.custom.v1/custom.1"], "one click doesn't delete")
@@ -1233,6 +1271,176 @@ return function(test, equal, client, pretty)
         equal(potion.rgba, Style.statusColour("met"))
 
         PluginShutdown()
+    end)
+
+    -- Quests and unlocks ---------------------------------------------------------------
+
+    test("the quest and unlock list finds quests and unlocks by name", function()
+        local UnlockData = require("src/data/unlock_data")
+
+        -- Quests come from the in-game quest list, by config name.
+        equal(UnlockData.questName("DESERT_TREASURE"), "Desert Treasure")
+        equal(UnlockData.questName("NOT_A_QUEST"), nil)
+
+        -- A name that starts with the words comes first, labelled with its kind.
+        local results, total = UnlockData.search("soul split", 5)
+        equal(results[1].kind, "unlock")
+        equal(results[1].key, "soul-split")
+        equal(results[1].label, "Soul Split (prayer)")
+        assert(total >= 1)
+
+        -- Quests and unlocks mix in one list: "Dragon Slayer" is both.
+        local kinds = {}
+
+        for _, entry in ipairs((UnlockData.search("dragon slayer", 5))) do
+            kinds[entry.label] = entry.kind
+        end
+
+        equal(kinds["Quest: Dragon Slayer"], "quest")
+        equal(kinds["Dragon Slayer ability (ability)"], "unlock")
+
+        -- Nothing for a blank search, like the item search.
+        equal(#UnlockData.search("   ", 5), 0)
+
+        -- Soul Split is checked the way bundled activities check it: its quest
+        -- and its Prayer level, with no icons (they'd cost native IDs).
+        local check = UnlockData.check("soul-split")
+        equal(check.kind, "all")
+        equal(check.text, "Soul Split (The Temple at Senntisten, 92 Prayer)")
+        equal(check.children[1].kind, "quest")
+        equal(check.children[1].quest, "TEMPLE_AT_SENNTISTEN")
+        equal(check.children[1].display_icon, nil)
+        equal(check.children[2].skill, "PRAYER")
+        equal(check.children[2].level, 92)
+
+        -- Every call is a fresh copy, so one activity's page can't change another's.
+        check.children[2].level = 1
+        equal(UnlockData.check("soul-split").children[2].level, 92)
+        equal(UnlockData.check("not-an-unlock"), nil)
+    end)
+
+    test("an unlock counts as a Required check, and unknown ones are refused", function()
+        local draft = Draft.blank()
+        draft.title = "Soul splitting"
+        draft.category = "pvm"
+        draft.rate.default = 10
+        draft.outputs[1] = { label = "Loot", pricing = "fixed", unit_value = 5, quantity = 1, basis = "action", state = "included" }
+
+        -- An unlock on its own is enough for PvM: the game checks it.
+        draft.requirements.required[1] = { kind = "unlock", unlock = "soul-split", name = "Soul Split" }
+        equal(valid(draft), true)
+
+        -- The activity uses the list's check, not anything in the record.
+        local record = Draft.copy(draft)
+        record.id = "custom.1"
+        local node = CustomMethods.toMethod(record).requirements.access.children[1]
+        equal(node.text, "Soul Split (The Temple at Senntisten, 92 Prayer)")
+        equal(node.children[2].level, 92)
+
+        -- A key that isn't in the list (an edited save, say) isn't trusted.
+        draft.requirements.required[1] = { kind = "unlock", unlock = "made-up", name = "Made up" }
+        local ok, problems = valid(draft)
+        equal(ok, false)
+        assert(table.concat(problems, " "):find("unlock Profit Path doesn't know", 1, true), table.concat(problems, " "))
+    end)
+
+    test("Duplicate as custom keeps a listed relic or diary as an unlock", function()
+        local method = {
+            title = "Relic user", category = "skilling",
+            income = { rate = { default = 10 }, inputs = {}, outputs = {} },
+            requirements = {
+                access = { kind = "all", text = "Required", children = {
+                    { kind = "flag", var = "ARCH_RELIC_DEATH_NOTE_UNLOCKED", text = "Death Note" },
+                    { kind = "flag", var = "SOMETHING_NOT_LISTED", text = "Mystery unlock" },
+                } },
+                recommended = { kind = "all", text = "Recommended", children = {} },
+            },
+        }
+
+        local required = Draft.fromMethod(method).requirements.required
+
+        equal(required[1].kind, "unlock")
+        equal(required[1].unlock, "death-note")
+        equal(required[1].name, "Death Note")
+
+        -- Not in the list: it can only be a note.
+        equal(required[2].kind, "note")
+    end)
+
+    test("editor: quests and unlocks are picked from one search", function()
+        local state = open()
+
+        button("Create activity")()
+        button("Skilling")()
+        field("e.g. Killing ghouls with a cannon"):SetText("Soul splitting", true)
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(4)
+
+        -- The box explains itself before anything's typed.
+        assert(shows("Not listed? Add it as a note."), (everything()))
+
+        field("Search quests and unlocks"):SetText("soul split", true)
+        settleSearch()
+        button("Soul Split (prayer)")()
+
+        -- The line says exactly what's checked.
+        assert(shows("Soul Split (The Temple at Senntisten, 92 Prayer)"), (everything()))
+
+        field("Search quests and unlocks"):SetText("desert treasure", true)
+        settleSearch()
+        button("Quest: Desert Treasure")()
+        assert(shows("Quest: Desert Treasure"), (everything()))
+
+        -- Nothing matches: it says so.
+        field("Search quests and unlocks"):SetText("zzzz", true)
+        settleSearch()
+        assert(shows("No quest or unlock matches \"zzzz\"."), (everything()))
+
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(2)
+        button("Custom item")()
+        button("Save")()
+
+        local saved = state.db["profit-path.custom.v1/custom.1"]
+        assert(saved, (everything()))
+        equal(saved.requirements.required[1].kind, "unlock")
+        equal(saved.requirements.required[1].unlock, "soul-split")
+        equal(saved.requirements.required[2].kind, "quest")
+        equal(saved.requirements.required[2].quest, "DESERT_TREASURE")
+
+        PluginShutdown()
+    end)
+
+    test("a custom activity's unlock is read from the game", function()
+        local record = {
+            schema = 1, id = "custom.1", title = "Relic needed", category = "production",
+            rate = { unit = "actions/hour", default = 10 },
+            outputs = { { label = "Other loot", pricing = "fixed", unit_value = 5, quantity = 1, basis = "action", state = "included" } },
+            supplies = {},
+            requirements = { required = { { kind = "unlock", unlock = "death-note", name = "Death Note" } }, recommended = {} },
+        }
+
+        -- Like open(), but the relic is unlocked before the plugin starts.
+        client({ [INDEX] = { schema = 1, next = 2, ids = { "custom.1" } }, ["profit-path.custom.v1/custom.1"] = record })
+        prettyui = pretty()
+        gepl = nil
+
+        local before = var
+        var = { VarPlayer = { ARCH_RELIC_DEATH_NOTE_UNLOCKED = { value = 1 } } }
+
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
+        prettyui:findButton("Open Profit Path")()
+        prettyui:chooseEntry("Custom only")
+
+        prettyui:findMethod("Relic needed")()
+        settleMethod()
+
+        -- Read from the game variable, so the line is green.
+        local relic = label("Death Note")
+        assert(relic, (everything()))
+        equal(relic.rgba, require("src/ui/view_style").statusColour("met"))
+
+        PluginShutdown()
+        var = before
     end)
 
     -- Native parts --------------------------------------------------------------------

@@ -12,6 +12,7 @@
 local CustomMethods = require("src/methods/custom_methods")
 local Income = require("src/methods/income")
 local Loot = require("src/methods/loot")
+local UnlockData = require("src/data/unlock_data")
 
 local Draft = {}
 
@@ -150,6 +151,11 @@ end
 function Draft.setCategory(draft, category)
     local was = draft.category
     draft.category = category
+
+    -- Only PvM has a difficulty.
+    if category ~= "pvm" then
+        draft.difficulty_level = nil
+    end
 
     if category == "recurring" then
         if was ~= "recurring" or draft.rate.unit ~= "runs" then
@@ -483,6 +489,10 @@ local function flattenRequirements(node, into, skipped, depth)
         add({ kind = "combat_level", level = node.level })
     elseif node.kind == "quest" and type(node.quest) == "string" and type(node.text) == "string" then
         add({ kind = "quest", quest = node.quest, name = shorten(node.text, CustomMethods.LIMITS.requirementNote) })
+    elseif (node.kind == "flag" or node.kind == "achievement") and UnlockData.matching(node) then
+        -- A relic, diary and so on that's in the unlock list keeps being checked.
+        local unlock = UnlockData.matching(node)
+        add({ kind = "unlock", unlock = unlock.key, name = unlock.name })
     elseif type(node.text) == "string" and node.text:find("%S") then
         add({ kind = "note", text = rowNote(node.text) })
     end
@@ -510,6 +520,13 @@ function Draft.fromMethod(method, quotes)
         unit = method.category == "pvm" and "kills/hour" or "actions/hour",
         default = income.rate.default,
     }
+
+    -- A bundled boss's researched difficulty comes along. One with only a
+    -- band counts as the hardest level in it, like Recommend for me does.
+    if method.category == "pvm" then
+        local bands = { Easy = 2, Medium = 4, Hard = 7, Elite = 10 }
+        draft.difficulty_level = method.difficulty_level or bands[method.difficulty]
+    end
 
     -- One income line as a custom row. Recipe-priced supplies (untradeable things
     -- you make yourself) have no custom equivalent yet, so they're reported.
@@ -635,7 +652,9 @@ end
 --   problems    validation problems; Save explains them while there are any
 function Draft.preview(draft, quotes)
     local record = Draft.withPlaceholderId(draft)
-    local ok, problems = CustomMethods.validate(record)
+
+    -- The save rules, so the preview says what Save would refuse.
+    local ok, problems = CustomMethods.validate(record, { saving = true })
     local preview = { problems = ok and {} or problems }
 
     -- Price only a valid draft: an invalid one has nothing trustworthy to add up.

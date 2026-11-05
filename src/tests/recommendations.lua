@@ -118,6 +118,59 @@ return function(test, equal, client, pretty)
         equal(ids(pool), "chopping")
     end)
 
+    -- Custom activities join the same pool, but only once every Required check is
+    -- confirmed met. They have no researched difficulty, so PvM comfort doesn't
+    -- apply to them.
+    test("custom activities are recommended only when every Required check is met", function()
+        local methods = catalogue()
+        local seen = context()
+
+        local function custom(id, status, profit, team)
+            local record = method(id, { team = team })
+            record.origin = "custom"
+            record.intensity = "Unclassified"
+            methods[#methods + 1] = record
+            seen.readiness[id] = { status = status }
+            seen.estimates[id] = profit and { status = "available", profit = profit } or nil
+        end
+
+        custom("mine-met", "met", 3000)
+        custom("mine-unknown", "unknown", 8000)
+        custom("mine-missing", "unmet", 8000)
+        custom("mine-loser", "met", -1)
+
+        -- Comfort 2 would drop a bundled Hard boss, but not the player's own.
+        local pool, skipped = Recommendations.pool(methods, "pvm", { comfort = 2, learning = false, group = "solo-preferred" }, seen)
+
+        equal(ids(pool), "mine-met,easy,unpriced,duo")
+        equal(skipped.unconfirmed, 1)
+        equal(skipped.missing, 1)
+        equal(skipped.unprofitable, 2)
+
+        -- Same group and hiding rules as anything else.
+        custom("mine-duo", "met", 4000, "Duo")
+        pool, skipped = Recommendations.pool(methods, "pvm", { comfort = 2, learning = false, group = "solo-only" }, seen)
+        equal(ids(pool), "mine-met,easy,unpriced")
+        equal(skipped.group, 2)
+
+        seen.hidden["mine-met"] = true
+        pool = Recommendations.pool(methods, "pvm", { comfort = 2, learning = false, group = "solo-only" }, seen)
+        equal(ids(pool), "easy,unpriced")
+
+        -- Rated in the editor: checked against comfort like a bundled boss,
+        -- including the one learning step above it. (The unrated ones above
+        -- are older saves: they still count as within comfort.)
+        seen.hidden = {}
+        custom("mine-rated-3", "met", 6000)
+        methods[#methods].difficulty_level = 3
+        custom("mine-rated-6", "met", 7000)
+        methods[#methods].difficulty_level = 6
+
+        pool, skipped = Recommendations.pool(methods, "pvm", { comfort = 2, learning = true, group = "solo-only" }, seen)
+        equal(ids(pool), "mine-met,easy,unpriced,mine-rated-3*")
+        equal(skipped.comfort, 4)
+    end)
+
     -- Unseen first; a new cycle doesn't start with the one just shown, unless
     -- it's the only match.
     test("rotation shows unseen matches before repeats and never repeats the last one when it can", function()
@@ -164,6 +217,36 @@ return function(test, equal, client, pretty)
 
         return browser
     end
+
+    -- A custom activity saved while the window is open joins the shared list;
+    -- its place in the rotation must stick like any other.
+    test("a custom activity saved while the window is open rotates like the rest", function()
+        client()
+        local prefs = Preferences.new(PersistentDB)
+        local browser = fakeBrowser(prefs)
+        local methods = { method("chopping", { category = "skilling" }) }
+        browser.readiness.chopping = { status = "met" }
+        browser.estimates.chopping = { status = "available", profit = 10 }
+
+        local recommender = Recommendations.new(methods, browser, prefs)
+        recommender:choose("skilling")
+        equal(recommender:suggestion().method.id, "chopping")
+
+        -- Saved after the recommender was made, and more profitable.
+        local mine = method("custom.1", { category = "skilling" })
+        mine.origin = "custom"
+        methods[#methods + 1] = mine
+        browser.readiness["custom.1"] = { status = "met" }
+        browser.estimates["custom.1"] = { status = "available", profit = 500 }
+
+        recommender:showAnother()
+        equal(recommender:suggestion().method.id, "custom.1")
+
+        -- Both have been shown, so a new cycle starts with the other one, not a
+        -- repeat of the custom activity.
+        recommender:showAnother()
+        equal(recommender:suggestion().method.id, "chopping")
+    end)
 
     -- Settings and rotation are saved per profile, so a reopened window carries
     -- on where it left off. Show another changes no settings.
@@ -401,6 +484,66 @@ return function(test, equal, client, pretty)
         equal(control("PvM").textColour, Style.categories.pvm)
         equal(control("Skilling").textColour, Style.muted)
         equal(control("All activities").textColour, Style.muted)
+
+        PluginShutdown()
+    end)
+
+    -- A custom activity on the card says it's the player's own. One whose
+    -- Required checks the game can't confirm (here, a relic it can't read) is
+    -- left out, and an empty result says why.
+    test("recommend for me suggests a confirmed custom activity and explains an unconfirmed one", function()
+        local function record(id, title, required)
+            return {
+                schema = 1, id = id, title = title, category = "production", no_requirements = #required == 0 or nil,
+                rate = { unit = "actions/hour", default = 10 },
+                outputs = { { label = "Other loot", pricing = "fixed", unit_value = 5, quantity = 1, basis = "action", state = "included" } },
+                supplies = {}, requirements = { required = required, recommended = {} },
+            }
+        end
+
+        client({
+            ["profit-path.custom.v1/index"] = { schema = 1, next = 3, ids = { "custom.1", "custom.2" } },
+            ["profit-path.custom.v1/custom.1"] = record("custom.1", "My plank run", {}),
+            ["profit-path.custom.v1/custom.2"] = record("custom.2", "My relic run",
+                { { kind = "unlock", unlock = "sticky-fingers", name = "Sticky Fingers" } }),
+        })
+        prettyui = pretty()
+        gepl = nil
+
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 1000, height = 740 } })
+        prettyui:findButton("Open Profit Path")()
+        prettyui:findButton("Recommend for me")()
+
+        local function shown(text)
+            for index = #prettyui.allViews, 1, -1 do
+                local view = prettyui.allViews[index]
+
+                if not view.destroyed then
+                    for _, label in ipairs(view.texts) do
+                        if tostring(label.content):find(text, 1, true) then
+                            return true
+                        end
+                    end
+                end
+            end
+
+            return false
+        end
+
+        -- Nothing to confirm, so it's met, and it comes before the bundled one
+        -- whose requirements still need checking.
+        prettyui:findButton("Production")()
+        assert(shown("My plank run"), "the confirmed custom activity is suggested")
+        assert(shown("Your custom activity"), "the card says it's the player's own")
+        assert(not shown("Unclassified"), "no unrated intensity on the card")
+
+        -- Not recommending the two that match leaves only the unconfirmed one.
+        prettyui:findButton("Don't recommend")()
+        prettyui:findButton("Don't recommend")()
+        assert(shown("Nothing matches right now"))
+        assert(shown("1 are custom activities whose Required checks the game can't confirm yet"))
+        assert(not shown("My relic run"))
 
         PluginShutdown()
     end)

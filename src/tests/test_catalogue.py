@@ -799,5 +799,43 @@ class RecipeTests(unittest.TestCase):
                     catalogue.choose_recipes(source)
 
 
+class CustomUnlockTests(unittest.TestCase):
+    """The custom activity editor's unlock list only ships things the game checks."""
+
+    def entries(self, unlocks):
+        # A throwaway custom-unlocks.json with just these entries.
+        with TemporaryDirectory() as folder:
+            path = Path(folder) / "custom-unlocks.json"
+            path.write_text(json.dumps({"schema": 1, "unlocks": unlocks}), encoding="utf-8")
+
+            with patch.object(catalogue, "CUSTOM_UNLOCKS", path):
+                return catalogue.unlock_entries()
+
+    def test_checks_are_the_bundled_ones_without_icons(self):
+        relic, prayer = self.entries([
+            {"name": "Death Note", "from": "Death Note", "kind": "relic"},
+            {"name": "Soul Split", "from": "Soul Split", "kind": "prayer"},
+        ])
+
+        self.assertEqual(relic["check"], {"kind": "flag", "var": "ARCH_RELIC_DEATH_NOTE_UNLOCKED", "text": "Death Note"})
+        self.assertEqual(prayer["key"], "soul-split")
+        self.assertEqual(prayer["check"]["text"], "Soul Split (The Temple at Senntisten, 92 Prayer)")
+        self.assertNotIn("display_icon", prayer["check"]["children"][0])
+
+    def test_anything_the_game_cannot_check_is_refused(self):
+        # A perk has no game variable we can read, so it can't be in the list.
+        perk = next(name for name, entry in catalogue.load_capabilities().items() if entry.get("kind") == "perk")
+
+        with self.assertRaisesRegex(ValueError, "can't be checked in game"):
+            self.entries([{"name": perk, "from": perk, "kind": "unlock"}])
+
+    def test_unknown_kinds_and_repeated_names_are_refused(self):
+        with self.assertRaisesRegex(ValueError, "unknown kind"):
+            self.entries([{"name": "Death Note", "from": "Death Note", "kind": "gizmo"}])
+
+        with self.assertRaisesRegex(ValueError, "two entries"):
+            self.entries([{"name": "Death Note", "from": "Death Note", "kind": "relic"}] * 2)
+
+
 if __name__ == "__main__":
     unittest.main()

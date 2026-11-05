@@ -1110,10 +1110,16 @@ function MethodView.mount(view, method, calculator, guarded, options)
     inputTable.update, inputTable.addRows = itemTable(inputs, method.income.inputs, Style.bad, method.income.period, quiet)
     outputTable.update, outputTable.addRows = itemTable(outputs, outputDefinitions, Style.good, method.income.period, quiet)
 
-    income:AddTitle("Notes")
+    -- The Notes heading only shows when there's at least one note under it,
+    -- so an activity with none doesn't end on an empty heading.
+    local assumptions = method.income.assumptions or {}
 
-    for _, assumption in ipairs(method.income.assumptions) do
-        income:AddText({ text = assumption, colour = Style.muted })
+    if #assumptions > 0 then
+        income:AddTitle("Notes")
+
+        for _, assumption in ipairs(assumptions) do
+            income:AddText({ text = assumption, colour = Style.muted })
+        end
     end
 
     -- At the bottom of the page, bundled hourly activities get Duplicate as

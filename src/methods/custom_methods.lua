@@ -20,6 +20,9 @@
 -- a deleted activity can never point at a different one later.
 local CustomMethods = {}
 
+-- The quests and unlocks a requirement can name (loaded on first use).
+local UnlockData = require("src/data/unlock_data")
+
 local INDEX_KEY = "profit-path.custom.v1/index"
 local RECORD_PREFIX = "profit-path.custom.v1/"
 
@@ -237,8 +240,8 @@ local function checkRow(row, side, index, problems)
     end
 end
 
--- Checks one requirement. Returns true if it's one the game can check (a level
--- or a quest), false for a note the player has to check themselves.
+-- Checks one requirement. Returns true if it's one the game can check (a level,
+-- quest, unlock or item), false for a note the player has to check themselves.
 local function checkRequirement(check, where, problems)
     if type(check) ~= "table" then
         problems[#problems + 1] = where .. " is not a record."
@@ -274,6 +277,21 @@ local function checkRequirement(check, where, problems)
 
         if not text(check.name, CustomMethods.LIMITS.requirementNote) then
             problems[#problems + 1] = where .. " needs the quest's name."
+        end
+
+        return true
+    end
+
+    -- An unlock from the bundled list (a prayer, relic, ability, diary...), by its
+    -- key, plus the name to show. Only keys in the list are allowed: the check
+    -- itself comes from the list, never from the saved record.
+    if check.kind == "unlock" then
+        if type(check.unlock) ~= "string" or not UnlockData.unlock(check.unlock) then
+            problems[#problems + 1] = where .. " names an unlock Profit Path doesn't know."
+        end
+
+        if not text(check.name, CustomMethods.LIMITS.requirementNote) then
+            problems[#problems + 1] = where .. " needs the unlock's name."
         end
 
         return true
@@ -342,8 +360,13 @@ end
 
 -- Checks a whole record. Returns true, or false plus a list of every problem
 -- found (not just the first), so the editor and import review can show them all.
-function CustomMethods.validate(record)
+--
+-- options.saving: the rules for a save (the editor's Save and its preview), on
+-- top of the ones every stored record must pass. A PvM activity needs a
+-- difficulty to be saved, but one saved before difficulty existed still loads.
+function CustomMethods.validate(record, options)
     local problems = {}
+    local saving = options and options.saving
 
     if type(record) ~= "table" or record.schema ~= 1 then
         return false, { "Unsupported custom activity format." }
@@ -488,14 +511,14 @@ function CustomMethods.validate(record)
 
     if NEEDS_TRACKED_CHECK[record.category] then
         if tracked == 0 then
-            problems[#problems + 1] = "PvM and Skilling activities need at least one Required level or quest."
+            problems[#problems + 1] = "PvM and Skilling activities need at least one Required level, quest, unlock or item."
         end
 
         if record.no_requirements then
             problems[#problems + 1] = "PvM and Skilling activities can't be marked 'no requirements needed'."
         end
     elseif tracked == 0 and not record.no_requirements then
-        problems[#problems + 1] = "Add a Required level or quest, or tick 'no requirements needed'."
+        problems[#problems + 1] = "Add a Required level, quest, unlock or item, or tick 'no requirements needed'."
     elseif tracked > 0 and record.no_requirements then
         problems[#problems + 1] = "'No requirements needed' can't be ticked alongside Required checks."
     end
@@ -506,6 +529,19 @@ function CustomMethods.validate(record)
     if source ~= nil and not (type(source) == "table" and (source.kind == "monster" or source.kind == "thieving")
         and text(source.title, CustomMethods.LIMITS.requirementNote)) then
         problems[#problems + 1] = "Invalid drop source."
+    end
+
+    -- How hard a PvM activity is, on the same 1-10 ladder as bundled bosses and
+    -- Recommend for me's PvM comfort. Only PvM has one. Checked last, so the editor's
+    -- status line still leads with anything more basic.
+    if record.difficulty_level ~= nil then
+        if record.category ~= "pvm" then
+            problems[#problems + 1] = "Only PvM activities have a difficulty."
+        elseif not wholeNumber(record.difficulty_level, 1, 10) then
+            problems[#problems + 1] = "The difficulty must be a whole number from 1 to 10."
+        end
+    elseif saving and record.category == "pvm" then
+        problems[#problems + 1] = "Pick how hard it is (1 to 10) on the Income tab."
     end
 
     if #problems > 0 then
@@ -556,6 +592,12 @@ local function requirementNode(check)
         return { kind = "quest", quest = check.quest, text = check.name }
     end
 
+    -- The same check a bundled activity uses for this unlock, e.g. Soul Split is
+    -- "all of" its quest and its Prayer level.
+    if check.kind == "unlock" then
+        return UnlockData.check(check.unlock)
+    end
+
     if check.kind == "item" then
         local text = (check.quantity > 1 and (check.quantity .. " x ") or "") .. check.name
         -- `picture` puts the item's picture beside the line on the activity page.
@@ -597,6 +639,20 @@ local function requirementGroup(checks, label)
     return { kind = "all", text = label, children = children }
 end
 
+-- Browse's Difficulty band for a 1-10 level: the same ranges as the bundled
+-- catalogue (src/tools/merge_methods.py, and Recommendations.bands).
+function CustomMethods.difficultyBand(level)
+    if level <= 2 then
+        return "Easy"
+    elseif level <= 4 then
+        return "Medium"
+    elseif level <= 7 then
+        return "Hard"
+    end
+
+    return "Elite"
+end
+
 -- Builds the method the rest of the plugin understands from a VALID record (call
 -- validate first). Only counted rows go into the income model: rows switched off
 -- are left out, and any row still waiting for a number makes the model incomplete,
@@ -622,6 +678,10 @@ function CustomMethods.toMethod(record)
         inputs[#inputs + 1] = incomeRow(row, false)
     end
 
+    -- A PvM difficulty works like a bundled boss's: the ladder level, the same
+    -- once practised (the player knows their own activity), and Browse's band.
+    local level = record.category == "pvm" and record.difficulty_level or nil
+
     return {
         schema = 1,
         id = record.id,
@@ -629,6 +689,9 @@ function CustomMethods.toMethod(record)
         title = record.title,
         category = record.category,
         source_category = CATEGORY_LABELS[record.category],
+        difficulty_level = level,
+        farm_level = level,
+        difficulty = level and CustomMethods.difficultyBand(level) or nil,
 
         -- Lists show this for an activity nobody has rated.
         intensity = "Unclassified",
@@ -774,7 +837,7 @@ function CustomMethods.store(db)
 
         saved.id = "custom." .. index.next
 
-        local valid, problems = CustomMethods.validate(saved)
+        local valid, problems = CustomMethods.validate(saved, { saving = true })
 
         if not valid then
             return nil, problems
@@ -813,7 +876,7 @@ function CustomMethods.store(db)
             return nil, warning
         end
 
-        local valid, problems = CustomMethods.validate(record)
+        local valid, problems = CustomMethods.validate(record, { saving = true })
 
         if not valid then
             return nil, problems
