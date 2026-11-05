@@ -465,6 +465,50 @@ class SpellTests(unittest.TestCase):
         catalogue.validate_methods({"schema": 1, "items": ctx.items, "methods": [method]}, {"monsters": []})
 
 
+class ResearchedCheckTests(unittest.TestCase):
+    # A Wiki line that names a group of items ("Shadow Realm shield" is a
+    # disambiguation page) gets a researched "check" in capabilities.json.
+    def shield_context(self, check):
+        ctx = context(capabilities={"Shadow Realm shield": {"kind": "item", "check": check}})
+        ctx.meta["items"].update({"Malevolent kiteshield": 30014, "Merciless kiteshield": 30022})
+
+        return ctx
+
+    def test_a_group_of_items_becomes_a_real_any_check_under_the_guides_name(self):
+        ctx = self.shield_context(["any", "item:Malevolent kiteshield", "item:Merciless kiteshield"])
+        method = merge_methods.convert_guide(guide(requirements={"required": ["item:Shadow Realm shield"]}), ctx, "pvm")
+        shield = method["requirements"]["access"]["children"][0]
+
+        self.assertEqual(shield["kind"], "any")
+        self.assertEqual(shield["text"], "Shadow Realm shield")
+        self.assertEqual(shield["display_items"], [30014, 30022])
+        self.assertEqual([child["itemId"] for child in shield["children"]], [30014, 30022])
+
+        catalogue.validate_methods({"schema": 1, "items": ctx.items, "methods": [method]}, {"monsters": []})
+
+    def test_the_guides_own_wording_still_wins(self):
+        ctx = self.shield_context(["any", "item:Malevolent kiteshield", "item:Merciless kiteshield"])
+        method = merge_methods.convert_guide(guide(requirements={"required": [
+            {"req": "item:Shadow Realm shield", "text": "Any Shadow Realm shield"},
+        ]}), ctx, "pvm")
+
+        self.assertEqual(method["requirements"]["access"]["children"][0]["text"], "Any Shadow Realm shield")
+
+    def test_research_that_still_cant_be_checked_is_refused(self):
+        # "Vengeful kiteshield" has no item ID in this meta, so it would be unknown.
+        ctx = self.shield_context(["any", "item:Malevolent kiteshield", "item:Vengeful kiteshield"])
+
+        with self.assertRaisesRegex(ValueError, "Vengeful kiteshield"):
+            merge_methods.convert_guide(guide(requirements={"required": ["item:Shadow Realm shield"]}), ctx, "pvm")
+
+    def test_the_item_lookup_includes_researched_check_items(self):
+        # wiki_methods.py --items must look these names up, or the merge above fails.
+        import wiki_methods
+
+        self.assertIn("Malevolent kiteshield", wiki_methods.choice_names())
+        self.assertIn("Massive pouch", wiki_methods.choice_names())
+
+
 class FreeTextTests(unittest.TestCase):
     def test_free_text_is_researched_dropped_or_listed_for_the_player(self):
         ctx = context(capabilities={

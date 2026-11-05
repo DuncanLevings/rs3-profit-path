@@ -127,6 +127,12 @@ def map_quests(dump_path):
             for entry in group:
                 names |= wiki_methods.requirement_quests(entry) | wiki_methods.requirement_items(entry)
 
+    # Our own research names quests too: Trollheim Teleport "requires" Eadgar's
+    # Ruse. Without these, that quest would stay a check-yourself line.
+    for research in load_capabilities().values():
+        for entry in research.get("requires", []) + ([research["check"]] if research.get("check") else []):
+            names |= wiki_methods.requirement_quests(entry)
+
     mapped = {}
 
     for name in sorted(names):

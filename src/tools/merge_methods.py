@@ -974,6 +974,14 @@ def capability(name, ctx, quest=False):
 
         return check
 
+    # A Wiki line that names a group of items rather than one item ("Shadow Realm
+    # shield" is a disambiguation page for three kiteshields; "Runecrafting
+    # pouches" means all five pouches or the expansive pouch that replaces them).
+    # "check" is one requirement in the guides' own shorthand, so ["any", ...]
+    # and ["all", ...] work, and it's checked like any guide requirement.
+    if research.get("check"):
+        return researched_check(name, research["check"], ctx)
+
     # A spell or prayer that only needs levels (and sometimes a quest), per the
     # Wiki's spell and prayer data, is checked as all of those. "requires" uses the
     # same shorthand as guide requirements ("skill:MAGIC:67", "quest:Desert Treasure").
@@ -1014,6 +1022,32 @@ def capability(name, ctx, quest=False):
 
         if research.get("sprite"):
             check["display_icon"] = catalogue.capability_icon(research["sprite"])
+
+    return check
+
+
+def researched_check(name, entry, ctx):
+    """A capability's researched "check" (see capability above), as a real check.
+
+    Research is only worth shipping if the plugin can actually check it, so this
+    refuses anything that comes out unknown: an item name with no item ID (not
+    in meta.json yet: run `wiki_methods.py --items`), a quest without a client
+    config, or a Wiki advice page. Better a failed build than a quiet "can't tell"."""
+    check = convert_requirement(entry, ctx)
+
+    if check is None:
+        raise ValueError(f"capabilities.json: {name}'s check has nothing left to check")
+
+    # Walk the whole tree: one unresolved leaf inside an "any" would otherwise
+    # hide behind its resolved siblings.
+    for leaf in walk_checks(check):
+        if leaf["kind"] in ("capability", "gear") and not leaf.get("equipment_group"):
+            raise ValueError(f"capabilities.json: {name}'s check can't be checked in game: {leaf['text']}")
+
+    # The guide's line keeps its own name ("Shadow Realm shield"); the item
+    # icons underneath show which items count.
+    check = dict(check)
+    check["text"] = tidy_name(name)
 
     return check
 

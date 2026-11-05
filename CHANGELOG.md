@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.28-dev - 2026-11-04
+
+- More requirements are real checks instead of "check this yourself" lines (164 unreadable checks down to 131; activities with an unreadable Required line down from 92 to 72). Each was looked up on the Wiki, with the page revision kept in `catalogue-source/research/capabilities.json`:
+  - Shadow Realm shield (Required on 14 activities: Elite Dungeons, Nex, Telos) is any of the Malevolent, Merciless or Vengeful kiteshield.
+  - All Runecrafting pouches is all five pouches (small to massive), or the expansive pouch, which replaces them.
+  - Greegree is any monkey greegree; Blood essence is any of the six blood essences; TokKul-Zo is the ring, charged or uncharged.
+  - The Lute of Love is an achievement (4921), and Eadgar's Ruse (needed for Trollheim Teleport) is a real quest check.
+- Crossing that Bridge and On the Threshold of the Mind are Archaeology research, not achievements, and Bountiful Harvest 2 is a Shop of Balance upgrade, so they stay check-yourself lines for now.
+- An activity that needs one of these can now read Missing, and Recommend for me leaves it out until you have it.
+
 ## 0.8.27-dev - 2026-11-04
 
 - Release preparation (no change to what the plugin does in game). `src/tools/package.py build` makes a repeatable release zip of only the files the game loads and lists what still blocks a submission (a development version, development-folder dependencies); `check-install PATH` compares an install with the repo by SHA-256.

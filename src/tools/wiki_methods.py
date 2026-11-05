@@ -668,9 +668,17 @@ def build(rows, revisions, item_ids, retrieved, families=None, item_names=None, 
 
 def choice_names():
     """Every item our research names: the income choices (Big bones as well as the
-    Bones a guide picked on import day), and items that access research turns into
-    real checks (a guide's plain "Rune ore box" becomes "item:Rune ore box")."""
+    Bones a guide picked on import day), items that access research turns into
+    real checks (a guide's plain "Rune ore box" becomes "item:Rune ore box"), and
+    the items in researched capability checks."""
     names = set()
+
+    # Items a researched capability check names ("Shadow Realm shield" -> the
+    # three kiteshields it stands for; see capability() in merge_methods.py).
+    if CAPABILITIES.exists():
+        for entry in json.loads(CAPABILITIES.read_text(encoding="utf-8"))["capabilities"].values():
+            if entry.get("check"):
+                names.update(requirement_items(entry["check"]))
 
     if ACCESS.exists():
         for entry in json.loads(ACCESS.read_text(encoding="utf-8"))["guides"]:
