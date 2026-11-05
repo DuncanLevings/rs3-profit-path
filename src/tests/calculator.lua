@@ -106,6 +106,71 @@ return function(test, equal, client, pretty)
         equal(zero.roi, nil)
     end)
 
+    -- The proposal's own example, with made-up numbers: 30 kills/hour and 10 kills
+    -- per trip is 3 trips/hour.
+    --   food:  8 per trip  x 3 trips  = 24 an hour x 10 GP = 240
+    --   key:   1 per kill  x 30 kills = 30 an hour x 20 GP = 600
+    --   timer: 5 per hour, whatever the kill rate         x 10 GP =  50
+    --   cost: 890.  Output: 1 bar per kill = 30 x 50 = 1,500 gross, 30 tax, 1,470 after.
+    --   profit: 1,470 - 890 = 580
+    local function tripModel(perTrip)
+        return {
+            coverage = "complete",
+            actions_per_trip = perTrip,
+            inputs = {
+                { name = "Food", item_id = 440, quantity = 8, basis = "trip" },
+                { name = "Key", item_id = 453, quantity = 1, basis = "action" },
+                { name = "Timer", item_id = 440, quantity = 5, basis = "hour" },
+            },
+            outputs = steel.income.outputs,
+        }
+    end
+
+    test("per-trip rows use trips/hour derived from the kill rate", function()
+        local result = Income.calculate(tripModel(10), 30, quotes())
+
+        equal(result.status, "available")
+        equal(result.tripsPerHour, 3)
+        equal(result.inputs[1].quantity, 24)
+        equal(result.inputs[1].basis, "trip")
+        equal(result.inputs[2].quantity, 30)
+        equal(result.inputs[3].quantity, 5)
+        equal(result.cost, 890)
+        equal(result.revenue, 1470)
+        equal(result.profit, 580)
+
+        -- Doubling the kill rate doubles trips and kills, but not the hourly row:
+        -- food 480 + keys 1,200 + timer 50 = 1,730.
+        local faster = Income.calculate(tripModel(10), 60, quotes())
+
+        equal(faster.tripsPerHour, 6)
+        equal(faster.cost, 1730)
+
+        -- Longer trips at the same kill rate mean fewer trips, so less food.
+        -- 30 kills / 15 per trip = 2 trips -> 16 food = 160, total 810.
+        equal(Income.calculate(tripModel(15), 30, quotes()).cost, 810)
+
+        -- At rate 0 there are no trips, so only the hourly row costs anything.
+        local stopped = Income.calculate(tripModel(10), 0, quotes())
+
+        equal(stopped.tripsPerHour, 0)
+        equal(stopped.cost, 50)
+    end)
+
+    test("per-trip rows without a usable kills-per-trip are refused, not free", function()
+        for _, perTrip in ipairs({ false, 0, -1, 0 / 0, math.huge }) do
+            local result = Income.calculate(tripModel(perTrip or nil), 30, quotes())
+
+            equal(result.status, "invalid")
+            equal(result.profit, nil)
+        end
+
+        -- A method with no trip rows doesn't need the number at all.
+        equal(Income.usesTrips(steel.income), false)
+        equal(Income.usesTrips(tripModel(10)), true)
+        equal(Income.calculate(steel.income, 2000, quotes()).tripsPerHour, nil)
+    end)
+
     -- Tax per bar is floor(price / 50): 49 -> 0, 99 -> 1, 100 -> 2. Times 3 bars.
     test("tax rounds down per item before multiplying quantity", function()
         local prices = quotes()

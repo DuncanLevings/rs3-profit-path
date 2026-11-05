@@ -241,10 +241,32 @@ function Income.captureQuotes(library, model, shared)
     return quotes
 end
 
+-- True if any supply or output row is counted per trip. Only then does a method
+-- need a kills/actions-per-trip number; without trip rows it's ignored.
+function Income.usesTrips(model)
+    for _, lines in ipairs({ model.inputs or {}, model.outputs or {} }) do
+        for _, line in ipairs(lines) do
+            if line.basis == "trip" then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
 -- Works out the hourly numbers for a method at a given rate (e.g. smelts/hour).
 --
 -- `model` is the method's income data, already checked when the catalogue was built,
 -- so we don't re-validate it here. `quotes` is the snapshot from captureQuotes.
+--
+-- Every row has a basis that says what its quantity is "per":
+--   "action" - per kill/smelt/item, so it scales with the rate
+--   "trip"   - per trip (food eaten on one trip, say). Trips/hour comes from
+--              rate / model.actions_per_trip, so the rate is still the one
+--              throughput number. It already includes banking and travel, so
+--              we never take downtime off a second time.
+--   "hour"   - a fixed amount per hour, whatever the rate
 --
 -- If the source recipe itself is incomplete, there's no total profit. A missing
 -- price is different: one thinly traded potion or rare drop shouldn't hide a
@@ -258,10 +280,38 @@ function Income.calculate(model, rate, quotes)
         return { status = "invalid", message = "Rate must be finite and zero or greater." }
     end
 
-    local calculated = { inputs = {}, outputs = {}, rate = rate }
+    -- Per-trip rows need to know how many actions make up one trip. Without a
+    -- sensible number we can't price them, and treating them as free would make
+    -- the profit look better than it is, so we stop here instead.
+    local tripsPerHour
+
+    if Income.usesTrips(model) then
+        local perTrip = model.actions_per_trip
+
+        if not nonNegativeFinite(perTrip) or perTrip == 0 then
+            return { status = "invalid", message = "Kills/actions per trip must be a finite number greater than zero." }
+        end
+
+        tripsPerHour = rate / perTrip
+    end
+
+    local calculated = { inputs = {}, outputs = {}, rate = rate, tripsPerHour = tripsPerHour }
 
     -- Set if a silly-big rate pushes any number to infinity; we report that below.
     local overflow = false
+
+    -- How many times one row's quantity happens per hour (see the basis list above).
+    local function perHour(line)
+        if line.basis == "action" then
+            return rate
+        end
+
+        if line.basis == "trip" then
+            return tripsPerHour
+        end
+
+        return 1
+    end
 
     -- Prices every row on one side of the recipe. `side` is "high" for supplies and
     -- "low" for outputs. Returns the rows plus the subtotal and tax subtotal; the
@@ -273,9 +323,8 @@ function Income.calculate(model, rate, quotes)
         local complete = true
 
         for _, line in ipairs(source) do
-            -- "action" rows scale with the rate (1 ore per smelt). "hour" rows are a
-            -- fixed amount per hour whatever the rate.
-            local quantity = line.quantity * (line.basis == "action" and rate or 1)
+            -- Turn the row's "per action/trip/hour" quantity into an hourly one.
+            local quantity = line.quantity * perHour(line)
 
             if not nonNegativeFinite(quantity) then
                 overflow = true
@@ -418,7 +467,7 @@ function Income.calculate(model, rate, quotes)
 
         for _, line in ipairs(lines) do
             if line.shop_price then
-                spent = spent + line.quantity * (line.basis == "action" and rate or 1) * line.shop_price
+                spent = spent + line.quantity * perHour(line) * line.shop_price
             end
         end
 
@@ -529,7 +578,7 @@ function Income.calculate(model, rate, quotes)
                     copy[key] = value
                 end
 
-                copy.quantity = shopSpend(settledOutputs) / (line.basis == "action" and rate or 1)
+                copy.quantity = shopSpend(settledOutputs) / perHour(line)
 
                 -- At a rate of 0 nothing is bought, so nothing is spent.
                 if copy.quantity ~= copy.quantity then

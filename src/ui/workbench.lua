@@ -15,6 +15,8 @@
 -- number has changed and does nothing, instead of poking UI that no longer exists.
 local MethodView = require("src/ui/method_view")
 local BrowseView = require("src/ui/browse_view")
+local MethodEditor = require("src/ui/method_editor")
+local Draft = require("src/methods/custom_draft")
 local UI = {}
 
 -- Window resizing. PrettyUI views size their inner content once, when they're
@@ -84,6 +86,12 @@ function UI.new(library, account, calculator, browser)
         if self.browseUnmount then
             self.browseUnmount()
             self.browseUnmount = nil
+        end
+
+        -- The editor's nested views go before the view itself (see method_editor.lua).
+        if self.editorUnmount then
+            self.editorUnmount()
+            self.editorUnmount = nil
         end
 
         if view then
@@ -172,22 +180,39 @@ function UI.new(library, account, calculator, browser)
                     self.methodTab = nil
 
                     navigate("method")
-                end)
+                end, {
+                    onNewCustom = function()
+                        self.editor = MethodEditor.state()
+                        self.editorReturn = "browse"
+                        navigate("editor")
+                    end,
+                })
             else
                 local backOptions = { tooltip = "Back to activities", size = 24 }
 
-                -- Back shares the title row with the method's name.
-                if self.screen == "method" then
+                -- Back shares the title row with the method's (or editor's) name.
+                if self.screen == "method" or self.screen == "editor" then
                     backOptions.absolute = true
                     backOptions.x = 10
                     backOptions.y = 10
                 end
 
+                -- From the editor, Back leaves without saving: to the activity
+                -- it was opened from, or to the list it was started from.
+                if self.screen == "editor" then
+                    backOptions.tooltip = "Back without saving"
+                end
+
                 view:AddSpriteButton("ARROW_LEFT", guarded(function()
                     if self.screen == "method" then
                         browser:returnFromMethod(self.method, calculator.quotes)
+                    elseif self.screen == "editor" and self.editorReturn == "method" then
+                        self.editor = nil
+                        navigate("method")
+                        return
                     end
 
+                    self.editor = nil
                     navigate("browse")
                 end), backOptions)
 
@@ -227,7 +252,11 @@ function UI.new(library, account, calculator, browser)
                     local versions = {}
 
                     for _, candidate in ipairs(browser.methods) do
-                        if candidate.title == self.method.title then
+                        -- Only bundled activities have versions. A custom activity
+                        -- stands alone, even when it shares a title with a bundled
+                        -- one or with another custom activity (a second copy).
+                        if candidate == self.method or self.method.origin ~= "custom"
+                            and candidate.origin ~= "custom" and candidate.title == self.method.title then
                             versions[#versions + 1] = candidate
                         end
                     end
@@ -239,6 +268,70 @@ function UI.new(library, account, calculator, browser)
                             calculator:select(version)
                             self.method = version
                             navigate("method")
+                        end,
+
+                        -- Custom activities keep their saved record on the method.
+                        onEdit = self.method.record and function()
+                            self.editor = MethodEditor.state({ draft = self.method.record })
+                            self.editorReturn = "method"
+                            navigate("editor")
+                        end,
+
+                        -- Deleted: back to the custom activities list.
+                        onDelete = self.method.record and function()
+                            local deleted, problem = calculator:deleteCustom(self.method.record.id)
+
+                            if not deleted then
+                                return problem or "Couldn't delete it. Try again."
+                            end
+
+                            browser.section = "custom"
+                            navigate("browse")
+                        end,
+
+                        onDuplicate = function()
+                            local draft, skipped = Draft.fromMethod(self.method, calculator.quotes)
+
+                            if draft then
+                                self.editor = MethodEditor.state({ draft = draft, skipped = skipped })
+                                self.editorReturn = "method"
+                                navigate("editor")
+                            end
+                        end,
+                    })
+                elseif self.screen == "editor" then
+                    self.editorUnmount = MethodEditor.mount(library, view, self.editor, guarded, {
+                        rebuild = function()
+                            navigate("editor")
+                        end,
+
+                        quote = function(itemId)
+                            return calculator:quote(itemId)
+                        end,
+
+                        save = function(draft)
+                            return calculator:saveCustom(draft)
+                        end,
+
+                        delete = function(customId)
+                            return calculator:deleteCustom(customId)
+                        end,
+
+                        -- Saved: open the activity's page. Deleted: back to the list.
+                        done = function(saved)
+                            self.editor = nil
+                            browser.section = "custom"
+
+                            local method = saved and browser:findMethod(saved.id)
+
+                            if method then
+                                calculator:select(method)
+                                self.method = method
+                                self.methodTab = nil
+                                navigate("method")
+                            else
+                                navigate("browse")
+                            end
                         end,
                     })
                 else

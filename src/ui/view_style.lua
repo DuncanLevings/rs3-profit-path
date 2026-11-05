@@ -144,6 +144,13 @@ end
 --
 -- Without `place` the button flows inline after the previous item. With it, the
 -- button goes at place.y, `place.right` in from the right edge of its parent.
+-- place = "line" puts it on a line of its own in a flowing page.
+-- The native sprite ID for one of our named icons, or nil if this client
+-- doesn't have it (callers then show text instead).
+function Style.spriteId(name)
+    return rsprite.Get(iconNames[name])
+end
+
 function Style.iconButtonWidth(name)
     return rsprite.Get(iconNames[name]) and 28 or 64
 end
@@ -153,7 +160,9 @@ function Style.iconButton(parent, name, fallbackText, tooltip, action, place)
     local width = Style.iconButtonWidth(name)
     local options = { width = width, height = 28, iconSize = 20, tooltip = tooltip }
 
-    if place then
+    if place == "line" then
+        options.marginTop = 8
+    elseif place then
         options.x = -(place.right + width)
         options.xAnchor = 1
         options.y = place.y
@@ -304,6 +313,9 @@ end
 -- (config.Font:GetStringWidth). `title` = true for title text. If measuring fails
 -- we guess about 8 units per character (10 for titles): worst case a gap is off.
 function Style.textWidth(text, title)
+    -- Nothing to measure is no width (rather than an error mid-draw).
+    text = text or ""
+
     local ok, width = pcall(function()
         return config.Font[title and TITLE_FONT or BODY_FONT]:GetStringWidth(text, false)
     end)

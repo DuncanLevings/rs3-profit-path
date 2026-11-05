@@ -98,8 +98,11 @@ local PAGE_SIZE = 10
 -- Recommend for me and My account aren't lists of methods: they have no search
 -- box, sort or filters, and their page takes the whole column.
 local function isList(section)
-    return section == "browse" or section == "favourites"
+    return section == "browse" or section == "favourites" or section == "custom"
 end
+
+-- Each list's heading.
+local listHeadings = { browse = "Browse activities", favourites = "Favourites", custom = "Custom activities" }
 
 -- A button just wide enough for the longest of `labels` (measured in the button
 -- font, so the client never clips one), so a set of choices lines up.
@@ -159,7 +162,8 @@ end
 
 -- `guarded` checks the screen's lifetime. Row callbacks also check a local
 -- generation because searching replaces rows without replacing the whole screen.
-function BrowseView.mount(library, view, browser, guarded, openMethod)
+-- `extra` (optional): { onNewCustom = function() end } for the Custom activities list.
+function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
     local sidebar, header, results
     local rowGeneration = 0
     local closed = false
@@ -893,7 +897,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         local headings = {}
 
         if heading then
-            heading.content = browser.section == "favourites" and "Favourites" or "Browse activities"
+            heading.content = listHeadings[browser.section] or listHeadings.browse
         end
 
         -- Only the page you're on (Browse, Favourites...) gets the gold native
@@ -937,7 +941,20 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
             results:AddText({ text = browser.message, colour = Style.bad })
         end
 
-        if #rows == 0 then
+        -- Saved custom activities that couldn't be read (they're still saved).
+        if browser.section == "custom" and browser.customWarning then
+            results:AddText({ text = browser.customWarning, colour = Style.bad })
+        end
+
+        -- Custom activities: start a new one from here.
+        if browser.section == "custom" and extra and extra.onNewCustom then
+            results:AddSimpleButton("New activity", rowAction(extra.onNewCustom), { width = 160, height = 30 })
+        end
+
+        if #rows == 0 and browser.section == "custom" and browser.customCount == 0 then
+            results:AddTitle("No custom activities yet")
+            results:AddText("Make your own: start from a monster's or thieving target's drops, or from nothing.")
+        elseif #rows == 0 then
             results:AddTitle("No matching activities")
             results:AddText("Try another activity or search. Add favourites from Browse to keep them here.")
         end
@@ -1031,7 +1048,9 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
             end
 
             -- Difficulty is only shown when the source rates it; we never guess one.
-            local activity = "Intensity: " .. method.intensity
+            -- Custom activities have no intensity rating, so they say what they are.
+            local activity = method.origin == "custom" and "Custom activity"
+                or "Intensity: " .. method.intensity
 
             if method.difficulty then
                 activity = activity .. "  /  Difficulty: " .. method.difficulty
@@ -1225,6 +1244,10 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
 
         sectionButtons.favourites = sidebar:AddSimpleButton("Favourites", guarded(function()
             showSection("favourites")
+        end), { width = 158, height = 32 })
+
+        sectionButtons.custom = sidebar:AddSimpleButton("Custom activities", guarded(function()
+            showSection("custom")
         end), { width = 158, height = 32 })
 
         sectionButtons.account = sidebar:AddSimpleButton("My account", guarded(function()

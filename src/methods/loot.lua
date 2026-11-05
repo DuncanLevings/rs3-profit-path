@@ -63,6 +63,25 @@ local function averageQuantity(drop)
     return tonumber(text)
 end
 
+-- Expected number of one drop per kill/action, or nil when its rate or quantity
+-- can't be read ("Very rare", "N/A", "8-9; 16-18"). Same rules as the build uses,
+-- but for the custom activity editor, which must never stop on a bad row: an
+-- unreadable one just comes in as "Needs a number".
+function Loot.expected(drop)
+    local okRate, rate = pcall(probability, drop.rate)
+    local okQuantity, quantity = pcall(averageQuantity, drop)
+
+    if not (okRate and okQuantity) then
+        return nil
+    end
+
+    local expected = rate * quantity
+
+    if expected >= 0 and expected < math.huge then
+        return expected
+    end
+end
+
 -- Pure expansion, also called with source JSON data by catalogue validation.
 -- Each selector produces one row; repeated coin ranges are combined into it.
 function Loot.expand(selection, monster)

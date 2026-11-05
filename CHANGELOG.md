@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.8.40-dev - 2026-11-05
+
+- Custom activities' item requirements (and item groups) show the item's picture on the activity page, with a border for whether you have it, like bundled activities.
+- An item a custom activity starts asking about after you closed the bank is answered from that session's bank visit, instead of staying unknown until the bank is opened again.
+- Custom activity editor: wider quantity, per and price boxes. Activities started from a thieving target only offer actions per hour.
+
+## 0.8.39-dev - 2026-11-05
+
+- Fix the error after saving a custom activity that shares its title with another custom activity (e.g. a second copy of the same activity): "attempt to get length of a nil value (local 'text')". Custom activities never group as versions of each other.
+
+## 0.8.38-dev - 2026-11-05
+
+- Custom activity editor: the same tabs as the activity page (Income, Outputs, Supplies, Requirements, How to do it, Getting there). Income takes your own notes, shown under the activity page's tables; Getting there takes your own directions, shown on that tab.
+- Every row's price can be edited: GE items start at the live GE price, and clearing the box goes back to it. Your price is still taxed when sold.
+- Coins, charms and other untradeable drops keep their item pictures, in the editor and on the activity page.
+- Clicks no longer scroll the tab back to the top. Switching between PvM, Skilling and Production no longer redraws the screen. The monster and thieving target search waits for a pause in typing.
+- Skills are picked from a grid of skill icons. Level boxes stop at 120 (combat at 152).
+- Fix the activity page failing to open for a duplicated activity that kept its bundled title.
+- The custom activity page's heading just says "Custom activity".
+
+## 0.8.37-dev - 2026-11-05
+
+- Custom activity requirements: items, "one of these items" and outfits are checks the game reads (Duplicate as custom keeps them instead of turning them into notes), including GE items no bundled activity uses. Up to 25 requirements (was 12). Both Defeating Croesus versions can now be copied and saved as is.
+- Custom activity editor: "Can't save yet" only shows after pressing Save. The top band is laid out like the activity page (ROI, revenue and cost with coins). Number boxes only take numbers, and a quantity can be a rate like 1/50. No more "1.23457e+06" values.
+- Outputs and supplies are a table like the activity page's (heading band, shaded rows, item icons, wider gaps). Only custom items can be renamed or repriced; copied rows keep their name and value. Drop notes show on the On/Off button.
+- Requirements: skills are a grid you can filter by typing; remove buttons sit left of the wording, which wraps.
+- Browse shows a custom activity's kind (PvM, Skilling...) instead of "Custom". Searches treat doubled spaces as one.
+
+## 0.8.36-dev - 2026-11-05
+
+- Custom activity editor: the top band now matches the activity page (profit with a coin, revenue and cost). "x of y" counts only show once a list is full. Pressing Save before it's ready makes the "Can't save yet" text blink red.
+- Outputs and supplies: the add form is above the list; the item search waits for a pause in typing, shows the top 5 matches and lists names that start with what you typed first. Added items are a table (Item, Qty, Per, Price each, Counted) that fits the smallest window. GE prices are shown, not typed. "Fixed GP amount" is now "Custom item". Only drops loaded from a monster or thieving target can be switched off.
+- Notes are now numbered steps (up to 10), shown on How to do it. An older single note opens as step 1, and Duplicate as custom copies the activity's steps.
+- Requirements: the form is above the lists; "Required" / "Recommended"; the skill box suggests skills as you type; items (with a quantity) can be requirements.
+- Custom activities can be deleted from their own page (bin icon beside Edit, two clicks). The editor's Delete button is no longer covered by the title.
+- Item and monster names no longer show HTML codes such as "&#39;s".
+
+## 0.8.35-dev - 2026-11-05
+
+- Fix the error after choosing how to start a custom activity ("attempt to index a nil value (local 'target')" in PrettyUI). The editor now removes its own scrolling areas before redrawing; a leftover scrollbar was still attached to the window.
+- New custom activity starts with what kind of activity it is: PvM, Skilling, Production or Daily / weekly. Loading a monster's drops or a thieving target's loot is now an optional second choice.
+- Daily/weekly custom activities: every row counts per run, with how often (every day, week or month) and optional minutes per run. Like Production, they need a Required check or "No requirements needed".
+- Duplicate as custom is now an icon button at the bottom of the Income tab ("Duplicate as custom for editing"); Edit on custom activities moved there too.
+
+## 0.8.34-dev - 2026-11-04
+
+- Custom activities (testing build). A new Custom activities section in the sidebar lists your own activities, kept apart from Browse (they also show in Favourites). They're saved once for every profile on this computer, up to 100.
+- New activity opens an editor: start from a monster's drops, a thieving target's loot (with its Thieving level as a requirement) or nothing. Tabs for Details, Outputs, Supplies and Requirements, with a preview of profit per hour, how full each list is, and why it can't be saved yet.
+- Loaded drops come in counted, off (a note restricts when the drop happens, the note isn't recognised, or the item can't be sold on the GE) or needing a number (a rate like "Very rare"). Coins count as 1 GP each. Over 40 drops, the most valuable 40 are kept and the rest can be added back.
+- Rows can be per kill/action, per trip or per hour; per-trip rows use a kills/actions-per-trip number. GE items are found by name (Grand Exchange items only); other things can be a fixed GP amount.
+- Requirements: skill levels, combat level and notes, as Required or Recommended. PvM and Skilling need at least one Required level; Production needs one or "No requirements needed". Notes are never checked by the game. Custom activities don't appear in Recommend for me yet.
+- Bundled activity pages have Duplicate as custom (not daily/weekly ones); custom pages have Edit, and Delete in the editor (two clicks).
+- Limits: 40 outputs, 15 supplies, 12 requirements, so a custom page stays well under the interface parts that ran out on Mega Shop Run. Custom pages leave out the per-row "price unavailable" tooltips; the status line still says when prices are missing.
+- Bundled data: Grand Exchange item names and thieving loot from the RuneScape Wiki (4 Nov 2026); see THIRD_PARTY_NOTICES.txt.
+
 ## 0.8.33-dev - 2026-11-04
 
 - Fix the client crash on opening Profit Path with trackingAccess granted: `Player.GetTrackingID()` is no longer called, and the trackingAccess permission is no longer requested. The 0.8.32-dev trace showed, on two separate client runs, `Plugin.HasPermission` returning true and then the client dying inside `GetTrackingID` (the 0.1.1-dev dump is a null-pointer read in rs2client.exe), so the crash is in the client and can't be caught from Lua.

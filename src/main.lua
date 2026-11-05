@@ -9,6 +9,8 @@ local catalogue = require("src/data/method_data")
 local UI = require("src/ui/workbench")
 local Browser = require("src/methods/browser")
 local Snapshot = require("src/storage/account_snapshot")
+local CustomMethods = require("src/methods/custom_methods")
+local ItemNames = require("src/data/item_names")
 
 local App = {}
 
@@ -63,7 +65,31 @@ function App.start()
         return result
     end
 
-    local browser = Browser.new(catalogue.methods, preferences, estimateMethod)
+    -- Browse gets the bundled catalogue plus the player's custom activities. The
+    -- customs are shared by every profile, so they load once here. A damaged save
+    -- just means no customs (with a message); the bundled ones still work.
+    local methods = {}
+
+    for _, method in ipairs(catalogue.methods) do
+        methods[#methods + 1] = method
+    end
+
+    local customs = CustomMethods.store(PersistentDB)
+    local records, customWarning = customs:load()
+
+    for _, record in ipairs(records) do
+        methods[#methods + 1] = CustomMethods.toMethod(record)
+    end
+
+    -- Kept for the custom activities screen (slice 3), which will show the warning.
+    calculator.customs = customs
+    calculator.customWarning = customWarning
+
+    local browser = Browser.new(methods, preferences, estimateMethod)
+
+    -- For the Custom activities list: its empty state and load warning.
+    browser.customCount = #records
+    browser.customWarning = customWarning
 
     -- Resolve account context only when the window is opened. A failed name read
     -- blocks opening rather than saving this character's choices under another one.
@@ -180,6 +206,44 @@ function App.start()
         return ok
     end
 
+    -- One GE quote, for the custom activity editor's rows.
+    function calculator:quote(itemId)
+        return Income.inspectQuote(gepl, itemId)
+    end
+
+    -- Saves a custom activity draft (new or edited) and puts it in the lists.
+    -- Returns the saved record, or nil plus a message or a list of problems.
+    function calculator:saveCustom(draft)
+        local saved, problem
+
+        if draft.id then
+            saved, problem = customs:update(draft)
+        else
+            saved, problem = customs:create(draft)
+        end
+
+        if saved then
+            local method = CustomMethods.toMethod(saved)
+            browser:putCustom(method)
+
+            -- Start reading whatever its requirements ask about (defined below,
+            -- next to the startup walk).
+            self:watchRequirements(method)
+        end
+
+        return saved, problem
+    end
+
+    function calculator:deleteCustom(customId)
+        local deleted, problem = customs:delete(customId)
+
+        if deleted then
+            browser:removeCustom(customId)
+        end
+
+        return deleted, problem
+    end
+
     function calculator:refreshPrices()
         self.quotes = Income.captureQuotes(gepl, self.method.income)
         self:recalculate()
@@ -211,10 +275,24 @@ function App.start()
     -- Groups whose items are already wanted (many checks share one group).
     local collectedGroups = {}
 
+    -- GE items a custom activity's requirements name that the bundled catalogue
+    -- doesn't have, by ID: { name = ... } (from the GE item names).
+    local extraItems = {}
+
     -- Include charged/worn IDs as ownership aliases, but keep the display ID stable.
     local function wantItem(itemId)
         local item = catalogue.items[tostring(itemId)]
         wanted[itemId] = true
+
+        if not item then
+            local name = ItemNames.label(itemId)
+
+            if name then
+                extraItems[itemId] = { name = name }
+            end
+
+            return
+        end
 
         for _, alias in ipairs(item.ownership_ids or {}) do
             wanted[alias] = true
@@ -258,9 +336,30 @@ function App.start()
         end
     end
 
-    for _, method in ipairs(catalogue.methods) do
+    -- Custom activities included, so their levels, quests and items are read too.
+    for _, method in ipairs(methods) do
         collect(method.requirements.access)
         collect(method.requirements.recommended)
+    end
+
+    -- Starts reading anything new a just-saved custom activity's requirements ask
+    -- about. `wanted` is replaced, not changed in place: readOwnership remembers
+    -- which set it last checked the bank against, and a new item needs a fresh look.
+    function calculator:watchRequirements(method)
+        local before = wanted
+        wanted = {}
+
+        for itemId in pairs(before) do
+            wanted[itemId] = true
+        end
+
+        collect(method.requirements.access)
+        collect(method.requirements.recommended)
+
+        -- Only once the window has read the account; opening it reads everything.
+        if self.evidence then
+            self:refreshEvidence()
+        end
     end
 
     -- Whether each catalogue item's ID really is that item in this client, by name.
@@ -318,9 +417,8 @@ function App.start()
             self.ownershipEvidence = account:readOwnership(wanted)
             evidence.items = {}
 
-            for key, item in pairs(catalogue.items) do
-                local itemId = tonumber(key)
-
+            -- One item's evidence, from what readOwnership saw.
+            local function observe(itemId, item)
                 if wanted[itemId] then
                     local quantity = self.ownershipEvidence.counts[itemId] or 0
                     local savedQuantity = (self.ownershipEvidence.savedCounts or {})[itemId] or 0
@@ -350,6 +448,14 @@ function App.start()
                     }
                 end
             end
+
+            for key, item in pairs(catalogue.items) do
+                observe(tonumber(key), item)
+            end
+
+            for itemId, item in pairs(extraItems) do
+                observe(itemId, item)
+            end
         end
 
         self.evidence = evidence
@@ -358,7 +464,7 @@ function App.start()
         -- Browse filters the listed requirements, using the same verdicts as
         -- the method page. A source's research status isn't a failed player check;
         -- individual checks with missing evidence still stay unknown on their own.
-        for _, method in ipairs(catalogue.methods) do
+        for _, method in ipairs(browser.methods) do
             local checked = Requirements.evaluateAccess(method.requirements, evidence)
 
             local previous = browser.readiness[method.id]

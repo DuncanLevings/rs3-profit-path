@@ -186,6 +186,46 @@ function Browser.new(methods, preferences, estimateMethod)
         end
     end
 
+    -- Adds a custom activity, or replaces the one with the same ID, after a save.
+    -- `methods` is the shared list main.lua made, so every view sees the change.
+    function self:putCustom(method)
+        local replaced = false
+
+        for index, existing in ipairs(methods) do
+            if existing.id == method.id then
+                methods[index] = method
+                replaced = true
+            end
+        end
+
+        if not replaced then
+            methods[#methods + 1] = method
+            self.customCount = (self.customCount or 0) + 1
+        end
+
+        self.estimates[method.id] = estimateMethod(method)
+    end
+
+    -- Removes a deleted custom activity from every list.
+    function self:removeCustom(customId)
+        for index = #methods, 1, -1 do
+            if methods[index].id == customId and methods[index].origin == "custom" then
+                table.remove(methods, index)
+                self.customCount = math.max(0, (self.customCount or 1) - 1)
+            end
+        end
+
+        self.estimates[customId] = nil
+    end
+
+    function self:findMethod(methodId)
+        for _, method in ipairs(methods) do
+            if method.id == methodId then
+                return method
+            end
+        end
+    end
+
     -- Uses the already-captured method quotes on Back. Discard an unsaved draft:
     -- list comparisons use each method's saved rate (or its source default).
     function self:returnFromMethod(method, quotes)
@@ -206,7 +246,17 @@ function Browser.new(methods, preferences, estimateMethod)
             local matchesCategory = self.category == "all" or method.category == self.category
             -- Hidden methods aren't filtered out here on purpose: they stay
             -- browsable (and favouritable). Only recommendations skip them.
-            local matchesSection = self.section ~= "favourites" or self.favourites[method.id]
+            -- Custom activities live in their own section (and Favourites), never
+            -- in Browse: players asked to keep their own recipes apart.
+            local matchesSection
+
+            if self.section == "favourites" then
+                matchesSection = self.favourites[method.id]
+            elseif self.section == "custom" then
+                matchesSection = method.origin == "custom"
+            else
+                matchesSection = method.origin ~= "custom"
+            end
 
             local matchesFilters = matchesLevel(self.difficulty, method.difficulty)
                 and matchesLevel(self.intensity, intensityLevel[method.intensity])

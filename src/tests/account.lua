@@ -164,6 +164,45 @@ return function(test, equal, client, pretty)
         equal(snapshot.data.BANK, nil)
     end)
 
+    -- A custom activity can start asking about an item after the bank closed.
+    -- This session's visit saw everything in the bank, so the answer comes from
+    -- it (there or not) instead of "unknown" until the bank is opened again.
+    test("an item first asked about after the bank closed uses this session's visit", function()
+        client()
+        local bankOpen = true
+        local bank = { { obj = { id = 42 }, count = 2 }, { obj = { id = 50 }, count = 1 } }
+
+        Inventory.Find = function(definition)
+            if definition.configName == "BANK" and not bankOpen then
+                return nil
+            end
+
+            local slots = definition.configName == "BANK" and bank or {}
+
+            return { isValid = true, GetSlots = function() return slots end, GetTotal = function(_, id)
+                for _, slot in ipairs(slots) do
+                    if slot.obj.id == id then
+                        return slot.count
+                    end
+                end
+
+                return 0
+            end }
+        end
+
+        local account = Account.new(function() end)
+        equal(account:readOwnership({ [42] = true }).sources.BANK, "live")
+
+        -- The bank closes; then items 50 (in it) and 77 (not) are wanted too.
+        bankOpen = false
+        local result = account:readOwnership({ [42] = true, [50] = true, [77] = true })
+        equal(result.sources.BANK, "from your last bank visit")
+        equal(result.counts[42], 2)
+        equal(result.counts[50], 1)
+        equal(result.counts[77], 0)
+        equal(result.lastKnownAbsent[77], true)
+    end)
+
     -- A closed bank counts as it was last seen (the game only sends it while
     -- it's open). Saved worn gear or backpack are only hints: those are readable
     -- live whenever the player is logged in.

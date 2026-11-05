@@ -401,6 +401,20 @@ local function pretty()
     -- nested columns. Tests find actions by label instead of layout coordinates.
     local library = { views = {}, allViews = {}, windows = {}, failTitle = false }
 
+    -- Rough native-part counts, for comparing how heavy pages are (Phase 9 size
+    -- limits). Every control counts 1 and every tooltip counts separately, since
+    -- PrettyUI builds tooltips up front at about 11 native IDs each. This is a
+    -- relative measure between pages, not the client's real ID count.
+    library.counted = { parts = 0, tooltips = 0 }
+
+    local function count(options)
+        library.counted.parts = library.counted.parts + 1
+
+        if type(options) == "table" and options.tooltip then
+            library.counted.tooltips = library.counted.tooltips + 1
+        end
+    end
+
     function library:findButton(label)
         for index = #self.allViews, 1, -1 do
             local view = self.allViews[index]
@@ -443,6 +457,7 @@ local function pretty()
         end
 
         function view:AddText(text)
+            count(text)
             local label = { content = type(text) == "table" and text.text or text, options = text }
             self.texts[#self.texts + 1] = label
 
@@ -499,6 +514,7 @@ local function pretty()
 
         -- Buttons are stored by label, so a test clicks with view.buttons["Save"]().
         function view:AddSimpleButton(text, callback, options)
+            count(options)
             local sprite = type(text) == "number" and text or nil
             text = sprite and options.tooltip or text
             self.buttons[text] = callback
@@ -558,6 +574,7 @@ local function pretty()
         -- Panels are owned children. Native destruction of a parent tears these
         -- down too; tests also record them for finding actions and evidence.
         function view:AddPanel(options)
+            count(options)
             local panel = surface()
             panel.options = options
             self.children[#self.children + 1] = panel
@@ -567,6 +584,7 @@ local function pretty()
         end
 
         function view:AddItemSlot(object, options)
+            count(options)
             local slot = { object = object, tooltip = options.tooltip, options = options }
             self.items = self.items or {}
             self.items[#self.items + 1] = slot
@@ -673,7 +691,8 @@ local function pretty()
 
         -- Mirrors the real TextField: SetText only fires onChange when notify is true.
         function view:AddTextField(options)
-            local field = { text = options.text }
+            count(options)
+            local field = { text = options.text, placeholder = options.placeholder }
 
             function field:GetText()
                 return self.text
@@ -728,8 +747,16 @@ local function pretty()
         end
 
         -- Destroying a view also destroys its tab pages, like the real library does.
+        -- A nested SimpleView must be destroyed by its owner first, though: PrettyUI
+        -- keeps its scrollbar overlay registered with the window until then, and
+        -- one left over crashed the next screen in game (4 Nov).
         function view:Destroy()
             assert(not self.destroyed, "Double destruction")
+
+            for _, child in ipairs(self.children) do
+                assert(not child.nested or child.destroyed,
+                    "A nested SimpleView was left for its parent to destroy (PrettyUI overlay leak)")
+            end
 
             self.destroyed = true
 
@@ -770,6 +797,7 @@ local function pretty()
         library.allViews[#library.allViews + 1] = view
 
         if parent.testOwner then
+            view.nested = true
             local children = parent.testOwner.children
             children[#children + 1] = view
         else
@@ -1692,6 +1720,9 @@ dofile("src/tests/browser.lua")(test, equal, client, pretty)
 
 dofile("src/tests/account.lua")(test, equal, client, pretty)
 dofile("src/tests/recommendations.lua")(test, equal, client, pretty)
+dofile("src/tests/custom_sources.lua")(test, equal)
+dofile("src/tests/custom_methods.lua")(test, equal, client, pretty)
+dofile("src/tests/custom_editor.lua")(test, equal, client, pretty)
 
 -- Last: the full shipped catalogue. test.py gave the tests above just our 4
 -- curated methods; forget every loaded plugin module (and that catalogue) so

@@ -8287,7 +8287,7 @@
    "type": "Shield"
   },
   {
-   "name": "Steel kiteshield (&#39;horse&#39;)",
+   "name": "Steel kiteshield ('horse')",
    "item_ids": [
     8760
    ],
@@ -14723,7 +14723,7 @@
    "type": "Shield"
   },
   {
-   "name": "Rune kiteshield (&#39;horse&#39;)",
+   "name": "Rune kiteshield ('horse')",
    "item_ids": [
     8728
    ],

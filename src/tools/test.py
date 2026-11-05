@@ -84,6 +84,10 @@ if recipes is not None:
 
 catalogue.verify_methods(monsters, recipes)
 
+# GE item names and thieving loot for custom activities: not used by the plugin
+# yet, but their packed files must match their sources and read back exactly.
+catalogue.verify_drop_sources()
+
 # The Wiki guide snapshot (catalogue-source/wiki) isn't used by the plugin yet, but
 # it must stay a clean, consistent import until it is.
 import wiki_methods

@@ -14,6 +14,14 @@ return {
     coins = "COINS",
     save = "WARDROBE_ICON_PRESET_SAVE_24PX_0",
 
+    -- rsprite's curated "edit" icon (client 950-1 reference list), for Edit and
+    -- Duplicate as custom. Not yet seen in game; the buttons fall back to text.
+    edit = "RS3_ICON_EDIT_23PX_0",
+
+    -- A rubbish bin, for removing rows and deleting custom activities. Not yet
+    -- seen in game; the buttons fall back to text.
+    trash = "AIF_COMBAR_TRASHCAN_0",
+
     -- Same stopwatch-reset art PrettyUI uses for its UNDO sprite button.
     reset = "RS3_ICON_STOPWATCH_RESET_0",
 

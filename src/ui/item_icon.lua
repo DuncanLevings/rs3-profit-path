@@ -2,18 +2,22 @@
 -- tables and the Requirements tab. This is display only: showing an icon never
 -- means the player owns the item or can use it.
 local definitions = require("src/data/method_data").items
+local ItemNames = require("src/data/item_names")
 local ItemIcon = {}
 
 -- Check the native item's name before showing it. A bad ID must never display
 -- some unrelated picture. Keep native property access inside the protected read.
 function ItemIcon.resolve(itemId)
+    -- The bundled catalogue's name first; custom activities can use any GE item,
+    -- so fall back to the GE item list's name.
     local definition = definitions[tostring(itemId)]
-    local expected = definition and definition.name or "Unknown item"
+    local expected = definition and definition.name or (itemId and ItemNames.label(itemId)) or "Unknown item"
+    local known = definition ~= nil or expected ~= "Unknown item"
     local ok, object = pcall(function()
         local native = config.Obj.FromID(itemId)
         local name = native and native.name
 
-        if definition and type(name) == "string" and name:lower() == expected:lower() then
+        if known and type(name) == "string" and name:lower() == expected:lower() then
             return native
         end
     end)

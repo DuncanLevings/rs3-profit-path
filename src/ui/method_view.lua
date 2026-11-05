@@ -370,7 +370,9 @@ local function mountRequirements(parent, method, calculator, fitter)
                     local border = Style.rectangle(section, { x = x, y = iconY, width = 40, height = 40, fill = false, colour = Style.muted })
 
                     -- Some items count under several IDs (charged or worn variants).
-                    local aliases = itemDefinitions[tostring(itemId)].ownership_ids or { itemId }
+                    -- A custom activity's item may not be in the bundled list at all.
+                    local definition = itemDefinitions[tostring(itemId)]
+                    local aliases = definition and definition.ownership_ids or { itemId }
 
                     borders[#borders + 1] = { border = border, aliases = aliases, verified = verified }
                 end
@@ -608,7 +610,12 @@ end
 -- An "Unavailable" value says why when hovered. PrettyUI can't change a label's
 -- tooltip after it's made, so the value label is made again when its reason
 -- changes. That only happens when prices are fetched again, never while typing.
-local function itemTable(panel, definitions, moneyColour, period)
+--
+-- `quiet` (custom activities): no per-row "why is this unavailable" tooltips. A
+-- custom page can have 55 rows, and a tooltip on every row as well as its icon
+-- would come close to what ran Mega Shop Run out of native IDs. The status line
+-- still says when prices are missing.
+local function itemTable(panel, definitions, moneyColour, period, quiet)
     -- Recurring (daily/weekly) methods count per run instead of per hour.
     local perRun = period == "run"
 
@@ -649,6 +656,10 @@ local function itemTable(panel, definitions, moneyColour, period)
         if value then
             -- A row in one of a guide's price choices says whether it's used and why.
             local tooltip = value.message or value.choiceNote or row.note
+
+            if quiet then
+                tooltip = row.note
+            end
 
             if not row.total or tooltip ~= row.tooltip then
                 addValue(row, tooltip)
@@ -790,6 +801,9 @@ end
 --   activeTab   reopen this tab, e.g. when the screen is rebuilt after a resize
 --   versions    every version of this method, in catalogue order
 --   onVersion   called with the chosen method when the player picks a version
+--   onEdit      custom activities: open the editor on this one
+--   onDelete    custom activities: delete it; returns a message if that failed
+--   onDuplicate bundled activities: open the editor on a copy
 --
 -- Returns three functions: refresh(reason), which the workbench calls when the
 -- account changes; activeTab(), which says which tab is open right now; and
@@ -836,6 +850,15 @@ function MethodView.mount(view, method, calculator, guarded, options)
     -- Filled in further down, but callbacks created before then need to see them.
     local render
     local ready = false
+
+    -- Custom activities say so up top (their numbers are the player's, not the Wiki's).
+    if method.origin == "custom" then
+        income:AddText({
+            text = "Custom activity",
+            colour = Style.gold, marginTop = 4,
+        })
+    end
+
 
     -- The Wiki's risk warning comes first when the guide has one, in the Wiki's
     -- own words ({{MMGWarning}}), with the editors' reason underneath.
@@ -975,13 +998,49 @@ function MethodView.mount(view, method, calculator, guarded, options)
     -- the money goes. The "Inputs"/"Outputs" headings still say it in words.
     -- Each table's update function, plus addRows to draw its item rows later.
     local inputTable, outputTable = {}, {}
-    inputTable.update, inputTable.addRows = itemTable(inputs, method.income.inputs, Style.bad, method.income.period)
-    outputTable.update, outputTable.addRows = itemTable(outputs, outputDefinitions, Style.good, method.income.period)
+    local quiet = method.origin == "custom"
+    inputTable.update, inputTable.addRows = itemTable(inputs, method.income.inputs, Style.bad, method.income.period, quiet)
+    outputTable.update, outputTable.addRows = itemTable(outputs, outputDefinitions, Style.good, method.income.period, quiet)
 
     income:AddTitle("Notes")
 
     for _, assumption in ipairs(method.income.assumptions) do
         income:AddText({ text = assumption, colour = Style.muted })
+    end
+
+    -- At the bottom of the page, an icon button: Edit for custom activities, or
+    -- Duplicate as custom for bundled hourly ones.
+    if method.origin == "custom" and options.onEdit then
+        Style.iconButton(income, "edit", "Edit", "Edit this custom activity", guarded(options.onEdit), "line")
+
+        -- Delete sits beside Edit. It can't be undone, so the first click only
+        -- asks for a second one (the note beside it says so).
+        if options.onDelete then
+            local armed = false
+            local confirm
+
+            Style.iconButton(income, "trash", "Delete", "Delete this custom activity", guarded(function()
+                if not armed then
+                    armed = true
+                    confirm.content = "Click the bin again to delete this activity. This can't be undone."
+                    confirm.rgba = Style.bad
+                    return
+                end
+
+                local problem = options.onDelete()
+
+                -- Still here: it didn't delete. Say why.
+                if problem then
+                    armed = false
+                    confirm.content = tostring(problem)
+                    confirm.rgba = Style.bad
+                end
+            end))
+
+            confirm = income:AddText({ text = "", inline = true, width = 460, height = 28, colour = Style.muted })
+        end
+    elseif method.origin ~= "custom" and options.onDuplicate and method.category ~= "recurring" then
+        Style.iconButton(income, "edit", "Duplicate", "Duplicate as custom for editing", guarded(options.onDuplicate), "line")
     end
 
     -- The other three tabs. Each is drawn once, when its turn comes or when it's
@@ -1013,8 +1072,14 @@ function MethodView.mount(view, method, calculator, guarded, options)
             instructions:AddText({ text = index .. ". " .. step, marginTop = 10, marginBottom = 12 })
         end
 
+        -- A custom activity's steps are the player's own notes (listed above).
+        if method.origin == "custom" then
+            if #method.instructions == 0 then
+                instructions:AddText({ text = "No steps were added to this custom activity.", colour = Style.muted })
+            end
+
         -- Imported methods don't have our own steps yet; point at the Wiki guide.
-        if #method.instructions == 0 then
+        elseif #method.instructions == 0 then
             instructions:AddText({ text = "Steps haven't been written for this activity yet. The Wiki guide \""
                 .. method.source.title .. "\" explains how to do it.", colour = Style.muted })
         end
@@ -1025,6 +1090,19 @@ function MethodView.mount(view, method, calculator, guarded, options)
 
         local travel = tabs:GetPage(4)
         local sections = method.location.sections or {}
+
+        -- A custom activity has the player's own directions, numbered.
+        if method.origin == "custom" then
+            for index, line in ipairs(method.location.routes) do
+                travel:AddText(index .. ". " .. line)
+            end
+
+            if #method.location.routes == 0 then
+                travel:AddText({ text = "No directions were added to this custom activity.", colour = Style.muted })
+            end
+
+            return
+        end
 
         -- Area headings replace the condensed location line when several places
         -- are offered. Keep standalone/generic locations' normal description.
@@ -1046,7 +1124,9 @@ function MethodView.mount(view, method, calculator, guarded, options)
             end
         end
 
-        if method.location.coverage ~= "complete" then
+        if method.origin == "custom" then
+            -- Nothing to prepare: custom activities don't record a location.
+        elseif method.location.coverage ~= "complete" then
             travel:AddText({ text = "Travel details are still being prepared for this activity.", colour = Style.muted })
         end
     end

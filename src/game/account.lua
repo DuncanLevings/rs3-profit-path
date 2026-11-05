@@ -27,6 +27,9 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         -- change while it's closed (bar deposit boxes, familiars and playing on
         -- another device), so the last read keeps counting after it closes. After
         -- a logout the saved bank (account_snapshot.lua) takes over the same way.
+        -- Besides the watched items' counts it keeps `all`: every item that was in
+        -- the bank, so an item a custom activity starts asking about after the
+        -- bank closed can still be answered (in it or not) from that same visit.
         sessionBank = nil,
         snapshot = snapshot,
         questVariables = {},
@@ -196,7 +199,12 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
                 -- With many items to ask about (the combat equipment group has
                 -- thousands), one pass over the container's slots is far cheaper
                 -- than one GetTotal call per item. Items not in any slot are 0.
-                local slots = missing > SLOT_SCAN_THRESHOLD and inventory.GetSlots and inventory:GetSlots()
+                --
+                -- The bank is always scanned once per change, so we know
+                -- everything in it (see sessionBank's `all`), not just what's watched.
+                local needAll = name == "BANK" and not (snapshot and snapshot.all)
+                local slots = (missing > SLOT_SCAN_THRESHOLD or needAll) and inventory.GetSlots and inventory:GetSlots()
+                local all = snapshot and snapshot.all
 
                 if slots then
                     local found = {}
@@ -205,9 +213,14 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
                         local itemId = slot.obj and slot.obj.id
                         local count = slot.count
 
-                        if type(itemId) == "number" and type(count) == "number" and count > 0 and wanted[itemId] then
+                        if type(itemId) == "number" and type(count) == "number" and count > 0 then
                             found[itemId] = (found[itemId] or 0) + count
                         end
+                    end
+
+                    -- Only the bank keeps the whole list; the others are read live.
+                    if name == "BANK" then
+                        all = found
                     end
 
                     for itemId in pairs(wanted) do
@@ -229,7 +242,7 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
                     end
                 end
 
-                return { configId = definition.id, counts = counts }
+                return { configId = definition.id, counts = counts, all = all }
             end)
 
             -- The bank is closed: use the last time it was open, from this session
@@ -248,11 +261,29 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
                 if counts and not (known and known.counts == counts and known.wanted == wanted) then
                     local covered = true
 
+                    -- An item we started watching after the bank closed: this
+                    -- session's visit saw everything in the bank, so it's that
+                    -- count, or 0 if it wasn't there. A saved bank from an earlier
+                    -- login only has the watched items, so there it stays unknown.
+                    local all = self.sessionBank and self.sessionBank.counts == counts and self.sessionBank.all
+
+                    local filled = false
+
                     for itemId in pairs(wanted) do
                         if counts[itemId] == nil then
-                            covered = false
-                            break
+                            if all then
+                                counts[itemId] = all[itemId] or 0
+                                filled = true
+                            else
+                                covered = false
+                                break
+                            end
                         end
+                    end
+
+                    -- Save the answers too, so the next login knows them.
+                    if filled and self.snapshot then
+                        self.snapshot:observe(name, counts)
                     end
 
                     known = { counts = counts, wanted = wanted, covered = covered }

@@ -130,7 +130,10 @@ function Recommendations.pool(methods, activity, settings, context)
     local skipped = { hidden = 0, missing = 0, comfort = 0, group = 0, unprofitable = 0 }
 
     for _, method in ipairs(methods) do
-        if method.category == activity then
+        -- Custom activities join recommendations once their requirements are
+        -- watched like the bundled ones (Phase 9, slice 5). Until then their
+        -- readiness is always unknown, so they'd only be noise here.
+        if method.category == activity and method.origin ~= "custom" then
             local readiness = context.readiness[method.id]
             local status = readiness and readiness.status or "unknown"
             local estimate = context.estimates[method.id]

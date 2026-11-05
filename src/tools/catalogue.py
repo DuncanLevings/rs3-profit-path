@@ -10,7 +10,9 @@ drop rows and sections. Only import needs an existing Monster Lookup checkout.
 #   format           tidy a hand-edited catalogue-source/methods.json into its standard
 #                    one-row-per-line layout (build and verify refuse any other layout)
 #   build            turn the JSON sources into data/monsters.lua, data/methods.lua and
-#                    data/recipes.lua (recipes come from src/tools/wiki_recipes.py)
+#                    data/recipes.lua (recipes come from src/tools/wiki_recipes.py),
+#                    plus data/ge_items.lua and data/thieving.lua when their sources
+#                    exist (from src/tools/wiki_drop_sources.py)
 #   verify           rebuild in memory and check the files on disk still match, then
 #                    load every monster back through the real Lua reader
 #
@@ -166,7 +168,9 @@ SECTION_FIELDS = (
     "title", "description", "afterword", "drops", "notes", "note_ids",
     "drop_mode", "drop_switch", "drop_threshold",
 )
-MONSTER_FIELDS = ("title", "npc_ids", "sections", "no_drops")
+# `level` is only set for thieving targets (their Thieving level); monsters leave it
+# out, and trailing empty fields aren't packed, so data/monsters.lua is unchanged.
+MONSTER_FIELDS = ("title", "npc_ids", "sections", "no_drops", "level")
 
 # Text fields get swapped for a number pointing into one shared string list.
 STRING_FIELDS = {
@@ -361,6 +365,9 @@ def json_text(value, *, pretty=False):
                       separators=None if pretty else (",", ":"))
 
 
+HTML_ENTITY = re.compile(r"&(#[0-9]+|#x[0-9a-fA-F]+|amp|quot|lt|gt|apos|nbsp);")
+
+
 def lua_literal(value):
     # Writes a Python value as Lua source on one line. Strings are escaped by hand
     # so no data can ever break out of its quotes and become runnable Lua.
@@ -374,6 +381,11 @@ def lua_literal(value):
         return json_text(value)
 
     if isinstance(value, str):
+        # Escaped Wiki text ("Armadyl&#39;s") shows on screen as-is and stops
+        # native item names matching, so it's a build error, not data.
+        if HTML_ENTITY.search(value):
+            raise ValueError(f"HTML entity in generated text (unescape it at import): {value!r}")
+
         escaped = []
 
         for char in value:
@@ -549,6 +561,9 @@ def validate(source):
         if "no_drops" in monster and not isinstance(monster["no_drops"], str):
             raise ValueError(f"Invalid no-drop reason: {title}")
 
+        if "level" in monster and (type(monster["level"]) is not int or not 1 <= monster["level"] <= 120):
+            raise ValueError(f"Invalid level: {title}")
+
         for npc_id in monster["npc_ids"]:
             if type(npc_id) is not int or npc_id < 0:
                 raise ValueError(f"Invalid NPC ID: {title}")
@@ -698,20 +713,21 @@ def decode_record(value, fields):
     return result
 
 
-def verify(source):
+def verify(source, output=OUTPUT, reader_module="src/data/monster_data", what="monster"):
     # Two checks:
     #   1. the generated file on disk is exactly what we'd build now (no stale data)
-    #   2. every monster read through the real Lua reader matches the JSON exactly
-    # The second one is what proves the packing and monster_data.lua agree.
+    #   2. every record read through the real Lua reader matches the JSON exactly
+    # The second one is what proves the packing and the reader agree. Thieving
+    # targets use the same format and reader, so they're checked the same way.
     expected = build_text(source)
 
-    if OUTPUT.read_text(encoding="utf-8") != expected:
-        raise ValueError("Generated monster data is out of date; run build")
+    if output.read_text(encoding="utf-8") != expected:
+        raise ValueError(f"Generated {what} data is out of date; run build")
 
     lua = LuaRuntime(unpack_returned_tuples=True)
     lua.globals().package.path = ROOT.as_posix() + "/?.lua"
 
-    loaded = lua.eval('require("src/data/monster_data")')
+    loaded = lua.eval(f'require("{reader_module}")')
     reader = loaded[0] if isinstance(loaded, tuple) else loaded
 
     for original in source["monsters"]:
@@ -726,8 +742,107 @@ def verify(source):
     compact_bytes = len(expected.encode("utf-8"))
     compact_json_bytes = len(json_text(source["monsters"]).encode("utf-8"))
 
-    print(f"Verified {len(source['monsters'])} complete record round trips; "
+    print(f"Verified {len(source['monsters'])} complete {what} record round trips; "
           f"{compact_bytes:,} runtime bytes ({compact_bytes / compact_json_bytes:.1%} of equivalent compact JSON).")
+
+
+# ---------------------------------------------------------------------------
+# Custom activity sources: GE item names and thieving loot (Phase 9)
+# ---------------------------------------------------------------------------
+#
+# Both come from src/tools/wiki_drop_sources.py. Nothing in the plugin loads them
+# yet; the custom activity editor will (item search, and "start from a thieving
+# target"). They're built and verified now so the data is reviewed before the UI.
+
+THIEVING_SOURCE = ROOT / "catalogue-source" / "thieving.json"
+THIEVING_OUTPUT = ROOT / "data" / "thieving.lua"
+ITEMS_SOURCE = ROOT / "catalogue-source" / "ge-items.json"
+ITEMS_OUTPUT = ROOT / "data" / "ge_items.lua"
+
+
+def thieving_as_monsters(document):
+    """thieving.json in the monster source shape, so it packs and reads the same way.
+
+    The page name and revision stay in the readable JSON for provenance; the
+    runtime only needs the title, the drop tables and the Thieving level.
+    """
+    import wiki_drop_sources
+
+    wiki_drop_sources.validate_thieving(document)
+
+    targets = []
+
+    for target in document["targets"]:
+        record = {key: target[key] for key in ("title", "npc_ids", "sections") if key in target}
+
+        if "level" in target:
+            record["level"] = target["level"]
+
+        targets.append(record)
+
+    # The build date is the day of retrieval (the timestamp's date part).
+    return {"schema": 1, "source": {"built": document["source"]["retrieved"][:10]}, "monsters": targets}
+
+
+def items_text(document):
+    """data/ge_items.lua: two parallel lists, sorted by label (see item_names.lua)."""
+    import wiki_drop_sources
+
+    wiki_drop_sources.validate_items(document)
+
+    ids = [entry["id"] for entry in document["items"]]
+    labels = [entry["label"] for entry in document["items"]]
+
+    return "\n".join([
+        "-- Generated by src/tools/catalogue.py; do not edit.",
+        "-- RuneScape Wiki contributors, CC BY-NC-SA 3.0. See THIRD_PARTY_NOTICES.txt.",
+        "return {", "schema=1,", "built=" + lua_literal(document["source"]["retrieved"][:10]) + ",",
+        "ids=" + lua_literal(ids) + ",",
+        "labels=" + lua_literal(labels) + ",",
+        "}",
+    ]) + "\n"
+
+
+def verify_items(document):
+    # Same two checks as verify(): the file is current, and every item reads back
+    # through the real reader by its ID with the same label.
+    expected = items_text(document)
+
+    if ITEMS_OUTPUT.read_text(encoding="utf-8") != expected:
+        raise ValueError("Generated GE item data is out of date; run build")
+
+    lua = LuaRuntime(unpack_returned_tuples=True)
+    lua.globals().package.path = ROOT.as_posix() + "/?.lua"
+
+    loaded = lua.eval('require("src/data/item_names")')
+    reader = loaded[0] if isinstance(loaded, tuple) else loaded
+
+    for entry in document["items"]:
+        if reader.label(entry["id"]) != entry["label"]:
+            raise ValueError(f"GE item round-trip mismatch: {entry['id']}")
+
+    print(f"Verified {len(document['items'])} GE item names; {len(expected.encode('utf-8')):,} runtime bytes.")
+
+
+def load_drop_sources():
+    """(items document, thieving document as monsters), or None for any not imported yet."""
+    items = json.loads(ITEMS_SOURCE.read_text(encoding="utf-8")) if ITEMS_SOURCE.exists() else None
+    thieving = None
+
+    if THIEVING_SOURCE.exists():
+        thieving = thieving_as_monsters(json.loads(THIEVING_SOURCE.read_text(encoding="utf-8")))
+
+    return items, thieving
+
+
+def verify_drop_sources():
+    items, thieving = load_drop_sources()
+
+    if items is not None:
+        verify_items(items)
+
+    if thieving is not None:
+        verify(thieving, THIEVING_OUTPUT, "src/data/thieving_data", "thieving target")
 
 
 # ---------------------------------------------------------------------------
@@ -1881,6 +1996,10 @@ def main():
             recipes = choose_recipes(recipe_source) if recipe_source else None
             generated_methods = methods_text(methods, source, recipes)
 
+        items, thieving = load_drop_sources()
+        generated_items = items_text(items) if items is not None else None
+        generated_thieving = build_text(thieving) if thieving is not None else None
+
         OUTPUT.parent.mkdir(parents=True, exist_ok=True)
         OUTPUT.write_text(generated, encoding="utf-8", newline="\n")
 
@@ -1890,8 +2009,15 @@ def main():
         if generated_recipes is not None:
             RECIPE_OUTPUT.write_text(generated_recipes, encoding="utf-8", newline="\n")
 
+        if generated_items is not None:
+            ITEMS_OUTPUT.write_text(generated_items, encoding="utf-8", newline="\n")
+
+        if generated_thieving is not None:
+            THIEVING_OUTPUT.write_text(generated_thieving, encoding="utf-8", newline="\n")
+
     # Always finish with a full verify, even straight after a build.
     verify(source)
+    verify_drop_sources()
 
     if recipe_source is not None:
         verify_recipes(recipe_source)

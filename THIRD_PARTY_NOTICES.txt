@@ -74,6 +74,19 @@ marks as obsolete are not included. Wiki contributor attribution and the CC BY-N
 Guide warnings ({{MMGWarning}} reasons) in catalogue-source/wiki/warnings.json are read from each guide page at its
 snapshot revision; the same attribution and licence apply.
 
+GE item names and thieving loot (custom activities, 2026-11-04)
+Derived from the RuneScape Wiki's infobox_item and dropsline structured data (Bucket API),
+category listings (Category:Thievable entities, Category:Stalls) and page revision IDs,
+retrieved 2026-11-04 with User-Agent "ProfitPath-development (Discord: Tatsuya)".
+https://runescape.wiki/w/Bucket:Infobox_item
+https://runescape.wiki/w/Bucket:Dropsline
+Item names are kept only for items with a Grand Exchange page; items the Wiki gives two
+names or an unversioned second ID are left out (listed in catalogue-source/ge-items.json).
+Thieving loot keeps only rows of drop type "thieving", grouped into one target per page or
+page version; each target records its page revision in catalogue-source/thieving.json.
+Note markup is reduced to plain text. Wiki contributor attribution and the CC BY-NC-SA 3.0
+licence above apply. Runtime uses data/ge_items.lua and data/thieving.lua.
+
 rsprite runtime dependency
 Profit Path uses the public API of the separately installed rsprite 0.1.2 library by sereselene.
 Project: https://github.com/sereselene/rsprite
