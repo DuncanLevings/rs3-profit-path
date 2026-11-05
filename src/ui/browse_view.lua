@@ -737,7 +737,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod)
         results:AddTitle({ text = "My account", colour = Style.gold, height = 32 })
         results:AddTitle({ text = "Profile", height = 30, marginTop = 8 })
 
-        -- Settings follow the character's name; no tracking ID is read.
+        -- Settings follow the display name, so a rename starts a new profile.
+        -- The name shown is read live; it can be missing for a moment after login.
         local profile = browser:profileInfo()
         local who = profile.character
             and ("Signed in as " .. profile.character .. ". ")

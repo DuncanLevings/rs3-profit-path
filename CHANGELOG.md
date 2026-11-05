@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.8.33-dev - 2026-11-04
+
+- Fix the client crash on opening Profit Path with trackingAccess granted: `Player.GetTrackingID()` is no longer called, and the trackingAccess permission is no longer requested. The 0.8.32-dev trace showed, on two separate client runs, `Plugin.HasPermission` returning true and then the client dying inside `GetTrackingID` (the 0.1.1-dev dump is a null-pointer read in rs2client.exe), so the crash is in the client and can't be caught from Lua.
+- Settings are keyed by display name again (`profit-path.characters.v1`); the tracking-ID record and its migration are removed (no build ever saved one). New characters still get "Character 2", "Character 3"...
+- Removed the temporary crash trace. The fake client in the tests now fails any call to `GetTrackingID` or `HasPermission`.
+
+## 0.8.32-dev - 2026-11-04
+
+- Temporary diagnostics for the trackingAccess crash: each step of the tracking read (enum present, HasPermission, GetTrackingID) is saved to `profit-path.diag.tracking.v1` before the next native call, so the last saved step after a crash names the call. Last 5 attempts kept; the ID itself is never recorded; nothing on screen. To be removed once the cause is known.
+- The 0.1.1-dev crash dump shows an access violation reading address 0x138 inside rs2client.exe (a null pointer in the client, not plugin code).
+
+## 0.8.31-dev - 2026-11-04
+
+- trackingAccess is now optional. Granting it and then opening Profit Path crashed the client in 0.8.30-dev (as granting did in 0.1.1-dev). Our calls are the documented `Plugin.HasPermission(PluginPermissions.trackingAccess)` then `Player.GetTrackingID()`; which one crashes isn't known yet.
+- Without the permission, settings are keyed by display name again (`profit-path.characters.v1`), and the window opens as in 0.8.29. With it, they're keyed by tracking ID as in 0.8.30, and a granted character's name entry moves to its ID on the same profile.
+- New characters get "Character 2", "Character 3"... on both paths, never clashing.
+
+## 0.8.30-dev - 2026-11-04
+
+- Settings now follow the character's tracking ID (`Player.GetTrackingID`) instead of its display name, so they survive a rename. `plugin.json` requires the trackingAccess permission; without it, or before the ID arrives a few seconds after login, the window explains why and saves nothing.
+- Existing settings carry over: the first time each character opens, its old name-keyed entry (`profit-path.characters.v1`) is matched by name, moved to `profit-path.characters.v2` under its tracking ID, and removed from the old record (deleted once empty). Display names are no longer stored.
+- New characters get profiles named "Character 2", "Character 3"... rather than their display name.
+- README: persistence table, Permissions and Data Protection disclosure updated; the rename limitation is gone.
+
+## 0.8.29-dev - 2026-11-04
+
+- `plugin.json` has the contact email the manifest docs require (`contactEmailAddress`: Tatsuya636@hotmail.com). `package.py build` now lists a missing contact address as a submission blocker.
+- README: the disclosure draft follows Jagex's submission sections (Email, Feedback and collaboration, EULA, Permissions, Data Protection), with one open question on which Data Protection case applies.
+
 ## 0.8.28-dev - 2026-11-04
 
 - More requirements are real checks instead of "check this yourself" lines (164 unreadable checks down to 131; activities with an unreadable Required line down from 92 to 72). Each was looked up on the Wiki, with the page revision kept in `catalogue-source/research/capabilities.json`:

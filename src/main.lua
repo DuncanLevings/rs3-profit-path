@@ -66,8 +66,10 @@ function App.start()
     local browser = Browser.new(catalogue.methods, preferences, estimateMethod)
 
     -- Resolve account context only when the window is opened. A failed name read
-    -- blocks edits rather than saving this character's choices under another one.
+    -- blocks opening rather than saving this character's choices under another one.
     function calculator:useCharacter()
+        -- Settings are keyed by display name. (The tracking ID would survive a
+        -- rename, but reading it crashes this client; see preferences.lua.)
         local name, problem = account:readCharacterName()
 
         if not name then

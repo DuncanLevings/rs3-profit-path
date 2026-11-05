@@ -90,6 +90,14 @@ def release_problems(manifest):
     if "-dev" in str(manifest.get("version", "")):
         problems.append(f"version {manifest.get('version')} is a development version")
 
+    # The manifest docs (developer.runescape.com/rs/structure.html) call the
+    # contact address a legal requirement. A rough shape check only: it catches
+    # a missing or blank field, not a mistyped address.
+    email = manifest.get("contactEmailAddress")
+
+    if not isinstance(email, str) or "@" not in email.strip(" @"):
+        problems.append("contactEmailAddress is missing")
+
     # A dependency given as a folder name (rather than a Plugin Hub ID number)
     # only works with that plugin sitting in dev_plugins on this computer.
     for name, value in sorted(manifest.get("requiredDependencies", {}).items()):

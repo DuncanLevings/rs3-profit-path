@@ -95,8 +95,9 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         return skills
     end
 
-    -- Read only our own visible name. Don't retain the entity proxy and never
-    -- use the tracking ID: it needs a permission this plugin doesn't request.
+    -- Our own visible name, for the window and My account, and the key that
+    -- picks this character's settings profile (see Preferences:bindCharacter).
+    -- Don't retain the entity proxy.
     function self:readCharacterName()
         if not self.active or not Player.IsAvailable() then
             return nil, "Enter a game world before opening Profit Path."

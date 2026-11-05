@@ -87,7 +87,7 @@ end
 -- logged out, state.failWrite = true for a storage failure, and so on.
 -- `database` optionally pre-fills PersistentDB, to simulate a reload.
 local function client(database)
-    local state = { available = true, permitted = false, identity = nil, inventory = nil, reads = 0, db = database or {} }
+    local state = { available = true, identity = nil, inventory = nil, reads = 0, db = database or {} }
 
     Event = {}
 
@@ -108,9 +108,10 @@ local function client(database)
             return state.available
         end,
 
-        -- Booby-trapped: the plugin must never read tracking IDs, so this throws.
+        -- The real one crashes the client every time (traced in 0.8.32-dev), so
+        -- any call at all fails the test.
         GetTrackingID = function()
-            error("Tracking ID reads are disabled after the reported client crash")
+            error("Player.GetTrackingID must never be called: it crashes the client")
         end,
 
         GetLevelUncapped = function(skill)
@@ -185,9 +186,10 @@ local function client(database)
         end,
     }
 
+    -- No permissions are requested, so nothing should ask about them.
     PluginPermissions = { trackingAccess = "trackingAccess" }
     Plugin = { HasPermission = function()
-        return state.permitted
+        error("Plugin.HasPermission must not be called: Profit Path requests no permissions")
     end }
 
     -- The fake exposes only the rsprite API we use: name lookups, plus drawing one
@@ -830,19 +832,44 @@ test("logged-out player never reads skills or identity", function()
     account:destroy()
 end)
 
--- Even if the player granted trackingAccess before, we must not read the ID
--- (the fake GetTrackingID throws if anyone tries).
-test("player reads never read tracking identity, even with an existing grant", function()
+-- Settings are keyed by display name (folded A-Z), first character on the
+-- existing profile, later ones numbered.
+test("the display name picks the profile, and bad names or failed writes change nothing", function()
     local state = client()
-    local account = Account.new(function() end)
+    local Preferences = require("src/storage/preferences")
+    local steel = require("src/data/method_data").find("smelting-steel-bars.basic")
+    local prefs = Preferences.new(PersistentDB)
 
-    state.permitted = true
+    -- The first character keeps the existing (Default) profile; a different
+    -- capitalisation is the same character.
+    assert(prefs:bindCharacter("Fixture"))
+    equal(prefs.profile, "Default")
+    assert(prefs:saveRate(steel, 1000))
+    equal(state.db["profit-path.characters.v1"].bindings["fixture"], "Default")
+    equal(state.db["profit-path.characters.v1"].owner, "fixture")
 
-    equal(account:readSkills({ PRAYER = true }).PRAYER.level, 92)
-    equal(account:readCombatLevel().status, "available")
-    assert(account:readCharacterName())
+    assert(prefs:bindCharacter("FIXTURE"))
+    equal(prefs.profile, "Default")
 
-    account:destroy()
+    -- A second character gets a numbered profile, starting from the source default.
+    assert(prefs:bindCharacter("Other"))
+    equal(prefs.profile, "Character 2")
+    equal(prefs:loadRate(steel), steel.income.rate.default)
+
+    -- Profiles older builds named after a character still count as taken.
+    state.db["profit-path.characters.v1"].bindings["third"] = "Character 3"
+    assert(prefs:bindCharacter("Fourth"))
+    equal(prefs.profile, "Character 4")
+
+    -- Bad names and failed writes never switch profile.
+    for _, invalid in ipairs({ "", "   ", "Name\n", "Name\0" }) do
+        equal(prefs:bindCharacter(invalid), false)
+        equal(prefs.profile, "Character 4")
+    end
+
+    state.failWrite = true
+    equal(prefs:bindCharacter("Fifth"), false)
+    equal(prefs.profile, "Character 4")
 end)
 
 -- A crashing native read must show up as an error, not look like an empty bank.

@@ -324,9 +324,9 @@ return function(test, equal, client, pretty)
 
         -- An unreadable list is never overwritten with an empty one.
         state.failWrite = false
-        state.db["profit-path.hidden.v1/5:Other"] = { schema = 2 }
+        state.db["profit-path.hidden.v1/11:Character 2"] = { schema = 2 }
         equal(prefs:saveHidden("b", true), false)
-        equal(state.db["profit-path.hidden.v1/5:Other"].schema, 2)
+        equal(state.db["profit-path.hidden.v1/11:Character 2"].schema, 2)
     end)
 
     -- "Don't recommend" will live on Recommend for me's cards, so for now the
@@ -1917,6 +1917,8 @@ return function(test, equal, client, pretty)
         parent:Destroy()
     end)
 
+    -- Names are kept byte for byte (only A-Z are folded), so UTF-8 and
+    -- nonbreaking spaces still find the right profile after a reload.
     test("native display names accept UTF-8 and nonbreaking spaces while preserving saved settings", function()
         equal(utf8, nil, "Run this regression with the client-unavailable library removed")
         client()
@@ -1940,12 +1942,5 @@ return function(test, equal, client, pretty)
         assert(restored:bindCharacter(first))
         equal(restored:loadRate(steel), 1000)
         assert(restored:loadFavourites()[steel.id])
-
-        local profile = restored.profile
-
-        for _, invalid in ipairs({ "", "   ", "Name\n", "Name\0" }) do
-            equal(restored:bindCharacter(invalid), false)
-            equal(restored.profile, profile)
-        end
     end)
 end

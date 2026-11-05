@@ -4,8 +4,11 @@
 --
 -- How profiles work: PersistentDB is shared by every character on this computer,
 -- so saved rates and favourites live under a "profile". When a window opens we
--- read the character's visible name and look up (or create) its profile. We never
--- use the tracking ID, which needs a permission we don't ask for.
+-- read the character's display name and look up (or create) its profile.
+--
+-- Why not the tracking ID (trackingAccess), which would survive a rename? In
+-- this client Player.GetTrackingID() crashes the whole game every time it's
+-- called (traced in 0.8.32-dev; see CHANGELOG), so it isn't used at all.
 --
 -- Each rate lives under its own key rather than in one big record, so a failed save
 -- or a reset can only ever touch that one rate. Treat the key formats below as a
@@ -209,14 +212,21 @@ function Preferences.new(db)
         return stored.value, true
     end
 
-    -- Switches to the profile for character `name`, creating one if it's new. No
+    -- Name keys are the display name with ASCII capitals folded. (Lua's
+    -- byte-wise lower() can damage UTF-8 under the Windows locale, so only
+    -- A-Z are touched.)
+    local function foldName(name)
+        return (name:gsub("[A-Z]", function(letter)
+            return string.char(letter:byte() + 32)
+        end))
+    end
+
+    -- Switches to the profile for this character, creating one if it's new. No
     -- saved rate is ever rewritten here: we only decide which profile to read from.
     --
-    -- The stored record is { schema, owner, bindings = { [name] = profile } }:
-    --   * the first character ever bound becomes the "owner" and keeps the old
-    --     profile (usually "Default"), so settings from older builds aren't lost;
-    --   * every later character gets a profile named after itself.
-    -- It's all one record, so a failed write can't leave half a migration behind.
+    -- CHARACTERS_KEY holds { schema = 1, owner = <first character>, bindings =
+    -- { [folded name] = profile } }. A renamed character looks new: its old
+    -- settings stay saved under the old name.
     function self:bindCharacter(name)
         if not validCharacterText(name) then
             return false, "Character name is unavailable or contains invalid text. Try opening again."
@@ -232,6 +242,7 @@ function Preferences.new(db)
 
         -- Load and check the existing bindings. If anything looks off we stop and
         -- write nothing, rather than risk overwriting the player's real setup.
+        local invalid = "Saved character bindings are invalid; existing settings were left untouched."
         local bindings = {}
         local owner
 
@@ -240,50 +251,50 @@ function Preferences.new(db)
                 and type(stored.bindings) == "table" and validCharacterText(stored.owner)
 
             if not validRecord then
-                return false, "Saved character bindings are invalid; existing settings were left untouched."
+                return false, invalid
             end
 
             owner = stored.owner
 
             for character, profile in pairs(stored.bindings) do
                 if not validCharacterText(character) or not validCharacterText(profile) then
-                    return false, "Saved character bindings are invalid; existing settings were left untouched."
+                    return false, invalid
                 end
 
                 bindings[character] = profile
             end
         end
 
-        -- Lua's byte-wise lower() can damage UTF-8 under the Windows locale.
-        -- Fold ASCII capitals only and leave every multibyte sequence untouched.
-        local normalized = name:gsub("[A-Z]", function(letter)
-            return string.char(letter:byte() + 32)
-        end)
-
+        local normalized = foldName(name)
         local profile = bindings[normalized]
 
         -- New character: work out its profile and save the binding.
         if not profile then
-            profile = owner and name or self.profile
-
-            -- Another character might already use a profile with this name (say, an
-            -- old typed profile). Prefix "_" until it's unique, so two characters
-            -- never share rates or favourites by accident.
+            -- The very first character keeps the settings older builds saved
+            -- (the typed profile, usually "Default"). Everyone after that gets
+            -- "Character 2", "Character 3"... (older builds used the name).
             local used = {}
 
             for _, existing in pairs(bindings) do
                 used[existing] = true
             end
 
-            while used[profile] do
-                profile = "_" .. profile
+            if not next(used) then
+                profile = self.profile
+            else
+                local number = 2
+
+                while used["Character " .. number] do
+                    number = number + 1
+                end
+
+                profile = "Character " .. number
             end
 
             bindings[normalized] = profile
-            owner = owner or normalized
 
             local success, written = pcall(function()
-                return db:SetStructuredData(CHARACTERS_KEY, { schema = 1, owner = owner, bindings = bindings })
+                return db:SetStructuredData(CHARACTERS_KEY, { schema = 1, owner = owner or normalized, bindings = bindings })
             end)
 
             if not success or written ~= true then

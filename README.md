@@ -2,7 +2,7 @@
 
 An RS3 plugin for planning money making. It lists every RuneScape Wiki money making guide (674 activities), works out each one's profit from live Grand Exchange prices, checks the guide's requirements against your account, and can suggest an activity that suits you.
 
-It is a planning tool only. It sends no game inputs, gives no live combat or movement advice, and opens no links. Status: development build (`plugin.json` version ends in `-dev`); not submitted, and no approval is implied.
+It is a planning tool only. It sends no game inputs, gives no live combat or movement advice, and opens no links. Status: development build (`plugin.json` version ends in `-dev`); not submitted, and no approval is implied. Contact: Tatsuya636@hotmail.com.
 
 ## What the player sees
 
@@ -30,7 +30,7 @@ A game-state change (login, logout, world hop) destroys the window, because its 
 | File | Owns |
 |---|---|
 | `src/main.lua` | Wiring, the calculator state behind the method screen, which account evidence the catalogue needs |
-| `src/game/account.lua` | All client event subscriptions and native account reads (skills, quests, unlock flags, achievements, backpack/worn/bank, tool belt) |
+| `src/game/account.lua` | All client event subscriptions and native account reads (display name, skills, quests, unlock flags, achievements, backpack/worn/bank, tool belt) |
 | `src/game/toolbelt.lua` | Tool-belt hatchet/pickaxe/mattock reads through the client's own item enums |
 | `src/game/requirements.lua` | Pure met / unmet / unknown evaluation of requirement trees (no client calls) |
 | `src/methods/income.lua` | GEPL price reads and the profit/ROI arithmetic |
@@ -102,7 +102,7 @@ Everything is stored in the client's `PersistentDB` on this computer. Keys (trea
 | Key | Holds |
 |---|---|
 | `profit-path.profile.v1` | The last selected profile |
-| `profit-path.characters.v1` | Which character display name uses which profile |
+| `profit-path.characters.v1` | Which character display name uses which profile (the first character keeps the existing profile; later ones are "Character 2", "Character 3"...; builds before 0.8.30 named them after the character) |
 | `profit-path.browser.v1` | Sort choice (device-wide) |
 | `profit-path.rate.v1/<profile>/<method>/<unit>` | One saved personal rate per activity |
 | `profit-path.favourites.v1/<profile>` | Favourites |
@@ -112,12 +112,15 @@ Everything is stored in the client's `PersistentDB` on this computer. Keys (trea
 
 Unreadable records are never overwritten; write failures are shown and can be retried.
 
-### Permissions, network and data disclosure (draft)
+### Submission disclosure (draft)
 
-- **Permissions requested:** none. `test.py` fails if one is added to `plugin.json`.
-- **Network:** Profit Path makes no requests itself. Prices come from GE Prices Library, which owns its own HTTP access and cache.
-- **Game data read:** your character's visible display name (to keep settings per character; the tracking ID is never read), skill levels, combat level, quest completion, specific unlock and achievement values, and counts of catalogue items in your backpack, worn equipment, bank and tool belt.
-- **Stored:** the settings and item counts listed above, locally only. Nothing is sent anywhere.
+Written to the section headings of Jagex's submission example (developer.runescape.com/rs/submission/example.html). Not submitted yet.
+
+- **Email:** Tatsuya636@hotmail.com (also `contactEmailAddress` in `plugin.json`).
+- **Feedback and collaboration:** in the plugin's channel on the RuneScape Plugin Portal Discord (channel link to add once it exists), or by the email above.
+- **EULA:** Profit Path uses software licensed by Jagex under the Jagex EULA (https://legal.jagex.com/docs/terms/eula); all development and use of the plugin is subject to it.
+- **Permissions:** none requested (no HttpAccess, chatAccess or trackingAccess). `test.py` fails if one is added. trackingAccess was tried in 0.8.30-dev to key settings by tracking ID, but `Player.GetTrackingID()` crashes this client every time (see Known limitations). Prices come from the separately installed GE Prices Library, which requests its own HttpAccess; Profit Path makes no network requests itself.
+- **Data Protection:** nothing is transmitted anywhere. What is read: your character's visible display name (to keep settings per character; the tracking ID is never read), skill levels, combat level, quest completion, specific unlock and achievement values, and counts of catalogue items in your backpack, worn equipment, bank and tool belt. What is stored locally between sessions: the settings in the table above, the display-name-to-profile link, and per-profile counts of catalogue items (so a closed bank can be counted). **Open question:** the example's case 1 (no transmission) says game information isn't stored between sessions, and Profit Path does keep the display name and item counts. Confirm with Jagex which case applies, or drop that storage, before submitting.
 
 ### Dependencies
 
@@ -188,6 +191,7 @@ Wiki collection is a deliberate maintainer step, never part of the plugin. It fo
 
 - Gear tier checks cover the bundled tier lists; other tool-belt categories and storage outside the backpack, worn gear and bank (e.g. Diango) aren't read.
 - Unlocks the game doesn't expose stay as "check yourself" lines (see Requirement checks).
-- A character display-name change looks like a new character; the old settings stay saved under the old name.
 - Window position isn't remembered across reloads.
+- A display-name change looks like a new character; the old settings stay saved under the old name.
+- Settings can't follow a renamed character: the documented `Player.GetTrackingID()` (trackingAccess) crashes the RuneScape client on every call (traced in 0.8.32-dev: `Plugin.HasPermission` returns true, then the client dies inside `GetTrackingID`). Profit Path never calls it; revisit once Jagex fixes it.
 - Profit is an estimate from the Wiki's rates and current GE prices, not a promise.

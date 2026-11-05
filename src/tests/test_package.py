@@ -49,13 +49,15 @@ class ReleaseProblemTests(unittest.TestCase):
             "requiredDependencies": {"prettyui": 6398181, "gepl": "gepl"},
         })
 
-        self.assertEqual(len(problems), 2)
+        self.assertEqual(len(problems), 3)
         self.assertIn("development version", problems[0])
-        self.assertIn("'gepl'", problems[1])
+        self.assertIn("contactEmailAddress", problems[1])
+        self.assertIn("'gepl'", problems[2])
 
     def test_release_manifest_has_none(self):
         problems = package.release_problems({
             "version": "1.0.0",
+            "contactEmailAddress": "someone@example.com",
             "requiredDependencies": {"prettyui": 6398181, "gepl": 1234},
         })
 

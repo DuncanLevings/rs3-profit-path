@@ -637,7 +637,8 @@ return function(test, equal, client, pretty)
         local reloaded = Preferences.new(PersistentDB)
         assert(reloaded:bindCharacter("Other character"))
 
-        equal(reloaded.profile, "Other character")
+        -- Profiles are numbered, never named after the character.
+        equal(reloaded.profile, "Character 2")
         equal(reloaded:loadRate(steel), 0)
 
         -- Resetting the first character's rate must not touch unrelated keys or the
@@ -685,13 +686,15 @@ return function(test, equal, client, pretty)
         assert(warning)
     end)
 
-    test("storage failures and invalid profile names are reported without changing selection", function()
+    test("storage failures and invalid character names are reported without changing selection", function()
         local state = client()
         local preferences = Preferences.new(PersistentDB)
 
-        -- Blank names and names with control characters are rejected outright.
+        -- Missing, blank and control-character names are rejected outright.
+        equal(preferences:bindCharacter(nil), false)
         equal(preferences:bindCharacter(""), false)
         equal(preferences:bindCharacter("bad\nname"), false)
+        equal(preferences.profile, "Default")
 
         -- A failed write leaves us on the old profile and reports failure.
         state.failWrite = true
@@ -835,6 +838,22 @@ return function(test, equal, client, pretty)
         for _, sourceEvent in pairs(Event) do
             equal(sourceEvent.count(), 0)
         end
+    end)
+
+    -- No permission is involved: the window opens keyed by the display name.
+    test("the window opens and saves the character under its display name", function()
+        local state = client()
+        prettyui = pretty()
+        gepl = nil
+
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
+        prettyui.views[1].buttons["Open Profit Path"]()
+
+        equal(#prettyui.windows, 1)
+        equal(state.db["profit-path.characters.v1"].bindings["fixture"], "Default")
+
+        PluginShutdown()
     end)
 
     test("launcher remount and close-reopen retain one independent window and its draft", function()
