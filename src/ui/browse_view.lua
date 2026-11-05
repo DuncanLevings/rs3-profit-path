@@ -165,7 +165,8 @@ end
 -- `guarded` checks the screen's lifetime. Row callbacks also check a local
 -- generation because searching replaces rows without replacing the whole screen.
 -- `extra` (optional): { onNewCustom = function() end }, which opens the custom
--- activity editor (the sidebar's Create activity button).
+-- activity editor (the sidebar's Create activity button), and onImport, which
+-- opens the screen for pasting in an activity someone shared (Import activity).
 function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
     local sidebar, header, results
     local rowGeneration = 0
@@ -961,10 +962,17 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
         -- same Create activity as the sidebar.
         if #rows == 0 and browser.origin == "custom" and (browser.customCount or 0) == 0 then
             results:AddTitle("No custom activities yet")
-            results:AddText("Make your own: start from a monster's or thieving target's drops, or from nothing.")
+            results:AddText("Make your own: start from a monster's or thieving target's drops, or from nothing. "
+                .. "Or import one someone shared.")
 
             if extra and extra.onNewCustom then
                 results:AddSimpleButton("Create activity", rowAction(extra.onNewCustom), { width = 160, height = 30 })
+            end
+
+            -- Or bring in one somebody shared.
+            if extra and extra.onImport then
+                results:AddSimpleButton("Import activity", rowAction(extra.onImport),
+                    { width = 160, height = 30, inline = extra.onNewCustom ~= nil })
             end
         elseif #rows == 0 then
             results:AddTitle("No matching activities")
@@ -1266,6 +1274,15 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             sidebar:AddSimpleButton("Create activity", guarded(function()
                 stopFinding()
                 extra.onNewCustom()
+            end), { width = 158, height = 32 })
+        end
+
+        -- Import activity is an action too: a screen for pasting in an activity
+        -- someone shared (from their activity page's Export).
+        if extra and extra.onImport then
+            sidebar:AddSimpleButton("Import activity", guarded(function()
+                stopFinding()
+                extra.onImport()
             end), { width = 158, height = 32 })
         end
 

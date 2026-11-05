@@ -6,7 +6,7 @@ It is a planning tool only. It sends no game inputs, gives no live combat or mov
 
 ## What the player sees
 
-The **Open Profit Path** button in the Plugins ribbon opens a separate, resizable window with four sidebar sections and a **Create activity** button (which opens the custom activity editor):
+The **Open Profit Path** button in the Plugins ribbon opens a separate, resizable window with four sidebar sections, a **Create activity** button (which opens the custom activity editor) and an **Import activity** button (which takes an activity someone shared):
 
 - **Browse**: every activity, bundled and your own custom ones, by group (PvM, Skilling, Production, Recurring), with search, Profit or ROI sort (highest first), Show (All or Custom only), and Intensity, Requirements and Difficulty filters. Ten rows per page.
 - **Recommend for me**: pick a group, get one suggestion at a time with the reasons for it. **Show another** moves on; **Don't recommend** skips that exact activity from now on (with Undo). Your custom activities are suggested too, once the game confirms every Required check; a custom PvM activity is rated 1-10 in the editor and checked against your PvM comfort like a bundled boss.
@@ -14,6 +14,8 @@ The **Open Profit Path** button in the Plugins ribbon opens a separate, resizabl
 - **My account**: which character and profile your settings belong to, Recommend for me's settings (PvM comfort 1-10, harder "learning" suggestions, solo/group), and the activities you chose not to have recommended.
 
 Opening an activity shows four tabs: **Income** (inputs, outputs, profit, ROI and an editable rate you can save or reset), **Requirements** (the guide's own wording, with what your account meets), **How to do it** and **Getting there**.
+
+A custom activity's page also has **Edit**, **Delete** and **Export** in its header. Export shows the activity as one line of text to copy (Ctrl+A, Ctrl+C) and send to someone. Import checks a pasted line and shows what it holds before **Add as new activity** saves it. Only the recipe is shared: no profile, favourites, saved rates, account details, your own GE prices or profit figures.
 
 ## Reviewer guide
 
@@ -39,6 +41,8 @@ A game-state change (login, logout, world hop) destroys the window, because its 
 | `src/methods/recommendations.lua` | Candidate filtering, ordering and rotation for Recommend for me |
 | `src/methods/custom_draft.lua` | The custom activity editor's working copy: loading drops from a monster or thieving target, the three row states, drops left out at the limit, Duplicate as custom and the preview |
 | `src/ui/method_editor.lua` | The custom activity editor screen (the activity page's tabs plus Outputs and Supplies, profit band, item table, searches that wait for a pause in typing) |
+| `src/methods/custom_share.lua` | Sharing custom activities: the `PP1:` share line (short field names, escaped text, an FNV-1a checksum), a strict reader that only builds known fields, and GE item names left out when they match the bundled list, the import review (the same checks as a save, plus warnings for unknown GE items and quests) |
+| `src/ui/share_view.lua` | The Export screen (the line in a box that puts itself back if typed in) and the Import screen (paste box, review, Add as new activity) |
 | `src/methods/custom_methods.lua` | Custom activities: record checks and size limits, conversion to the shared method shape, and storage. Saved ones show in Browse (Show: Custom only lists just them) and Favourites |
 | `src/storage/preferences.lua` | Every saved setting (keys below) |
 | `src/storage/account_snapshot.lua` | Saved catalogue-relevant item counts per profile (stands in for a closed bank) |
@@ -81,6 +85,7 @@ There is no gameplay polling. Late button callbacks are ignored using a per-scre
 - **No `utf8` global** in the client; the tests run with it removed.
 - **Native dynamic IDs**: the client has 4,096 shared by every plugin, and PrettyUI builds each tooltip up front (about 11 IDs each), so activity pages draw in steps and use tooltips sparingly. The Mega Shop Run guide is left out of the catalogue because its page alone ran out of IDs. Custom activities are capped (40 outputs, 15 supplies) so their page stays under 60% of that page's tooltips: their rows keep the item icon's tooltip but not a per-row price note, and the editor draws 8 rows at a time, with tooltips only on each row's item icon, remove button and (drops with a note) On/Off button. Each row's "About 2.4 an hour" line is plain text, with no tooltip. On a custom page, item requirements show the item's picture beside a line that names it, and item groups list their items in the line, so neither adds a tooltip; the budget test includes a full requirements list. The test fake counts parts and tooltips (src/tests/custom_editor.lua); that's a relative measure, not the client's real ID count.
 - **Item IDs** are checked against the client's own item name before an icon is shown or ownership counts.
+- **Sharing** (`custom_share.lua`): plugins have no clipboard or file API, so activities are shared as text in an InputField. A probe plugin (5 Nov 2026) found that a box holds at most 9,999 characters whatever `maxLength` asks for, that a line break cuts the text, and that Ctrl+C and Ctrl+V keep the text exactly. So the share line is one line of printable ASCII of at most 9,998 characters, and a 9,999-character paste is refused as possibly cut off. GE item names that match the bundled GE list are left out of the line and filled back in from the list on import (an item the list lacks comes in as "Item <id>", with a warning), so a typical monster activity is about 2,200 characters. One with long notes on every row, or every requirement a full item group, can still go over the limit. The editor's profit band shows the share size from 8,500 characters ("Share code: 8,700 of 9,998 characters", red when over), and Export then says what to shorten. The text limits weren't lowered: bundled steps and directions already run past them (up to about 1,250 characters, shortened on Duplicate), and saved activities must keep loading.
 
 ### Requirement checks and their limits
 
@@ -204,3 +209,4 @@ Wiki collection is a deliberate maintainer step, never part of the plugin. It fo
 - A display-name change looks like a new character; the old settings stay saved under the old name.
 - Settings can't follow a renamed character: the documented `Player.GetTrackingID()` (trackingAccess) crashes the RuneScape client on every call (traced in 0.8.32-dev: `Plugin.HasPermission` returns true, then the client dies inside `GetTrackingID`). Profit Path never calls it; revisit once Jagex fixes it.
 - Profit is an estimate from the Wiki's rates and current GE prices, not a promise.
+- A very large custom activity (long notes on every row, or every requirement a full item group) can be too big to export; the box holds 9,999 characters. The editor warns from 8,500.

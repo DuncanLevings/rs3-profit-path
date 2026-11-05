@@ -1744,6 +1744,7 @@ dofile("src/tests/recommendations.lua")(test, equal, client, pretty)
 dofile("src/tests/custom_sources.lua")(test, equal)
 dofile("src/tests/custom_methods.lua")(test, equal, client, pretty)
 dofile("src/tests/custom_editor.lua")(test, equal, client, pretty)
+dofile("src/tests/custom_share.lua")(test, equal, client, pretty)
 
 -- Last: the full shipped catalogue. test.py gave the tests above just our 4
 -- curated methods; forget every loaded plugin module (and that catalogue) so

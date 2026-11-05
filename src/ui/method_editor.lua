@@ -19,6 +19,7 @@
 -- (drops with a note) On/Off button; Requirements has one per skill icon and
 -- per remove button. Tests measure both (see README "Native dynamic IDs").
 local CustomMethods = require("src/methods/custom_methods")
+local CustomShare = require("src/methods/custom_share")
 local Draft = require("src/methods/custom_draft")
 local Income = require("src/methods/income")
 local ItemIcon = require("src/ui/item_icon")
@@ -685,6 +686,41 @@ function MethodEditor.mount(library, view, state, guarded, actions)
     Style.coins(band, { x = 316, y = Style.middle(moneyY, 24, 18), size = 18 })
     local cost = band:AddText({ text = "", x = 338, y = moneyY, width = 150, height = 24, colour = Style.bad })
 
+    -- The share code's size, on the right of the third line, but only once it's
+    -- close to what the game's text box holds (Export needs it to fit). Blank
+    -- the rest of the time.
+    local shareSize = band:AddText({
+        text = "", x = -(300 + 14), xAnchor = 1, y = moneyY, width = 300, height = 24,
+        colour = Style.gold, alignHorizontal = ui.AlignMode.BOTTOMRIGHT,
+    })
+
+    local function updateShareSize()
+        -- Measured as it would be saved: blank note lines are dropped then.
+        local measured = {}
+
+        for key, value in pairs(draft) do
+            measured[key] = value
+        end
+
+        for _, key in ipairs(LINE_LISTS) do
+            measured[key] = CustomMethods.lines(draft[key])
+        end
+
+        local length = CustomShare.length(measured)
+
+        if length > CustomShare.MAX_LENGTH then
+            shareSize.content = "Too big to share: " .. Style.number(length) .. " of "
+                .. Style.number(CustomShare.MAX_LENGTH) .. " characters"
+            shareSize.rgba = Style.bad
+        elseif length >= CustomShare.WARN_LENGTH then
+            shareSize.content = "Share code: " .. Style.number(length) .. " of "
+                .. Style.number(CustomShare.MAX_LENGTH) .. " characters"
+            shareSize.rgba = Style.gold
+        else
+            shareSize.content = ""
+        end
+    end
+
     -- Rewrites the band from the draft. Cheap: text only.
     local function updatePreview()
         local preview = Draft.preview(draft, state.quotes)
@@ -732,6 +768,8 @@ function MethodEditor.mount(library, view, state, guarded, actions)
             status.content = "Ready to save."
             status.rgba = Style.good
         end
+
+        updateShareSize()
     end
 
     -- Blinks the status red, so a Save that didn't happen is hard to miss.

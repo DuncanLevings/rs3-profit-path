@@ -484,12 +484,36 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
-    test("bundled pages offer Duplicate as custom as an icon at the bottom", function()
+    test("bundled pages offer Duplicate as custom in the header, where custom ones have Edit", function()
         open()
 
         prettyui:findButton("Browse")()
         prettyui:chooseEntry("All")
         prettyui:findMethod("Smelting steel bars")()
+
+        -- Top right, left of the star, like a custom activity's Edit: the
+        -- same boxed pencil, and not at the bottom of the Income tab any more.
+        local placed
+
+        for _, view in ipairs(live()) do
+            local control = view.buttonControls and view.buttonControls["Duplicate as custom for editing"]
+
+            if control then
+                placed = control.options
+            end
+        end
+
+        assert(placed, (everything()))
+        equal(placed.absolute, true)
+        equal(placed.y, require("src/ui/method_view").HEADER_ICON_Y)
+
+        local income = prettyui.views[#prettyui.views].tabs[1].pages[1]
+        equal(income.buttons["Duplicate as custom for editing"], nil)
+
+        -- No Delete on a bundled activity.
+        for _, view in ipairs(live()) do
+            equal(view.buttonControls and view.buttonControls["Delete this custom activity"], nil)
+        end
 
         -- An icon button, found by its tooltip.
         button("Duplicate as custom for editing")()

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.51-dev - 2026-11-05
+
+- Shorter share codes: a GE item's name is left out when it matches Profit Path's GE list, and import fills it back in. A typical monster activity drops from about 3,000 to 2,200 characters, and every requirement as a full item group now fits. An item the importer's list doesn't have comes in as "Item <id>", with a warning.
+- The custom activity editor shows the share code's size once it's close to the text box's limit ("Share code: 8,700 of 9,998 characters", from 8,500), and in red when it's too big to share. Saving still works either way.
+
+## 0.8.50-dev - 2026-11-05
+
+- Custom activities can be shared. Export, in a custom activity's page header (left of Delete), shows the activity as one line of text to copy with Ctrl+A and Ctrl+C. Import activity, in the sidebar and on the empty Custom only list, takes a pasted line. It shows what the activity holds before **Add as new activity** saves it as a new custom activity of your own.
+- Only the recipe is shared: name, rows, requirements, notes and drop source. Your own GE prices, saved rates, favourites, account details and profit figures aren't.
+- Import refuses text that isn't a Profit Path activity, comes from a newer version, was cut off or changed on the way (a checksum at the end catches this), or breaks the same rules as a save, and says why. Nothing is saved then. Items missing from Profit Path's GE list, and quests missing from its quest list, import with a warning.
+- The line fits the game's text box, which holds up to 9,999 characters, with no line breaks (checked with a probe plugin). An activity too big for that says what to shorten instead.
+
+## 0.8.49-dev - 2026-11-05
+
+- A bundled activity's Duplicate as custom is in the page header, left of the favourite star, where a custom activity has Edit (it was at the bottom of the Income tab).
+
 ## 0.8.48-dev - 2026-11-05
 
 - GE Prices Library is now the released Plugin Hub version (ID 6414886) instead of a development folder.

@@ -819,9 +819,9 @@ local function mountTitle(view, method, guarded, versions, onVersion, inset)
     return release
 end
 
--- ---- Edit and Delete in the header (custom activities) ------------------------
+-- ---- Edit, Delete and Export in the header (Duplicate for bundled ones) ------
 -- Right to left: the favourite star (the workbench draws it, FAVOURITE_RIGHT
--- in from the right edge), Edit, then Delete, all the same boxed buttons.
+-- in from the right edge), Edit, Delete, then Export, all the same boxed buttons.
 -- There's a wide gap between each, so a click meant for one can't land on its
 -- neighbour.
 MethodView.FAVOURITE_RIGHT = 12
@@ -837,15 +837,21 @@ local function starLeft()
     return MethodView.FAVOURITE_RIGHT + width
 end
 
--- Where Edit and Delete go (distance in from the right edge), and how much room
--- the title must keep clear at each side to stay centred without overlapping.
-local function headerIconPlaces(withDelete)
+-- Where Edit, Delete and Export go (distance in from the right edge), and how
+-- much room the title must keep clear at each side to stay centred without
+-- overlapping.
+local function headerIconPlaces(withDelete, withExport)
     local places = { edit = starLeft() + HEADER_ICON_GAP }
     local leftEdge = places.edit + Style.iconButtonWidth("edit")
 
     if withDelete then
         places.delete = leftEdge + HEADER_ICON_GAP
         leftEdge = places.delete + Style.iconButtonWidth("trash")
+    end
+
+    if withExport then
+        places.export = leftEdge + HEADER_ICON_GAP
+        leftEdge = places.export + Style.iconButtonWidth("share")
     end
 
     places.inset = leftEdge + 12
@@ -855,9 +861,23 @@ end
 -- Draws Edit and (if allowed) Delete. Delete can't be undone, so the first
 -- click only arms it: the page title turns red and says to click again. The
 -- title is in the header, so the warning shows whichever tab is open.
-local function mountHeaderIcons(view, places, titleLabel, guarded, options)
-    Style.iconButton(view, "edit", "Edit", "Edit this custom activity", guarded(options.onEdit),
-        { right = places.edit, y = HEADER_ICON_Y, absolute = true })
+--
+-- A bundled activity gets the same pencil in the same place, but it's
+-- Duplicate as custom (a bundled one can't be edited in place), and no Delete.
+local function mountHeaderIcons(view, places, titleLabel, guarded, options, custom)
+    if custom then
+        Style.iconButton(view, "edit", "Edit", "Edit this custom activity", guarded(options.onEdit),
+            { right = places.edit, y = HEADER_ICON_Y, absolute = true })
+    else
+        Style.iconButton(view, "edit", "Duplicate", "Duplicate as custom for editing", guarded(options.onDuplicate),
+            { right = places.edit, y = HEADER_ICON_Y, absolute = true })
+    end
+
+    -- Export opens a screen with the activity as a line of text to copy.
+    if places.export then
+        Style.iconButton(view, "share", "Export", "Export to share with others", guarded(options.onExport),
+            { right = places.export, y = HEADER_ICON_Y, absolute = true })
+    end
 
     if not places.delete then
         return
@@ -902,6 +922,7 @@ end
 --   onVersion   called with the chosen method when the player picks a version
 --   onEdit      custom activities: open the editor on this one
 --   onDelete    custom activities: delete it; returns a message if that failed
+--   onExport    custom activities: open the Export screen
 --   onDuplicate bundled activities: open the editor on a copy
 --
 -- Returns three functions: refresh(reason), which the workbench calls when the
@@ -913,14 +934,23 @@ function MethodView.mount(view, method, calculator, guarded, options)
 
     local activeTab = options.activeTab or 1
 
-    -- A custom activity has Edit and Delete in the header, left of the
-    -- favourite star, so the title keeps clear of them too.
-    local headerIcons = method.origin == "custom" and options.onEdit and headerIconPlaces(options.onDelete ~= nil)
+    -- A custom activity has Edit, Delete and Export in the header, left of the
+    -- favourite star; a bundled hourly one has Duplicate as custom there
+    -- (daily/weekly ones can't be copied yet). The title keeps clear of them.
+    local custom = method.origin == "custom"
+    local headerIcons
+
+    if custom and options.onEdit then
+        headerIcons = headerIconPlaces(options.onDelete ~= nil, options.onExport ~= nil)
+    elseif not custom and options.onDuplicate and method.category ~= "recurring" then
+        headerIcons = headerIconPlaces(false)
+    end
+
     local releaseTitle, titleLabel = mountTitle(view, method, guarded, options.versions, options.onVersion,
         headerIcons and headerIcons.inset)
 
     if headerIcons then
-        mountHeaderIcons(view, headerIcons, titleLabel, guarded, options)
+        mountHeaderIcons(view, headerIcons, titleLabel, guarded, options, custom)
     end
 
     -- buildTab[index] draws that tab's contents; it's set further down and cleared
@@ -1120,12 +1150,6 @@ function MethodView.mount(view, method, calculator, guarded, options)
         for _, assumption in ipairs(assumptions) do
             income:AddText({ text = assumption, colour = Style.muted })
         end
-    end
-
-    -- At the bottom of the page, bundled hourly activities get Duplicate as
-    -- custom. (A custom activity's Edit and Delete are in the header instead.)
-    if method.origin ~= "custom" and options.onDuplicate and method.category ~= "recurring" then
-        Style.iconButton(income, "edit", "Duplicate", "Duplicate as custom for editing", guarded(options.onDuplicate), "line")
     end
 
     -- The other three tabs. Each is drawn once, when its turn comes or when it's

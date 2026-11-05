@@ -22,6 +22,10 @@ return {
     -- seen in game; the buttons fall back to text.
     trash = "AIF_COMBAR_TRASHCAN_0",
 
+    -- The client's own menu "share" button art, for Export on a custom
+    -- activity. Not yet seen in game; the button falls back to text.
+    share = "RS3_MENU_BTN_SHARE_NORMAL",
+
     -- The activity page's boxed favourite button: gold once it's a favourite,
     -- silver when it isn't. These are the stars PrettyUI's own STAR sprite
     -- button draws (seen in game before the button was boxed). rsprite's

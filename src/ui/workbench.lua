@@ -16,6 +16,7 @@
 local MethodView = require("src/ui/method_view")
 local BrowseView = require("src/ui/browse_view")
 local MethodEditor = require("src/ui/method_editor")
+local ShareView = require("src/ui/share_view")
 local Draft = require("src/methods/custom_draft")
 local Style = require("src/ui/view_style")
 local UI = {}
@@ -93,6 +94,12 @@ function UI.new(library, account, calculator, browser)
         if self.editorUnmount then
             self.editorUnmount()
             self.editorUnmount = nil
+        end
+
+        -- The same for the Export and Import screens (share_view.lua).
+        if self.shareUnmount then
+            self.shareUnmount()
+            self.shareUnmount = nil
         end
 
         if view then
@@ -187,12 +194,18 @@ function UI.new(library, account, calculator, browser)
                         self.editorReturn = "browse"
                         navigate("editor")
                     end,
+
+                    -- A fresh, empty paste box each time.
+                    onImport = function()
+                        self.importState = ShareView.importState()
+                        navigate("import")
+                    end,
                 })
             else
                 local backOptions = { tooltip = "Back to activities", size = 24 }
 
                 -- Back shares the title row with the method's (or editor's) name.
-                if self.screen == "method" or self.screen == "editor" then
+                if self.screen ~= "browse" then
                     backOptions.absolute = true
                     backOptions.x = 10
                     backOptions.y = 10
@@ -202,18 +215,22 @@ function UI.new(library, account, calculator, browser)
                 -- it was opened from, or to the list it was started from.
                 if self.screen == "editor" then
                     backOptions.tooltip = "Back without saving"
+                elseif self.screen == "export" then
+                    backOptions.tooltip = "Back to the activity"
                 end
 
                 view:AddSpriteButton("ARROW_LEFT", guarded(function()
                     if self.screen == "method" then
                         browser:returnFromMethod(self.method, calculator.quotes)
-                    elseif self.screen == "editor" and self.editorReturn == "method" then
+                    elseif self.screen == "editor" and self.editorReturn == "method" or self.screen == "export" then
+                        -- Back to the activity this was opened from.
                         self.editor = nil
                         navigate("method")
                         return
                     end
 
                     self.editor = nil
+                    self.importState = nil
                     navigate("browse")
                 end), backOptions)
 
@@ -299,6 +316,11 @@ function UI.new(library, account, calculator, browser)
                             navigate("browse")
                         end,
 
+                        -- Custom activities: show the line to copy and share.
+                        onExport = self.method.record and function()
+                            navigate("export")
+                        end,
+
                         onDuplicate = function()
                             local draft, skipped = Draft.fromMethod(self.method, calculator.quotes)
 
@@ -332,6 +354,35 @@ function UI.new(library, account, calculator, browser)
                             self.editor = nil
 
                             local method = saved and browser:findMethod(saved.id)
+
+                            if method then
+                                calculator:select(method)
+                                self.method = method
+                                self.methodTab = nil
+                                navigate("method")
+                            else
+                                navigate("browse")
+                            end
+                        end,
+                    })
+                elseif self.screen == "export" then
+                    self.shareUnmount = ShareView.export(library, view, self.method.record, guarded)
+                elseif self.screen == "import" then
+                    self.shareUnmount = ShareView.import(library, view, self.importState, guarded, {
+                        rebuild = function()
+                            navigate("import")
+                        end,
+
+                        -- No ID, so it's saved as a new activity.
+                        add = function(record)
+                            return calculator:saveCustom(record)
+                        end,
+
+                        -- Added: open its page, like a save from the editor.
+                        done = function(saved)
+                            self.importState = nil
+
+                            local method = browser:findMethod(saved.id)
 
                             if method then
                                 calculator:select(method)
