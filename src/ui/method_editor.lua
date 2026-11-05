@@ -274,7 +274,7 @@ local function tripsOn(state)
 end
 
 -- A short, readable amount for the hourly line: whole numbers once they're
--- big, a couple of decimals for small ones (0.25 food a kill).
+-- big, a couple of decimals for small ones (0.25 drops an hour).
 local function roughNumber(value)
     if value >= 100 then
         return Style.number(value, 0)
@@ -296,9 +296,8 @@ local function roughNumber(value)
     return text
 end
 
--- The grey line under a row's boxes: what the row comes to over an hour (or,
--- for an hourly row, per kill/action), so the player can see straight away
--- whether they picked the right "Each ...". Blank when it can't be worked out
+-- The grey line under a row's boxes always shows the hourly total, so changing
+-- "Each ..." keeps the same unit for an easy comparison. Blank when it can't be worked out
 -- yet (no quantity, no kills an hour, no kills per trip) or the row isn't counted.
 local function hourlyText(row, draft)
     local rate = draft.rate.default
@@ -309,11 +308,6 @@ local function hourlyText(row, draft)
 
     if type(rate) ~= "number" or rate <= 0 then
         return ""
-    end
-
-    -- An hourly row: show it per kill/action instead (an hour is already shown).
-    if row.basis == "hour" then
-        return "About " .. roughNumber(row.quantity / rate) .. " a " .. actionWord(draft)
     end
 
     local times = Income.timesPerHour(row.basis, rate, draft.actions_per_trip)

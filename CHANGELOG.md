@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.55-dev - 2026-11-05
+
+- Custom activity editor: row hints consistently show the hourly total. A supply of 4 counted Each hour now says "About 4 an hour", instead of converting it to a tiny per-action amount. Each action and Each trip rows still show their calculated hourly total.
+
+## 0.8.54-dev - 2026-11-05
+
+- Removed the rsprite runtime dependency. UI icons now resolve through the client's own sprite-name table, and the fallback coin picture is drawn directly. Existing icon names, missing-icon fallbacks and the known unsafe-sprite exclusion are kept. Item pictures still use the client's item configuration.
+
 ## 0.8.53-dev - 2026-11-05
 
 - Fixed the empty Plugins ribbon page: the Open Profit Path button now uses the ribbon content's measured width. PrettyUI buttons do not apply widthAnchor, so the previous negative width hid it.

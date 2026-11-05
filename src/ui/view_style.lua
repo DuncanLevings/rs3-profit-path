@@ -2,8 +2,8 @@
 -- formatting, and a few small decorations (icons, coin, boxed icon buttons).
 --
 -- Ownership: every control made here is a child of the `parent` passed in, so it
--- gets cleaned up when that parent view is destroyed. Nothing here keeps state
--- between calls.
+-- gets cleaned up when that parent view is destroyed. Missing-icon warnings
+-- are remembered for this session so a redraw does not repeat them.
 -- Icon aliases -> native sprite names: our hand-picked list first, then the
 -- capability sprites (relics, abilities, perks...) that ship with the catalogue.
 -- Copied into a new table so neither source is changed.
@@ -125,17 +125,62 @@ function Style.panelFitter(host, padding, gap)
     return fitter
 end
 
--- Draws one of our named sprites (see data/icons.lua). rsprite finds the sprite's ID
--- and warns once if it's missing; PrettyUI draws it. If the sprite doesn't exist we
--- just skip it, because every icon sits next to text that still makes sense alone.
+-- Look up only our configured UI icons, using the client's named sprite table.
+-- Missing names can throw through the native proxy, so protect that read. Warn
+-- once per name and let each caller keep its existing text/empty-icon fallback.
+local reportedSprites = {}
+
+local function resolveIcon(alias)
+    local name = iconNames[alias]
+
+    if not name then
+        return nil
+    end
+
+    -- The previous library's client observations identify FLOORSHADOWS (1243)
+    -- as crash-prone. Keep that exclusion even though none of our icons use it.
+    if name == "FLOORSHADOWS" then
+        return nil
+    end
+
+    local ok, sprite = pcall(function()
+        return id.Sprite[name]
+    end)
+
+    if ok and type(sprite) == "number" and sprite >= 0 and sprite < math.huge
+        and sprite == math.floor(sprite) and sprite ~= 1243 then
+        return sprite
+    end
+
+    if not reportedSprites[name] then
+        reportedSprites[name] = true
+        pcall(print, "[Profit Path] UI sprite unavailable: " .. name
+            .. (ok and "" or (" - " .. tostring(sprite))))
+    end
+
+    return nil
+end
+
+-- PrettyUI draws the resolved sprite and owns its lifetime. A missing icon is
+-- decoration only: the adjacent text still explains the requirement or action.
 function Style.icon(parent, name, options)
-    local sprite = rsprite.Get(iconNames[name])
+    local sprite = resolveIcon(name)
 
     if not sprite then
         return nil
     end
 
     return parent:AddSprite(sprite, options)
+end
+
+-- The native sprite ID for one of our named icons, or nil if this client
+-- doesn't have it (callers then show text instead).
+function Style.spriteId(name)
+    return resolveIcon(name)
+end
+
+function Style.iconButtonWidth(name)
+    return resolveIcon(name) and 28 or 64
 end
 
 -- A small boxed button showing a native sprite, like the Save and Reset buttons by
@@ -145,18 +190,8 @@ end
 -- Without `place` the button flows inline after the previous item. With it, the
 -- button goes at place.y, `place.right` in from the right edge of its parent.
 -- place = "line" puts it on a line of its own in a flowing page.
--- The native sprite ID for one of our named icons, or nil if this client
--- doesn't have it (callers then show text instead).
-function Style.spriteId(name)
-    return rsprite.Get(iconNames[name])
-end
-
-function Style.iconButtonWidth(name)
-    return rsprite.Get(iconNames[name]) and 28 or 64
-end
-
 function Style.iconButton(parent, name, fallbackText, tooltip, action, place)
-    local sprite = rsprite.Get(iconNames[name])
+    local sprite = resolveIcon(name)
     local width = Style.iconButtonWidth(name)
     local options = { width = width, height = 28, iconSize = 20, tooltip = tooltip }
 
@@ -284,13 +319,30 @@ function Style.coins(parent, options)
         end)
     end
 
-    if not rsprite.Get(iconNames.coins) then
+    local spriteId = resolveIcon("coins")
+
+    if not spriteId then
         return nil
     end
 
-    local drawOptions = { x = x, y = y, xAnchor = xAnchor, size = size, placeholder = false }
+    -- The fallback is a plain client sprite. Like the item picture above, its
+    -- parent owns it and it can be moved when the money label changes width.
+    local fallback
+    local fallbackDrawn = coinStep("fallback sprite", function()
+        fallback = ui.Sprite.new(parent.content)
+        fallback:SetPos(x, y, xAnchor, 0)
+        fallback:SetSize(size, size)
+        fallback.clickthrough = true
+        fallback.sprite = spriteId
+    end)
 
-    return (rsprite.Draw(parent.content, iconNames.coins, drawOptions))
+    if not fallbackDrawn and fallback then
+        pcall(function()
+            fallback.hidden = true
+        end)
+    end
+
+    return fallbackDrawn and fallback or nil
 end
 
 -- Switches a text label to a named client font (e.g. Style.HEADLINE_FONT). Give

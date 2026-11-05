@@ -141,15 +141,14 @@ Written to the section headings of Jagex's submission example (developer.runesca
 |---|---|---|
 | PrettyUI 1.2.0 | All UI | Plugin Hub ID 6398181 |
 | GE Prices Library | Every price | Plugin Hub ID 6414886 |
-| rsprite 0.1.2 | Icon sprites by name | Development folder `rsprite` (not on the Plugin Hub yet) |
 
-rsprite must become a Plugin Hub ID before submission; `package.py build` lists this.
+UI icons use the client's own named sprite table. rsprite was used to find sprite names during development; it is not a runtime dependency.
 
 ## Development
 
 ### Setup
 
-Use the RS3 plugin beta. Put this folder in `dev_plugins` as `profit-path`, with rsprite in `dev_plugins/rsprite`, and PrettyUI and GE Prices Library installed from the Plugin Hub. Enable the dependencies in the client yourself, then reload Profit Path.
+Use the RS3 plugin beta. Put this folder in `dev_plugins` as `profit-path`, with PrettyUI and GE Prices Library installed from the Plugin Hub. Enable the dependencies in the client yourself, then reload Profit Path.
 
 ### Tests
 

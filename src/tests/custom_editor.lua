@@ -1037,9 +1037,9 @@ return function(test, equal, client, pretty)
         equal(prettyui.counted.parts, before, "no redraw while typing")
         assert(shows("About 24 an hour"), (everything()))
 
-        -- An hourly row says what it is per kill instead.
+        -- An hourly row keeps the same unit: 8 each hour means 8 an hour.
         button("Each trip")()
-        assert(shows("About 0.27 a kill"), (everything()))
+        assert(shows("About 8 an hour"), (everything()))
         button("Each hour")()
         button("Each kill")()
 
@@ -1053,11 +1053,22 @@ return function(test, equal, client, pretty)
         assert(field("0.8"), "the quantity was converted")
         assert(shows("About 24 an hour"), (everything()))
 
+        -- A fast activity makes the difference obvious: 4 each kill at 3,200
+        -- kills an hour means 12,800; switching to each hour means just 4.
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(1)
+        field("e.g. 300"):SetText("3200", true)
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(3)
+        field("0.8"):SetText("4", true)
+        assert(shows("About 12,800 an hour"), (everything()))
+        button("Each kill")()
+        assert(shows("About 4 an hour"), (everything()))
+        assert(not shows("a kill"), (everything()))
+
         -- Outputs start on each kill.
         prettyui.views[#prettyui.views].tabs[1]:SetActive(2)
         button("Custom item")()
         assert(button("Each kill"), (everything()))
-        assert(shows("About 30 an hour"), (everything()))
+        assert(shows("About 3,200 an hour"), (everything()))
 
         PluginShutdown()
     end)
@@ -1203,11 +1214,11 @@ return function(test, equal, client, pretty)
 
         local icons = require("data/icons")
         local emptySprite = starSprite("Add favourite")
-        equal(emptySprite, rsprite.Get(icons.star_empty))
+        equal(emptySprite, id.Sprite[icons.star_empty])
 
         button("Add favourite")()
         local filledSprite, filled = starSprite("Remove favourite")
-        equal(filledSprite, rsprite.Get(icons.star_filled))
+        equal(filledSprite, id.Sprite[icons.star_filled])
         equal(filled.x, star.x)
         equal(starSprite("Add favourite"), nil, "the old star is gone")
 

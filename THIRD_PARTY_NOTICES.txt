@@ -87,8 +87,9 @@ page version; each target records its page revision in catalogue-source/thieving
 Note markup is reduced to plain text. Wiki contributor attribution and the CC BY-NC-SA 3.0
 licence above apply. Runtime uses data/ge_items.lua and data/thieving.lua.
 
-rsprite runtime dependency
-Profit Path uses the public API of the separately installed rsprite 0.1.2 library by sereselene.
+rsprite development reference
+Sprite names were identified during development using rsprite 0.1.2 by sereselene.
+Profit Path resolves these names through the client directly and does not require rsprite at runtime.
 Project: https://github.com/sereselene/rsprite
 Licence: PolyForm Strict 1.0.0, as supplied with rsprite. Its source code is not copied or bundled here.
 The small native sprite-name registry (data/icons.lua and catalogue-source/research/capabilities.json, whose names were matched against rsprite's reference list) references RuneScape game assets, copyright Jagex Ltd.; Profit Path does not distribute these images or rsprite's list.

@@ -42,7 +42,8 @@ manifest = json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))
 assert manifest["requiredPermissions"] == []
 assert manifest["optionalPermissions"] == []
 assert manifest["urls"] == {}
-assert manifest["requiredDependencies"]["rsprite"] == "rsprite"
+assert "rsprite" not in manifest["requiredDependencies"]
+assert "rsprite" not in manifest["optionalDependencies"]
 
 # The client runs Lua 5.4, so make sure the embedded runtime is 5.4 as well.
 lua = LuaRuntime(unpack_returned_tuples=True)

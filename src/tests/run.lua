@@ -192,19 +192,26 @@ local function client(database)
         error("Plugin.HasPermission must not be called: Profit Path requests no permissions")
     end }
 
-    -- The fake exposes only the rsprite API we use: name lookups, plus drawing one
-    -- native sprite (the coin). No search index or startup work should be requested
-    -- for this fixed set of icons. Every name in data/icons.lua gets a made-up ID.
+    -- UI icons come from the client's sprite-name table. Keep the dependency
+    -- absent for every test so accidental runtime calls cannot pass unnoticed.
+    rsprite = nil
     local spriteIDs = {}
     state.spriteLookups = {}
     local nextSpriteID = 1000
 
-    for _, name in pairs(require("data/icons")) do
-        spriteIDs[name] = nextSpriteID
-        nextSpriteID = nextSpriteID + 1
+    for _, names in ipairs({ require("data/icons"), require("src/data/method_data").icons or {} }) do
+        for _, name in pairs(names) do
+            spriteIDs[name] = nextSpriteID
+            nextSpriteID = nextSpriteID + 1
+        end
     end
 
-    -- A native sprite as rsprite returns it. It records where it was moved to, and
+    local spriteTable = setmetatable({}, { __index = function(_, name)
+        state.spriteLookups[name] = (state.spriteLookups[name] or 0) + 1
+        return spriteIDs[name]
+    end })
+
+    -- A native sprite records where it was moved to, and
     -- belongs to the PrettyUI view whose native `.content` layer it was drawn on.
     local function nativeSprite(parent, source, options)
         assert(parent.testOwner, "Native sprites must be drawn on a view's content layer")
@@ -220,20 +227,6 @@ local function client(database)
 
         return sprite
     end
-
-    rsprite = {
-        version = "0.1.2",
-
-        Get = function(name)
-            assert(type(name) == "string", "rsprite.Get expects a native sprite name")
-            state.spriteLookups[name] = (state.spriteLookups[name] or 0) + 1
-            return spriteIDs[name]
-        end,
-
-        Draw = function(parent, name, options)
-            return nativeSprite(parent, { name = name }, options), 1
-        end,
-    }
 
     -- Fake font measurement: 7 units per character is close enough for checking
     -- that a coin moves when the number next to it gets longer.
@@ -251,14 +244,14 @@ local function client(database)
     -- The game area our window hangs off. Tests can set state.gameArea = nil to
     -- simulate it not existing.
     state.gameArea = { width = 1280, height = 900, interfaceID = 1 }
-    id = { Component = { TOPLEVEL_V2__GAME_AREA = 123 }, StyleSheet = { DROPDOWN_DEFAULT = 456 } }
+    id = { Component = { TOPLEVEL_V2__GAME_AREA = 123 }, StyleSheet = { DROPDOWN_DEFAULT = 456 }, Sprite = spriteTable }
     ui = { Interfaces = { GetComponent = function(_, componentId)
         equal(componentId, id.Component.TOPLEVEL_V2__GAME_AREA)
         return state.gameArea
     end } }
 
     -- Plain native sprites (the coin). They record the item and quantity they were
-    -- given, and land in the same nativeSprites list as rsprite's drawings.
+    -- given, and land in the same nativeSprites list as fallback UI sprites.
     ui.ObjectQuantityDisplayMode = { NEVER = "never", ALWAYS = "always", MULTIPLE = "multiple" }
     ui.Sprite = { new = function(parent)
         local sprite = nativeSprite(parent, {}, {})

@@ -1485,7 +1485,7 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
-    test("rsprite native icons use PrettyUI buttons and keep callbacks inert after navigation", function()
+    test("client native icons use PrettyUI buttons and keep callbacks inert after navigation", function()
         local state = client()
         prettyui = pretty()
         gepl = nil
@@ -1648,7 +1648,7 @@ return function(test, equal, client, pretty)
 
     test("missing native sprites do not block browsing calculating or saving rates", function()
         local state = client()
-        rsprite.Get = function() return nil end
+        id.Sprite = {}
         prettyui = pretty()
         gepl = nil
         dofile("main.lua")
@@ -1665,13 +1665,82 @@ return function(test, equal, client, pretty)
         equal(preferences:loadRate(require("src/data/method_data").find("smelting-steel-bars.basic")), 1000)
 
         -- Resolving a sprite later makes the next decoration usable.
-        rsprite.Get = function(name)
-            equal(name, "COINS")
-            return 431
-        end
+        id.Sprite.COINS = 431
         local icon = require("src/ui/view_style").icon(income, "coins", { size = 20 })
         assert(icon)
         PluginShutdown()
+    end)
+
+    -- The native name table is a proxy: a missing entry may throw instead of
+    -- returning nil. Invalid IDs and the known crash-prone sprite must not draw.
+    test("native icon lookup rejects failed invalid and unsafe IDs and warns once", function()
+        client()
+        local Style = dofile("src/ui/view_style.lua")
+        local printed = {}
+        local realPrint = print
+
+        print = function(message)
+            printed[#printed + 1] = message
+        end
+
+        id.Sprite = setmetatable({}, { __index = function()
+            error("fixture sprite lookup failure")
+        end })
+
+        local first = Style.spriteId("save")
+        local repeated = Style.spriteId("save")
+        print = realPrint
+
+        equal(first, nil)
+        equal(repeated, nil)
+        equal(#printed, 1, "A repeated failed lookup only warns once")
+        assert(printed[1]:find("fixture sprite lookup failure", 1, true))
+
+        local name = require("data/icons").save
+
+        for _, value in ipairs({ -1, 1.5, math.huge, 0 / 0, "431", 1243 }) do
+            id.Sprite = { [name] = value }
+            equal(Style.spriteId("save"), nil)
+        end
+
+        id.Sprite = { [name] = 431 }
+        equal(Style.spriteId("save"), 431)
+        equal(Style.spriteId("unconfigured-icon"), nil)
+    end)
+
+    -- Losing the Coins item picture still leaves a movable native COINS sprite,
+    -- without bringing back the removed library or leaving the failed item visible.
+    test("coin item failures use the client sprite fallback without rsprite", function()
+        client()
+        local Style = dofile("src/ui/view_style.lua")
+        local create = ui.Sprite.new
+
+        ui.Sprite.new = function(parent)
+            local sprite = create(parent)
+            sprite.SetAssociatedObject = function()
+                error("fixture item picture failure")
+            end
+            return sprite
+        end
+
+        local parent = { content = { testOwner = {} } }
+        local realPrint = print
+        print = function() end
+        local coin = Style.coins(parent, { x = 12, y = 14, size = 24 })
+        print = realPrint
+
+        equal(rsprite, nil)
+        equal(parent.content.testOwner.nativeSprites[1].hidden, true)
+        equal(coin.sprite, id.Sprite.COINS)
+        equal(coin.width, 24)
+        equal(coin.height, 24)
+        equal(coin.x, 12)
+        equal(coin.y, 14)
+        equal(coin.clickthrough, true)
+
+        coin:SetPos(20, 30)
+        equal(coin.x, 20)
+        equal(coin.y, 30)
     end)
 
     -- Coins: one coin per table, by the heading total only (not on every row). It's

@@ -1,7 +1,7 @@
 -- The small set of native sprite names Profit Path draws, keyed by the short alias
 -- the views use. This isn't a copy of rsprite's catalogue: names were picked from
--- its client 950-1 reference list, and rsprite resolves them against the running
--- client (and refuses sprites known to crash it).
+-- its client 950-1 reference list. view_style.lua resolves them against the
+-- running client and keeps the known unsafe-sprite exclusion.
 --
 -- Skill icons use the HITMARK_ICON_SKILL_* set: the small flat icons from XP drops,
 -- which match the skills tab. The SKILL_* set is the round level-up medallion art,
