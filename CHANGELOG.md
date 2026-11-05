@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.27-dev - 2026-11-04
+
+- Release preparation (no change to what the plugin does in game). `src/tools/package.py build` makes a repeatable release zip of only the files the game loads and lists what still blocks a submission (a development version, development-folder dependencies); `check-install PATH` compares an install with the repo by SHA-256.
+- README rewritten as a short reviewer guide: entry point, modules, events and per-tick work, shutdown order, saved keys, data read and stored, dependencies, and known limits.
+- THIRD_PARTY_NOTICES: the Wiki guide snapshot is the shipped catalogue (no longer "not yet used"), the guide warnings source is listed, and PvM ratings are described as the 1-10 ladder.
+
 ## 0.8.26-dev - 2026-10-30
 
 - Removed Mega Shop Run (Daily and Weekly). With 51 shop items per version, its activity page ran out of the client's interface parts ("invalid dynamic ID") when opened. Income rows keep their icons with name tooltips.
