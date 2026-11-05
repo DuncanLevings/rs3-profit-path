@@ -1,5 +1,5 @@
--- Draws the workbench's sidebar, filters and method list. This file owns three
--- child views; its cleanup runs before workbench.lua destroys the parent screen.
+-- Draws the browser columns and the full-width My account screen. It owns its
+-- child views; cleanup runs before workbench.lua destroys the parent screen.
 -- Browser state and money calculations live elsewhere, so repainting is cheap.
 local Browser = require("src/methods/browser")
 local Recommendations = require("src/methods/recommendations")
@@ -97,8 +97,8 @@ local ROW_INSET = 16
 -- for a single callback; 10 stays well inside it.
 local PAGE_SIZE = 10
 
--- Recommend for me and My account aren't lists of methods: they have no search
--- box, sort or filters, and their page takes the whole column.
+-- Recommend for me has no search, sort or filters. My account opens separately
+-- through the workbench, leaving the current browser section intact.
 local function isList(section)
     return section == "browse" or section == "favourites"
 end
@@ -167,7 +167,13 @@ end
 -- `extra` (optional): { onNewCustom = function() end }, which opens the custom
 -- activity editor (the sidebar's Create activity button), and onImport, which
 -- opens the screen for pasting in an activity someone shared (Import activity).
+-- onAccount opens My account; accountState draws that page without the browser
+-- columns and holds its scroll position through redraws and window resizes.
 function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
+    -- My account uses these controls in a full-width screen. Its own scroll
+    -- state lets Back keep the previous list or recommendation where it was.
+    local accountPage = extra and extra.accountState ~= nil
+    local scrollState = accountPage and extra.accountState or browser
     local sidebar, header, results
     local rowGeneration = 0
     local closed = false
@@ -250,7 +256,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
         -- Keep the list's scroll position, so a rebuild (e.g. after the window is
         -- resized) lands where the player was.
         if results then
-            browser.scroll = results.scrollY
+            scrollState.scroll = results.scrollY
         end
 
         clearResults()
@@ -750,7 +756,6 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
         local fitter = Style.panelFitter(results, 10)
         local recommendations = browser.recommendations
 
-        results:AddTitle({ text = "My account", colour = Style.gold, height = 32 })
         results:AddTitle({ text = "Profile", height = 30, marginTop = 8 })
 
         -- Settings follow the display name, so a rename starts a new profile.
@@ -772,7 +777,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
 
         -- A change redraws in place, keeping the scroll position.
         local function changed()
-            browser.scroll = results.scrollY
+            scrollState.scroll = results.scrollY
             renderResults()
         end
 
@@ -860,14 +865,14 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             })
 
             row:AddSimpleButton("Recommend again", rowAction(function()
-                browser.scroll = results.scrollY
+                scrollState.scroll = results.scrollY
                 browser:setHidden(entry.id, false)
                 renderResults()
             end), { x = -(restoreWidth + 10), xAnchor = 1, y = 8, width = restoreWidth, height = 28 })
         end
 
         fitter:fit()
-        results:SetScrollPosition(browser.scroll)
+        results:SetScrollPosition(scrollState.scroll)
     end
 
     -- These are interface units, not physical pixels. The right column stretches
@@ -875,11 +880,13 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
     local function drawResults()
         local generation = rowGeneration
 
-        -- Recommend for me and My account have no header, so they take the whole column.
-        local top = isList(browser.section) and resultsY or 0
+        -- My account spans the window below its title; recommendations use the
+        -- whole right column. Lists leave room above for their filters.
+        local top = accountPage and 48 or (isList(browser.section) and resultsY or 0)
+        local left = accountPage and 0 or 190
 
         results = library.SimpleView.new(view.content, {
-            x = 190, y = top, width = -190, height = -top,
+            x = left, y = top, width = -left, height = -top,
             widthAnchor = 1, heightAnchor = 1, scrollable = true,
             layout = { startY = 8, padding = 10, rowGap = 8 },
         })
@@ -891,6 +898,12 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
                     callback(...)
                 end
             end)
+        end
+
+        -- Account controls never need to sort or page the activity list.
+        if accountPage then
+            drawAccount(rowAction)
+            return
         end
 
         local rows = browser:rows()
@@ -931,12 +944,6 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
 
             -- The bar is always there; it's see-through (alpha 0) when not chosen.
             categoryBars[category].rgba = chosen and colour or (colour & 0xFFFFFF00)
-        end
-
-        -- My account and Recommend for me aren't lists, so they draw their own page.
-        if browser.section == "account" then
-            drawAccount(rowAction)
-            return
         end
 
         if browser.section == "recommend" then
@@ -1093,7 +1100,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             })
 
             row:AddSpriteButton("ARROW_RIGHT", rowAction(function()
-                browser.scroll = results.scrollY
+                scrollState.scroll = results.scrollY
                 openMethod(method)
             end), { x = -38, xAnchor = 1, y = 62, size = 24, tooltip = "View activity" })
 
@@ -1102,7 +1109,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             -- "hide this row", and "Don't recommend" belongs on recommendations.
             if isHidden then
                 row:AddSpriteButton("EYE", rowAction(function()
-                    browser.scroll = results.scrollY
+                    scrollState.scroll = results.scrollY
                     browser:setHidden(method.id, false)
                     renderResults()
                 end), {
@@ -1117,7 +1124,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             local favouriteText = isFavourite and "Remove favourite" or "Add favourite"
 
             row:AddSpriteButton("STAR", rowAction(function()
-                browser.scroll = results.scrollY
+                scrollState.scroll = results.scrollY
                 browser:toggleFavourite(method)
                 renderResults()
             end), { x = ROW_INSET, y = 8, size = 24, tooltip = favouriteText, toggleable = true, disabled = not isFavourite })
@@ -1128,7 +1135,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             local function turn(step)
                 return rowAction(function()
                     browser.page = browser.page + step
-                    browser.scroll = 0
+                    scrollState.scroll = 0
                     renderResults()
                 end)
             end
@@ -1165,7 +1172,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             entry.variant:SetSize(math.max(0, room - titleWidth - gap), 28, 0, 0)
         end
 
-        results:SetScrollPosition(browser.scroll)
+        results:SetScrollPosition(scrollState.scroll)
     end
 
     -- Search and sort can rebuild after the initial mount has finished. Clean up
@@ -1183,7 +1190,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
 
     -- Filter changes start at the top. Opening a method does not reset this state.
     local function filterChanged()
-        browser.scroll = 0
+        scrollState.scroll = 0
         browser.page = 1
         renderResults()
     end
@@ -1223,113 +1230,124 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
     end
 
     local ok, failure = pcall(function()
-        -- A continuous backdrop and divider tie navigation to the window edge.
-        Style.rectangle(view, { x = 0, y = 0, width = 174, height = 0, heightAnchor = 1, colour = 0x24231FFF })
-        Style.rectangle(view, { x = 172, y = 0, width = 2, height = 0, heightAnchor = 1, colour = 0x655638FF })
+        if accountPage then
+            view:AddTitle({ text = "My account", x = 52, y = 10, height = 32, colour = Style.gold })
+        else
+            -- A continuous backdrop and divider tie navigation to the window edge.
+            Style.rectangle(view, { x = 0, y = 0, width = 174, height = 0, heightAnchor = 1, colour = 0x24231FFF })
+            Style.rectangle(view, { x = 172, y = 0, width = 2, height = 0, heightAnchor = 1, colour = 0x655638FF })
 
-        sidebar = library.SimpleView.new(view.content, {
-            x = 0, y = 0, width = 174, height = 0, heightAnchor = 1,
-            layout = { startY = 10, padding = 8, rowGap = 8 },
-        })
+            sidebar = library.SimpleView.new(view.content, {
+                x = 0, y = 0, width = 174, height = 0, heightAnchor = 1,
+                layout = { startY = 10, padding = 8, rowGap = 8 },
+            })
 
-        -- Switches the sidebar section. Only a move between a list (Browse,
-        -- Favourites) and a page (Recommend for me, My account) touches the
-        -- header; Browse <-> Favourites keeps it (and the search text).
-        function showSection(section)
-            stopFinding()
-            local wasList = isList(browser.section)
-            browser.section = section
+            -- Switches the sidebar section. Only a move between a list (Browse,
+            -- Favourites) and Recommend for me touches the
+            -- header; Browse <-> Favourites keeps it (and the search text).
+            function showSection(section)
+                stopFinding()
 
-            if wasList and not isList(section) then
-                dropHeader()
-            elseif isList(section) and not wasList then
-                buildHeader()
+                if section == "account" then
+                    extra.onAccount()
+                    return
+                end
+
+                local wasList = isList(browser.section)
+                browser.section = section
+
+                if wasList and not isList(section) then
+                    dropHeader()
+                elseif isList(section) and not wasList then
+                    buildHeader()
+                end
+
+                filterChanged()
             end
 
-            filterChanged()
-        end
-
-        sidebar:AddText({ text = "FIND AN ACTIVITY", colour = Style.muted, height = 26 })
-        sectionButtons.browse = sidebar:AddSimpleButton("Browse", guarded(function()
-            showSection("browse")
-        end), { width = 158, height = 32 })
-
-        -- Recommend for me always opens on the activity choice. (Back from a
-        -- method doesn't come through here, so it keeps its suggestion.)
-        sectionButtons.recommend = sidebar:AddSimpleButton("Recommend for me", guarded(function()
-            stopFinding()
-            browser.recommendations:changeActivity()
-            showSection("recommend")
-        end), { width = 158, height = 32 })
-
-        sectionButtons.favourites = sidebar:AddSimpleButton("Favourites", guarded(function()
-            showSection("favourites")
-        end), { width = 158, height = 32 })
-
-        -- Create activity is an action, not a list: it opens the custom activity
-        -- editor, so it never lights up as the page you're on. Your own
-        -- activities show in Browse with everything else (Show: Custom only
-        -- narrows to them).
-        if extra and extra.onNewCustom then
-            sidebar:AddSimpleButton("Create activity", guarded(function()
-                stopFinding()
-                extra.onNewCustom()
+            sidebar:AddText({ text = "FIND AN ACTIVITY", colour = Style.muted, height = 26 })
+            sectionButtons.browse = sidebar:AddSimpleButton("Browse", guarded(function()
+                showSection("browse")
             end), { width = 158, height = 32 })
-        end
 
-        -- Import activity is an action too: a screen for pasting in an activity
-        -- someone shared (from their activity page's Export).
-        if extra and extra.onImport then
-            sidebar:AddSimpleButton("Import activity", guarded(function()
+            -- Recommend for me always opens on the activity choice. (Back from a
+            -- method doesn't come through here, so it keeps its suggestion.)
+            sectionButtons.recommend = sidebar:AddSimpleButton("Recommend for me", guarded(function()
                 stopFinding()
-                extra.onImport()
+                browser.recommendations:changeActivity()
+                showSection("recommend")
             end), { width = 158, height = 32 })
-        end
 
-        sectionButtons.account = sidebar:AddSimpleButton("My account", guarded(function()
-            showSection("account")
-        end), { width = 158, height = 32 })
+            sectionButtons.favourites = sidebar:AddSimpleButton("Favourites", guarded(function()
+                showSection("favourites")
+            end), { width = 158, height = 32 })
 
-        sidebar:AddText({ text = "ACTIVITIES", colour = Style.muted, marginTop = 18, height = 26 })
+            -- Create activity is an action, not a list: it opens the custom activity
+            -- editor, so it never lights up as the page you're on. Your own
+            -- activities show in Browse with everything else (Show: Custom only
+            -- narrows to them).
+            if extra and extra.onNewCustom then
+                sidebar:AddSimpleButton("Create activity", guarded(function()
+                    stopFinding()
+                    extra.onNewCustom()
+                end), { width = 158, height = 32 })
+            end
 
-        for _, category in ipairs(categories) do
-            categoryButtons[category.id] = sidebar:AddSimpleButton(category.label, guarded(function()
-                browser.category = category.id
+            -- Import activity is an action too: a screen for pasting in an activity
+            -- someone shared (from their activity page's Export).
+            if extra and extra.onImport then
+                sidebar:AddSimpleButton("Import activity", guarded(function()
+                    stopFinding()
+                    extra.onImport()
+                end), { width = 158, height = 32 })
+            end
 
-                -- Skilling, Production and Recurring have no Difficulty filter, so
-                -- a difficulty picked on PvM mustn't quietly empty them.
-                if not showsDifficulty() then
-                    browser.difficulty = "any"
-                end
+            if extra and extra.onAccount then
+                sidebar:AddSimpleButton("My account", guarded(function()
+                    showSection("account")
+                end), { width = 158, height = 32 })
+            end
 
-                -- An activity is a list filter, so from a page it opens Browse.
-                -- On a list, the header is rebuilt when Difficulty comes or goes.
-                if not isList(browser.section) then
-                    showSection("browse")
-                else
-                    if header and headerDifficulty ~= showsDifficulty() then
-                        dropHeader()
-                        buildHeader()
+            sidebar:AddText({ text = "ACTIVITIES", colour = Style.muted, marginTop = 18, height = 26 })
+
+            for _, category in ipairs(categories) do
+                categoryButtons[category.id] = sidebar:AddSimpleButton(category.label, guarded(function()
+                    browser.category = category.id
+
+                    -- Skilling, Production and Recurring have no Difficulty filter, so
+                    -- a difficulty picked on PvM mustn't quietly empty them.
+                    if not showsDifficulty() then
+                        browser.difficulty = "any"
                     end
 
-                    filterChanged()
-                end
-            end), { width = 158, height = 32, colour = Style.categories[category.id] or Style.text })
+                    -- An activity is a list filter, so from a page it opens Browse.
+                    -- On a list, the header is rebuilt when Difficulty comes or goes.
+                    if not isList(browser.section) then
+                        showSection("browse")
+                    else
+                        if header and headerDifficulty ~= showsDifficulty() then
+                            dropHeader()
+                            buildHeader()
+                        end
 
-            -- A thin bar down the button's left edge, lit for the chosen activity.
-            -- It's a plain rectangle, so it costs one native part per button.
-            local bar = ui.Rectangle.new(categoryButtons[category.id].root)
-            bar:SetPos(5, 6, 0, 0)
-            bar:SetSize(4, -12, 0, 1)
-            bar.fill = true
-            bar.clickthrough = true
-            bar.rgba = (Style.categories[category.id] or Style.text) & 0xFFFFFF00
-            categoryBars[category.id] = bar
+                        filterChanged()
+                    end
+                end), { width = 158, height = 32, colour = Style.categories[category.id] or Style.text })
+
+                -- A thin bar down the button's left edge, lit for the chosen activity.
+                -- It's a plain rectangle, so it costs one native part per button.
+                local bar = ui.Rectangle.new(categoryButtons[category.id].root)
+                bar:SetPos(5, 6, 0, 0)
+                bar:SetSize(4, -12, 0, 1)
+                bar.fill = true
+                bar.clickthrough = true
+                bar.rgba = (Style.categories[category.id] or Style.text) & 0xFFFFFF00
+                categoryBars[category.id] = bar
+            end
         end
 
-        -- The header: heading, search box, sort and filter dropdowns. My account
-        -- has no use for any of it, so it's built only for the method lists, and
-        -- dropped (with the dropdowns' pending callbacks) on the way into My account.
+        -- Only lists need search, sorting and filters. Switching to Recommend
+        -- for me drops this header along with its pending dropdown callbacks.
         buildHeader = function()
             header = library.SimpleView.new(view.content, {
                 x = 190, y = 0, width = -190, height = headerHeight, widthAnchor = 1, scrollable = false,
@@ -1461,7 +1479,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             end
         end
 
-        if isList(browser.section) then
+        if not accountPage and isList(browser.section) then
             buildHeader()
         end
 
@@ -1477,7 +1495,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
     -- player's scroll position (unlike a filter change, which starts at the top).
     local function refresh()
         if results then
-            browser.scroll = results.scrollY
+            scrollState.scroll = results.scrollY
         end
 
         renderResults()

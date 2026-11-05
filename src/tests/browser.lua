@@ -385,17 +385,29 @@ return function(test, equal, client, pretty)
         assert(says(steel, "Not recommended"), "A row that isn't recommended says so")
         equal(steel.buttonControls["Not recommended - click to recommend again"].disabled, true)
 
-        -- My account: the header (search, filters) is gone while it's open.
+        -- My account replaces the whole browser, keeping its search and scroll for Back.
+        list(returned).scrollY = 75
         local header = returned.children[2]
         prettyui:findButton("My account")()
         assert(header.destroyed, "No search or filters on My account")
 
-        local account = list(returned)
-        assert(says(account, "My account"))
+        local accountScreen = prettyui.views[#prettyui.views]
+        local account = list(accountScreen)
+        assert(says(accountScreen, "My account"))
+        equal(account.options.x, 0)
+        equal(account.options.width, 0)
+        equal(#accountScreen.children, 1, "No sidebar or filter header on My account")
+        assert(accountScreen.buttons["Back to activities"])
+        account.scrollY = 180
         prettyui:findButton("Recommend again")()
-        assert(says(list(returned), "Nothing here"), "Recommended again, so the list is empty")
+        assert(says(list(accountScreen), "Nothing here"), "Recommended again, so the list is empty")
 
-        -- An activity from My account opens Browse, with a new header.
+        prettyui:findButton("Back to activities")()
+        assert(accountScreen.destroyed, "Back releases the account screen")
+        returned = prettyui.views[#prettyui.views]
+        equal(list(returned).scrollY, 75, "Account scrolling leaves the list position alone")
+
+        -- Back restores Browse with its previous search and filters.
         local function liveHeader()
             for index = #returned.children, 1, -1 do
                 local child = returned.children[index]

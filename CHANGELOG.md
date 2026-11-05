@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.53-dev - 2026-11-05
+
+- Fixed the empty Plugins ribbon page: the Open Profit Path button now uses the ribbon content's measured width. PrettyUI buttons do not apply widthAnchor, so the previous negative width hid it.
+
+## 0.8.52-dev - 2026-11-05
+
+- The Plugins ribbon page has one large Open Profit Path button, without the heading or description. A message appears only if the window cannot open.
+- Removed the storage-source and colour explanation at the bottom of an activity's Requirements tab.
+- My account opens as a full-width page with a Back arrow. Back restores the previous list or recommendation, including its scroll position.
+
 ## 0.8.51-dev - 2026-11-05
 
 - Shorter share codes: a GE item's name is left out when it matches Profit Path's GE list, and import fills it back in. A typical monster activity drops from about 3,000 to 2,200 characters, and every requirement as a full item group now fits. An item the importer's list doesn't have comes in as "Item <id>", with a warning.

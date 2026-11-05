@@ -11,7 +11,7 @@ The **Open Profit Path** button in the Plugins ribbon opens a separate, resizabl
 - **Browse**: every activity, bundled and your own custom ones, by group (PvM, Skilling, Production, Recurring), with search, Profit or ROI sort (highest first), Show (All or Custom only), and Intensity, Requirements and Difficulty filters. Ten rows per page.
 - **Recommend for me**: pick a group, get one suggestion at a time with the reasons for it. **Show another** moves on; **Don't recommend** skips that exact activity from now on (with Undo). Your custom activities are suggested too, once the game confirms every Required check; a custom PvM activity is rated 1-10 in the editor and checked against your PvM comfort like a bundled boss.
 - **Favourites**: the activities you starred, with the same sorting and filters.
-- **My account**: which character and profile your settings belong to, Recommend for me's settings (PvM comfort 1-10, harder "learning" suggestions, solo/group), and the activities you chose not to have recommended.
+- **My account**: a full-width page showing which character and profile your settings belong to, Recommend for me's settings (PvM comfort 1-10, harder "learning" suggestions, solo/group), and the activities you chose not to have recommended. Back returns to the previous list or recommendation.
 
 Opening an activity shows four tabs: **Income** (inputs, outputs, profit, ROI and an editable rate you can save or reset), **Requirements** (the guide's own wording, with what your account meets), **How to do it** and **Getting there**.
 

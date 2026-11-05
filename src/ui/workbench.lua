@@ -200,6 +200,11 @@ function UI.new(library, account, calculator, browser)
                         self.importState = ShareView.importState()
                         navigate("import")
                     end,
+
+                    onAccount = function()
+                        self.accountState = { scroll = 0 }
+                        navigate("account")
+                    end,
                 })
             else
                 local backOptions = { tooltip = "Back to activities", size = 24 }
@@ -330,6 +335,10 @@ function UI.new(library, account, calculator, browser)
                                 navigate("editor")
                             end
                         end,
+                    })
+                elseif self.screen == "account" then
+                    self.browseUnmount, self.browseRefresh = BrowseView.mount(library, view, browser, guarded, nil, {
+                        accountState = self.accountState,
                     })
                 elseif self.screen == "editor" then
                     self.editorUnmount = MethodEditor.mount(library, view, self.editor, guarded, {
@@ -578,19 +587,30 @@ function UI.new(library, account, calculator, browser)
         self.launcher = launcher
 
         local ok, failure = pcall(function()
-            launcher:AddTitle("Profit Path")
-            launcher:AddText("Browse money-making activities and calculate income in the Profit Path window.")
+            -- Leave the ribbon clear unless opening fails. The message belongs
+            -- below the button, without an empty gap above the action.
+            local status
 
-            -- Shows why opening failed (e.g. not logged in yet); empty otherwise.
-            local status = launcher:AddText({ text = "", height = 80 })
+            -- SimpleButton uses a fixed width; it does not apply widthAnchor.
+            -- Measure the ribbon content instead of passing a negative offset.
+            local buttonWidth = math.max(1, launcher.content.width - 20)
 
             launcher:AddSimpleButton("Open Profit Path", function()
                 -- Ignore clicks on a launcher that's already been replaced.
                 if self.active and self.launcher == launcher then
                     local opened, problem = self:openWindow()
-                    status.content = opened and "" or problem
+
+                    if not opened then
+                        if not status then
+                            status = launcher:AddText({ text = "", x = 10, y = 82, width = -20, widthAnchor = 1, height = 100 })
+                        end
+
+                        status.content = problem
+                    elseif status then
+                        status.content = ""
+                    end
                 end
-            end, { width = 220 })
+            end, { x = 10, y = 10, width = buttonWidth, height = 60 })
         end)
 
         if not ok then

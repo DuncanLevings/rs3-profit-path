@@ -475,6 +475,11 @@ return function(test, equal, client, pretty)
         prettyui:findButton("Solo only")()
         equal(control("Solo only").active, true)
 
+        -- Back returns to the same recommendation and its activity strip.
+        prettyui:findButton("Back to activities")()
+        assert(shown("Up to 4: Intermediate"))
+        assert(shown("Solo only"))
+
         -- The sidebar frames only the page you're on. The chosen activity is a
         -- filter, so it shows in its colour while the others go muted.
         local Style = require("src/ui/view_style")

@@ -1096,6 +1096,10 @@ return function(test, equal, client, pretty)
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
 
         local launcher = prettyui.views[1]
+        equal(#launcher.texts, 0, "The ribbon only shows its button")
+        equal(launcher.buttonControls["Open Profit Path"].options.height, 60)
+        equal(launcher.buttonControls["Open Profit Path"].options.width, launcher.content.width - 20)
+        equal(launcher.buttonControls["Open Profit Path"].options.widthAnchor, nil)
         launcher.buttons["Open Profit Path"]()
         local first = prettyui.windows[1]
 
@@ -1111,13 +1115,14 @@ return function(test, equal, client, pretty)
         launcher.buttons["Open Profit Path"]()
         equal(#prettyui.windows, 1)
 
-        local message = table.concat({ launcher.texts[1].content, launcher.texts[2].content, launcher.texts[3].content })
+        local message = launcher.texts[1].content
         assert(message:find("game area is unavailable", 1, true))
 
         -- Back in game: Open builds a brand-new window.
         state.gameArea = { width = 1280, height = 900, interfaceID = 2 }
         launcher.buttons["Open Profit Path"]()
         equal(#prettyui.windows, 2)
+        equal(launcher.texts[1].content, "", "Opening clears the failure message")
 
         PluginShutdown()
         assert(prettyui.windows[2].destroyed)

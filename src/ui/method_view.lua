@@ -441,8 +441,6 @@ local function mountRequirements(parent, method, calculator, fitter)
         end
     end
 
-    local storageStatus = parent:AddText({ text = "", height = 96, colour = Style.muted })
-
     -- Apply the shared verdict to text and update the owned-equipment match.
     -- Only a changed match creates/removes its small slot; the rate field stays put.
     local function refreshRequirements()
@@ -561,25 +559,11 @@ local function mountRequirements(parent, method, calculator, fitter)
 
     -- Recolour from the same cached evidence as the checks:
     -- Green = live, gold = saved presence, red = absent when last checked in all
-    -- three stores, grey = never fully checked. The footer makes saved stores clear;
+    -- three stores, grey = never fully checked. Saved matches keep their own labels;
     -- retained red borders don't turn historical evidence into a live access check.
     -- Unverified icons (name mismatch) always stay grey.
     local function refreshOwnership()
         local ownership = calculator:ownership()
-        local sources = ownership.sources or {}
-        local labels = { INV = "Backpack", WORN = "Worn", BANK = "Bank" }
-        local parts = {}
-
-        for _, container in ipairs({ "INV", "WORN", "BANK" }) do
-            parts[#parts + 1] = labels[container] .. ": " .. (sources[container] or "unavailable")
-        end
-
-        parts[#parts + 1] = "Tool belt (hatchet/pickaxe/mattock): " .. (sources.TOOLBELT or "unavailable")
-        storageStatus.content = table.concat(parts, " / ") .. ". Red: absent when last checked. Gold: saved item. Other tool-belt items and stores are not checked."
-
-        if ownership.message then
-            storageStatus.content = storageStatus.content .. " " .. ownership.message
-        end
 
         for _, entry in ipairs(borders) do
             local present = false
