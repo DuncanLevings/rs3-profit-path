@@ -333,7 +333,7 @@ return function(test, equal, client, pretty)
         dofile("main.lua")
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui:findButton("Open Profit Path")()
-        prettyui:findButton("Custom activities")()
+        prettyui:chooseEntry("Custom only")
 
         return state
     end
@@ -341,7 +341,7 @@ return function(test, equal, client, pretty)
     test("editor: create from a thieving target, save, edit, then delete", function()
         local state = open()
 
-        button("New activity")()
+        button("Create activity")()
         button("A thieving target's loot")()
 
         -- The search waits for typing to stop; Enter skips the wait.
@@ -359,7 +359,7 @@ return function(test, equal, client, pretty)
         assert(not shows("list is full"), (everything()))
 
         -- The rows are a table, with headings saying what each column is.
-        for _, heading in ipairs({ "Item", "Qty", "Per", "Price each", "Counted" }) do
+        for _, heading in ipairs({ "Item", "Qty", "Counted", "Price each", "Include" }) do
             assert(shows(heading), heading)
         end
 
@@ -399,7 +399,7 @@ return function(test, equal, client, pretty)
     test("editor: a blank activity says why it can't be saved yet", function()
         local state = open()
 
-        button("New activity")()
+        button("Create activity")()
 
         -- The start screen leads with the kind of activity, every kind included.
         for _, kind in ipairs({ "PvM", "Skilling", "Production", "Daily / weekly" }) do
@@ -448,7 +448,7 @@ return function(test, equal, client, pretty)
     test("editor: a daily/weekly activity counts per run", function()
         local state = open()
 
-        button("New activity")()
+        button("Create activity")()
         button("Daily / weekly")()
 
         field("e.g. Killing ghouls with a cannon"):SetText("Weekly herb run", true)
@@ -462,9 +462,16 @@ return function(test, equal, client, pretty)
         editor.tabs[1]:SetActive(2)
         button("Custom item")()
 
-        -- Rows have no per kill/trip/hour choice: everything is per run.
-        assert(shows("Per run"), (everything()))
+        -- Rows have no each kill/trip/hour choice: everything is each run, and
+        -- there's no trips question or hourly line.
+        assert(shows("Each run"), (everything()))
+        assert(not pcall(button, "Each hour"), "no Counted button")
+        assert(not shows("About "), (everything()))
         assert(shows("Profit per run (after tax)"), (everything()))
+
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(1)
+        assert(not shows("Do you bank between trips?"), (everything()))
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(2)
 
         button("Save")()
 
@@ -481,6 +488,7 @@ return function(test, equal, client, pretty)
         open()
 
         prettyui:findButton("Browse")()
+        prettyui:chooseEntry("All")
         prettyui:findMethod("Smelting steel bars")()
 
         -- An icon button, found by its tooltip.
@@ -494,7 +502,7 @@ return function(test, equal, client, pretty)
     test("editor: rows switch on and off, change basis, and get a number", function()
         local state = open()
 
-        button("New activity")()
+        button("Create activity")()
         button("A monster's drops")()
 
         local search = field("Type part of the name")
@@ -528,18 +536,34 @@ return function(test, equal, client, pretty)
 
         prettyui.views[#prettyui.views].tabs[1]:SetActive(2)
 
-        -- A row's basis cycles kill -> trip -> hour; a trip row needs
-        -- kills per trip.
-        button("Per kill")()
-        assert(shows("need a number of kills/actions per trip"), (everything()))
-        button("Per trip")()
-        assert(not shows("need a number of kills/actions per trip"))
+        -- Not banking between trips: a row's Counted button goes each kill ->
+        -- each hour, with no "Each trip" in between.
+        assert(not shows("Each trip"), (everything()))
+        button("Each kill")()
+        assert(not pcall(button, "Each trip"), "no Each trip without trips")
+        -- (The rows share one table; the fake finds the last button with a
+        -- label, row 8. This puts it back on each kill.)
+        button("Each hour")()
 
+        -- Banking between trips: "Each trip" joins the cycle, and a trip row
+        -- needs kills per trip.
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(1)
+        button("Yes")()
+        assert(shows("Kills per trip"), (everything()))
+
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(2)
+        button("Each kill")()
+        assert(button("Each trip"), (everything()))
+        button("Save")()
+        assert(shows("need a number of kills/actions per trip"), (everything()))
+
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(1)
+        field("e.g. 25"):SetText("10", true)
         button("Save")()
 
         local saved = state.db["profit-path.custom.v1/custom.1"]
-        -- (The rows share one table now; the fake finds the last "Per kill" button, row 8.)
-        equal(saved.outputs[8].basis, "hour")
+        equal(saved.outputs[8].basis, "trip")
+        equal(saved.actions_per_trip, 10)
         equal(saved.requirements.required[1].level, 85)
 
         PluginShutdown()
@@ -548,7 +572,7 @@ return function(test, equal, client, pretty)
     test("editor: item search waits for typing to stop and lists the best match first", function()
         local state = open()
 
-        button("New activity")()
+        button("Create activity")()
         button("Production")()
         field("e.g. Killing ghouls with a cannon"):SetText("Prayer potions", true)
 
@@ -582,7 +606,7 @@ return function(test, equal, client, pretty)
     test("editor: steps are a numbered list, and items can be requirements", function()
         local state = open()
 
-        button("New activity")()
+        button("Create activity")()
         button("Skilling")()
         field("e.g. Killing ghouls with a cannon"):SetText("Cleaning herbs", true)
 
@@ -655,6 +679,7 @@ return function(test, equal, client, pretty)
         open()
 
         prettyui:findButton("Browse")()
+        prettyui:chooseEntry("All")
         prettyui:findMethod("Smelting steel bars")()
         button("Duplicate as custom for editing")()
 
@@ -667,12 +692,12 @@ return function(test, equal, client, pretty)
     test("editor: number boxes take numbers only, and a quantity can be a 1/50 rate", function()
         local state = open()
 
-        button("New activity")()
+        button("Create activity")()
         button("Production")()
         field("e.g. Killing ghouls with a cannon"):SetText("Rates", true)
 
-        -- Letters are taken straight back out of the rate box.
-        local rate = field("Rate")
+        -- Letters are taken straight back out of the speed box.
+        local rate = field("e.g. 300")
         rate:SetText("12a0", true)
         equal(rate.text, "120")
 
@@ -710,6 +735,7 @@ return function(test, equal, client, pretty)
         local state = open()
 
         prettyui:findButton("Browse")()
+        prettyui:chooseEntry("All")
         prettyui:findMethod("Smelting steel bars")()
         button("Duplicate as custom for editing")()
         prettyui.views[#prettyui.views].tabs[1]:SetActive(2)
@@ -748,6 +774,7 @@ return function(test, equal, client, pretty)
             end
 
             prettyui:findButton("Browse")()
+            prettyui:chooseEntry("All")
             prettyui:findMethod("Smelting steel bars")()
             button("Duplicate as custom for editing")()
             button("Save")()
@@ -766,7 +793,7 @@ return function(test, equal, client, pretty)
     test("editor: Income notes and Getting there are tabs like the activity page's", function()
         local state = open()
 
-        button("New activity")()
+        button("Create activity")()
         button("Production")()
         field("e.g. Killing ghouls with a cannon"):SetText("Noted", true)
 
@@ -808,7 +835,7 @@ return function(test, equal, client, pretty)
     test("editor: a thieving target only counts actions per hour", function()
         open()
 
-        button("New activity")()
+        button("Create activity")()
         button("A thieving target's loot")()
         local search = assert(field("Type part of the name"))
         search:SetText("master farmer")
@@ -816,12 +843,186 @@ return function(test, equal, client, pretty)
         button("Master Farmer")()
         prettyui.views[#prettyui.views].tabs[1]:SetActive(1)
 
-        assert(button("Actions per hour"), (everything()))
-        assert(not pcall(button, "Kills per hour"), "no kills for thieving")
+        assert(shows("About how many actions an hour?"), (everything()))
 
-        -- Even as PvM it stays actions.
+        -- Even as PvM it stays actions (you pickpocket it, never kill it).
         button("PvM")()
-        assert(not pcall(button, "Kills per hour"))
+        assert(shows("About how many actions an hour?"), (everything()))
+        assert(not shows("kills an hour"), (everything()))
+
+        PluginShutdown()
+    end)
+
+    test("editor: the speed question follows the category, with no kills/actions buttons", function()
+        open()
+
+        button("Create activity")()
+        button("PvM")()
+
+        assert(shows("About how many kills an hour?"), (everything()))
+        assert(not pcall(button, "Kills per hour"), "no unit buttons any more")
+        assert(not pcall(button, "Actions per hour"), "no unit buttons any more")
+        assert(not shows("Throughput"), (everything()))
+        assert(not shows("Default rate"), (everything()))
+
+        -- In place, with trips on: both the question and the per-trip label change.
+        button("Yes")()
+        assert(shows("Kills per trip"), (everything()))
+
+        local before = prettyui.counted.parts
+        button("Skilling")()
+        equal(prettyui.counted.parts, before, "no redraw")
+        assert(shows("About how many actions an hour?"), (everything()))
+        assert(shows("Actions per trip"), (everything()))
+
+        button("Production")()
+        assert(shows("About how many actions an hour?"), (everything()))
+
+        PluginShutdown()
+    end)
+
+    test("drafts: the category decides kills or actions, even for a saved activity", function()
+        local draft = Draft.blank("skilling")
+        equal(draft.rate.unit, "actions/hour")
+
+        -- An older save could count kills under Skilling; it keeps that...
+        draft.rate.unit = "kills/hour"
+        draft.outputs[1] = { label = "Bones", pricing = "fixed", unit_value = 1, quantity = 1, basis = "action" }
+        draft.rate.default = 50
+
+        -- ...until the category changes, which then decides.
+        Draft.setCategory(draft, "pvm")
+        equal(draft.rate.unit, "kills/hour")
+        Draft.setCategory(draft, "production")
+        equal(draft.rate.unit, "actions/hour")
+    end)
+
+    test("drafts: switching trips off keeps every row's hourly amount", function()
+        local Income = require("src/methods/income")
+        local draft = Draft.blank("pvm")
+
+        draft.rate.default = 30
+        draft.actions_per_trip = 10
+        draft.supplies = {
+            { label = "Shark", pricing = "fixed", unit_value = 1, quantity = 8, basis = "trip" },
+            { label = "Prayer potion", pricing = "fixed", unit_value = 1, quantity = 2, basis = "hour" },
+        }
+        draft.outputs = {
+            { label = "Clue", pricing = "fixed", unit_value = 1, quantity = 1, basis = "trip", state = "included" },
+        }
+
+        local function hourly(row)
+            return row.quantity * Income.timesPerHour(row.basis, draft.rate.default, draft.actions_per_trip)
+        end
+
+        local before = { hourly(draft.supplies[1]), hourly(draft.supplies[2]), hourly(draft.outputs[1]) }
+        equal(Draft.usesTrips(draft), true)
+
+        Draft.stopTrips(draft)
+
+        -- 8 sharks a trip at 10 kills a trip is 0.8 a kill: still 24 an hour.
+        equal(draft.supplies[1].basis, "action")
+        equal(draft.supplies[1].quantity, 0.8)
+        equal(draft.supplies[2].basis, "hour")
+        equal(draft.outputs[1].basis, "action")
+        equal(draft.actions_per_trip, nil)
+        equal(Draft.usesTrips(draft), false)
+
+        local after = { hourly(draft.supplies[1]), hourly(draft.supplies[2]), hourly(draft.outputs[1]) }
+
+        for index = 1, 3 do
+            assert(math.abs(before[index] - after[index]) < 1e-9, "row " .. index .. " changed its hourly amount")
+        end
+    end)
+
+    test("drafts: new rows start on the likeliest Counted choice", function()
+        local pvm = Draft.blank("pvm")
+        local weekly = Draft.blank("recurring")
+
+        equal(Draft.newRowBasis(pvm, "outputs", true), "action")
+        equal(Draft.newRowBasis(pvm, "outputs", false), "action")
+        equal(Draft.newRowBasis(pvm, "supplies", true), "trip")
+        equal(Draft.newRowBasis(pvm, "supplies", false), "hour")
+        equal(Draft.newRowBasis(weekly, "supplies", false), "action")
+        equal(Draft.newRowBasis(weekly, "outputs", false), "action")
+    end)
+
+    test("income: times an hour for each kill, each trip and each hour", function()
+        local Income = require("src/methods/income")
+
+        equal(Income.timesPerHour("action", 30, nil), 30)
+        equal(Income.timesPerHour("trip", 30, 10), 3)
+        equal(Income.timesPerHour("hour", 30, nil), 1)
+
+        -- No sensible kills per trip: unknown, never a guess.
+        equal(Income.timesPerHour("trip", 30, nil), nil)
+        equal(Income.timesPerHour("trip", 30, 0), nil)
+        equal(Income.timesPerHour("trip", 30, 0 / 0), nil)
+    end)
+
+    test("editor: each row shows what it comes to, and turning trips off converts rows", function()
+        open()
+
+        button("Create activity")()
+        button("PvM")()
+
+        field("e.g. 300"):SetText("30", true)
+
+        -- Trips on, 10 kills a trip.
+        button("Yes")()
+        field("e.g. 25"):SetText("10", true)
+
+        -- A supply added now starts on each trip; an output on each kill.
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(3)
+        button("Custom item")()
+        assert(button("Each trip"), (everything()))
+
+        -- 1 a trip at 30 kills an hour and 10 a trip: 3 trips, so 3 an hour.
+        assert(shows("About 3 an hour"), (everything()))
+
+        -- Typing a quantity updates the line in place (no redraw).
+        local before = prettyui.counted.parts
+        field("1"):SetText("8", true)
+        equal(prettyui.counted.parts, before, "no redraw while typing")
+        assert(shows("About 24 an hour"), (everything()))
+
+        -- An hourly row says what it is per kill instead.
+        button("Each trip")()
+        assert(shows("About 0.27 a kill"), (everything()))
+        button("Each hour")()
+        button("Each kill")()
+
+        -- Back to each trip. Turning trips off makes it 0.8 a kill: still 24 an hour.
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(1)
+        button("No")()
+        assert(not shows("Kills per trip"), (everything()))
+
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(3)
+        assert(button("Each kill"), (everything()))
+        assert(field("0.8"), "the quantity was converted")
+        assert(shows("About 24 an hour"), (everything()))
+
+        -- Outputs start on each kill.
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(2)
+        button("Custom item")()
+        assert(button("Each kill"), (everything()))
+        assert(shows("About 30 an hour"), (everything()))
+
+        PluginShutdown()
+    end)
+
+    test("editor: the hourly line waits for a speed instead of guessing", function()
+        open()
+
+        button("Create activity")()
+        button("PvM")()
+
+        prettyui.views[#prettyui.views].tabs[1]:SetActive(2)
+        button("Custom item")()
+
+        -- No kills an hour yet: no hourly line, and one note saying where to fill it in.
+        assert(not shows("About "), (everything()))
+        assert(shows("on the Income tab to see what each row comes to"), (everything()))
 
         PluginShutdown()
     end)
@@ -829,7 +1030,7 @@ return function(test, equal, client, pretty)
     test("editor: switching between PvM, Skilling and Production redraws nothing", function()
         open()
 
-        button("New activity")()
+        button("Create activity")()
         button("PvM")()
 
         local before = prettyui.counted.parts
@@ -847,7 +1048,7 @@ return function(test, equal, client, pretty)
     test("editor: a click keeps the tab scrolled where it was", function()
         open()
 
-        button("New activity")()
+        button("Create activity")()
         button("Production")()
         prettyui.views[#prettyui.views].tabs[1]:SetActive(4)
 
@@ -893,7 +1094,7 @@ return function(test, equal, client, pretty)
     test("the activity page deletes a custom activity with two clicks", function()
         local state = open()
 
-        button("New activity")()
+        button("Create activity")()
         button("Production")()
         field("e.g. Killing ghouls with a cannon"):SetText("Short lived", true)
         prettyui.views[#prettyui.views].tabs[1]:SetActive(4)
@@ -903,10 +1104,68 @@ return function(test, equal, client, pretty)
         button("Save")()
         assert(state.db["profit-path.custom.v1/custom.1"])
 
-        -- One click only asks.
+        -- Edit and Delete sit in the header, right of the title, left of the
+        -- favourite star (12-36 in from the right), each well apart.
+        local function placed(tooltip)
+            for _, view in ipairs(live()) do
+                local control = view.buttonControls and view.buttonControls[tooltip]
+
+                if control then
+                    return control.options
+                end
+            end
+        end
+
+        local star = placed("Add favourite")
+        local edit, delete = placed("Edit this custom activity"), placed("Delete this custom activity")
+        assert(star and edit and delete, (everything()))
+
+        -- All three are the same boxed buttons, on one line.
+        for _, options in ipairs({ star, edit, delete }) do
+            equal(options.absolute, true)
+            equal(options.y, star.y)
+            equal(options.height, 28)
+        end
+
+        -- x is the left edge, measured back from the right edge (negative).
+        local starRight = -(star.x + star.width)
+        local editRight, deleteRight = -(edit.x + edit.width), -(delete.x + delete.width)
+        assert(editRight - (starRight + star.width) >= 32, "Edit is at least 32 clear of the star")
+        assert(deleteRight - (editRight + edit.width) >= 32, "Delete is at least 32 clear of Edit")
+
+        -- Starring swaps in a filled star in the same place.
+        local function starSprite(tooltip)
+            for _, view in ipairs(live()) do
+                local control = view.buttonControls and view.buttonControls[tooltip]
+
+                if control and not control.destroyed then
+                    return control.sprite, control.options
+                end
+            end
+        end
+
+        local icons = require("data/icons")
+        local emptySprite = starSprite("Add favourite")
+        equal(emptySprite, rsprite.Get(icons.star_empty))
+
+        button("Add favourite")()
+        local filledSprite, filled = starSprite("Remove favourite")
+        equal(filledSprite, rsprite.Get(icons.star_filled))
+        equal(filled.x, star.x)
+        equal(starSprite("Add favourite"), nil, "the old star is gone")
+
+        button("Remove favourite")()
+        equal(starSprite("Add favourite"), emptySprite)
+
+        -- Not at the bottom of the Income tab any more.
+        local income = prettyui.views[#prettyui.views].tabs[1].pages[1]
+        equal(income.buttons["Edit this custom activity"], nil)
+
+        -- One click only asks, in the title (so it shows on any tab).
         button("Delete this custom activity")()
         assert(state.db["profit-path.custom.v1/custom.1"], "one click doesn't delete")
-        assert(shows("Click the bin again"), (everything()))
+        assert(shows("Click the bin again to delete"), (everything()))
+        equal(label("Click the bin again").rgba, require("src/ui/view_style").bad)
 
         button("Delete this custom activity")()
         equal(state.db["profit-path.custom.v1/custom.1"], nil)
@@ -947,7 +1206,7 @@ return function(test, equal, client, pretty)
         dofile("main.lua")
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui:findButton("Open Profit Path")()
-        prettyui:findButton("Custom activities")()
+        prettyui:chooseEntry("Custom only")
 
         prettyui:findMethod("Needs a potion")()
         settleMethod()
@@ -1083,7 +1342,7 @@ return function(test, equal, client, pretty)
     test("native parts: the editor's busiest tab draws one page of rows", function()
         local state = open()
 
-        button("New activity")()
+        button("Create activity")()
         button("A monster's drops")()
 
         local search = field("Type part of the name")

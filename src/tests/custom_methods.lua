@@ -161,19 +161,32 @@ return function(test, equal, client, pretty)
         } })), true)
     end)
 
-    test("custom records: per-trip rows need kills per trip, and only then", function()
+    test("custom records: per-trip rows need kills per trip; the number may be saved on its own", function()
         rejected({ actions_per_trip = 0 }, "per trip")
         rejected({ actions_per_trip = math.huge }, "per trip")
         rejected({ actions_per_trip = false }, "per trip")
 
-        -- No trip rows: the number has nothing to do, so it's refused rather
-        -- than kept around to confuse later.
-        rejected({ supplies = {} }, "only used with per-trip rows")
         -- (Passing nil in `fields` wouldn't clear it, so clear it here.)
-        local noTrips = record({ supplies = {} })
-        noTrips.actions_per_trip = nil
+        local missing = record()
+        missing.actions_per_trip = nil
+        equal(CustomMethods.validate(missing), false)
 
-        equal(CustomMethods.validate(noTrips), true)
+        -- No trip rows yet: the editor's "bank between trips: Yes" keeps the
+        -- number, so it's accepted, but it still has to be a real number.
+        equal(CustomMethods.validate(record({ supplies = {} })), true)
+        rejected({ supplies = {}, actions_per_trip = -1 }, "greater than 0")
+        rejected({ supplies = {}, actions_per_trip = 0 / 0 }, "greater than 0")
+
+        -- ...and it doesn't change the profit: nothing is counted per trip.
+        local withNumber = CustomMethods.toMethod(record({ supplies = {} }))
+        local without = record({ supplies = {} })
+        without.actions_per_trip = nil
+
+        local quotes = { [2353] = { status = "available", low = 500, lowTime = 1, high = 500, highTime = 1 } }
+        local profit = Income.calculate(withNumber.income, 30, quotes).profit
+
+        assert(type(profit) == "number", "the fixture prices to a real profit")
+        equal(profit, Income.calculate(CustomMethods.toMethod(without).income, 30, quotes).profit)
     end)
 
     test("custom records: size limits stop huge activities", function()
@@ -436,14 +449,20 @@ return function(test, equal, client, pretty)
             return table.concat(values, ",")
         end
 
-        equal(shown(), "bundled")
+        -- Browse shows both; Show: Custom only narrows to the player's own.
+        equal(shown(), "bundled,custom.1")
 
-        browser.section = "custom"
+        browser.origin = "custom"
         equal(shown(), "custom.1")
 
+        -- Favourites take the Show filter too.
+        browser.origin = "all"
         browser.section = "favourites"
         browser.favourites = { ["custom.1"] = true, bundled = true }
         equal(shown(), "bundled,custom.1")
+
+        browser.origin = "custom"
+        equal(shown(), "custom.1")
 
         local pool = Recommendations.pool({ bundled, custom }, "pvm", { comfort = 10, learning = false, group = "either" }, {
             readiness = { bundled = { status = "met" }, ["custom.1"] = { status = "met" } },
@@ -475,7 +494,7 @@ return function(test, equal, client, pretty)
         return screenText(view):find(text, 1, true) ~= nil
     end
 
-    test("Custom activities section: empty state, then saved activities only", function()
+    test("Browse: Show Custom only has an empty state, then lists saved activities", function()
         client()
         prettyui = pretty()
         gepl = nil
@@ -483,12 +502,27 @@ return function(test, equal, client, pretty)
         dofile("main.lua")
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui:findButton("Open Profit Path")()
-        prettyui:findButton("Custom activities")()
 
+        -- No Custom activities section any more: Create activity instead.
+        assert(not pcall(prettyui.findButton, prettyui, "Custom activities"), "no separate section")
+        assert(prettyui:findButton("Create activity"))
+
+        prettyui:chooseEntry("Custom only")
         local view = prettyui.views[#prettyui.views]
 
         assert(has(view, "No custom activities yet"), screenText(view))
-        assert(not prettyui:findMethod("Smelting steel bars"), "Bundled activities stay out")
+        assert(not prettyui:findMethod("Smelting steel bars"), "Custom only hides bundled activities")
+
+        -- The empty state offers the same Create activity.
+        local createButtons = 0
+
+        for _, candidate in ipairs(prettyui.allViews) do
+            if not candidate.destroyed and candidate.buttons["Create activity"] then
+                createButtons = createButtons + 1
+            end
+        end
+
+        equal(createButtons, 2)
         PluginShutdown()
 
         -- A saved activity, read back at start-up like after a reload.
@@ -502,18 +536,47 @@ return function(test, equal, client, pretty)
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui:findButton("Open Profit Path")()
 
-        -- Not in Browse...
-        assert(not prettyui:findMethod("Fixture monster"), "Custom activities stay out of Browse")
+        -- In Browse with everything else (searching finds it among 674)...
+        local search
 
-        -- ...but in its own section, labelled as custom.
-        prettyui:findButton("Custom activities")()
+        for _, candidate in ipairs(prettyui.allViews) do
+            for _, box in ipairs(not candidate.destroyed and candidate.fields or {}) do
+                if box.placeholder == "Search activities" then
+                    search = box
+                end
+            end
+        end
+
+        search:SetText("Fixture", true)
+        search:Submit()
+        assert(prettyui:findMethod("Fixture monster"), "custom activities show in Browse")
+
+        -- ...and on its own with Show: Custom only, labelled as custom.
+        search:SetText("", true)
+        search:Submit()
+        prettyui:chooseEntry("Custom only")
         view = prettyui.views[#prettyui.views]
 
         assert(prettyui:findMethod("Fixture monster"), screenText(view))
         assert(not prettyui:findMethod("Smelting steel bars"))
-        assert(has(view, "Custom activities"))
         assert(has(view, "Custom activity"))
         assert(not has(view, "No custom activities yet"))
+
+        -- Show offers just All and Custom only.
+        local offered = false
+
+        for _, candidate in ipairs(prettyui.allViews) do
+            for _, list in ipairs(not candidate.destroyed and candidate.nativeLists or {}) do
+                if list.entries["Custom only"] then
+                    offered = true
+                    equal(list.entries.All, 0)
+                    equal(list.entries["Custom only"], 1)
+                    equal(list.entries["Bundled only"], nil)
+                end
+            end
+        end
+
+        assert(offered, "the Show dropdown is there")
 
         -- Its page says it's a custom activity (just that, no longer blurb).
         prettyui:findMethod("Fixture monster")()
@@ -524,7 +587,7 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
-    test("Custom activities section shows a load warning but still opens", function()
+    test("Browse shows a custom activity load warning but still opens", function()
         client({
             [INDEX] = { schema = 1, next = 3, ids = { "custom.1", "custom.2" } },
             ["profit-path.custom.v1/custom.1"] = record(),
@@ -536,7 +599,7 @@ return function(test, equal, client, pretty)
         dofile("main.lua")
         Event.ContentLayerReady.emit({ component = { width = 600, height = 400 } })
         prettyui:findButton("Open Profit Path")()
-        prettyui:findButton("Custom activities")()
+        prettyui:chooseEntry("Custom only")
 
         local view = prettyui.views[#prettyui.views]
 

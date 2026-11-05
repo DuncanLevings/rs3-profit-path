@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.8.45-dev - 2026-11-05
+
+- The activity page's favourite star uses PrettyUI's silver and gold stars inside its box. The empty star drew as black in game.
+
+## 0.8.44-dev - 2026-11-05
+
+- Browse's Show filter is just All or Custom only.
+- The activity page's favourite star is a boxed button like Edit and Delete beside it: a filled star once it's a favourite, an empty one when not.
+- Custom activity editor: each item's name is centred on its icon, with the "About ... an hour" line in a smaller grey font just below it.
+
+## 0.8.43-dev - 2026-11-05
+
+- Custom activities show in Browse with everything else. The sidebar's Custom activities section is replaced by a Create activity button, which opens the editor.
+- Browse and Favourites have a Show filter (All, Bundled only, Custom only) in place of the Highest first / Lowest first choice. Lists are always sorted highest first.
+- A custom activity's Edit and Delete icons are in the page header, left of the favourite star and spaced well apart. Delete still takes two clicks; the first turns the title red and says to click again, whichever tab is open.
+- Custom activity editor: each row's "About ... an hour" line sits under the item's name, and the row's boxes and buttons are centred, so the table lines up.
+
+## 0.8.42-dev - 2026-11-05
+
+- Custom activity editor: the Income tab asks "About how many kills an hour?" (or actions), following the category, instead of Throughput, the Kills/Actions per hour buttons and "Default rate". A thieving target always counts actions.
+- New "Do you bank between trips?" No / Yes on the Income tab. Yes shows kills per trip straight away; "Each trip" is only offered on rows while it's on. No turns per-trip rows into per-kill rows with the same hourly amount (8 a trip at 10 kills a trip becomes 0.8 a kill). Kills per trip can now be saved before any row uses it.
+- Each row shows what it comes to, e.g. "About 24 an hour" (or "About 0.27 a kill" for an hourly row), updated as you type. It stays blank until there's a speed to work from, and the table says what to fill in.
+- The Per column is now Counted (Each kill, Each trip, Each hour; Each run for daily/weekly), and the outputs On/Off column is now Include. New outputs start on each kill; new supplies start on each trip when you bank between trips, otherwise each hour.
+
 ## 0.8.41-dev - 2026-11-05
 
 - Custom activity pages stay within the client's shared native ID budget with a full requirements list. A required item shows its picture beside a line naming it (no tooltip), and an item group lists its items in the line instead of on hover. Before, a full list could add up to 250 tooltipped pictures.

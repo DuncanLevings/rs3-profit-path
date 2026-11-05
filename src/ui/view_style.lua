@@ -166,6 +166,9 @@ function Style.iconButton(parent, name, fallbackText, tooltip, action, place)
         options.x = -(place.right + width)
         options.xAnchor = 1
         options.y = place.y
+
+        -- On a screen's header row (not a flowing page), like the favourite star.
+        options.absolute = place.absolute
     else
         options.inline = true
     end

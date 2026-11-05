@@ -6,9 +6,9 @@ It is a planning tool only. It sends no game inputs, gives no live combat or mov
 
 ## What the player sees
 
-The **Open Profit Path** button in the Plugins ribbon opens a separate, resizable window with four sidebar sections:
+The **Open Profit Path** button in the Plugins ribbon opens a separate, resizable window with four sidebar sections and a **Create activity** button (which opens the custom activity editor):
 
-- **Browse**: every activity, by group (PvM, Skilling, Production, Recurring), with search, Profit or ROI sort, and Intensity, Requirements and Difficulty filters. Ten rows per page.
+- **Browse**: every activity, bundled and your own custom ones, by group (PvM, Skilling, Production, Recurring), with search, Profit or ROI sort (highest first), Show (All or Custom only), and Intensity, Requirements and Difficulty filters. Ten rows per page.
 - **Recommend for me**: pick a group, get one suggestion at a time with the reasons for it. **Show another** moves on; **Don't recommend** skips that exact activity from now on (with Undo).
 - **Favourites**: the activities you starred, with the same sorting and filters.
 - **My account**: which character and profile your settings belong to, Recommend for me's settings (PvM comfort 1-10, harder "learning" suggestions, solo/group), and the activities you chose not to have recommended.
@@ -39,7 +39,7 @@ A game-state change (login, logout, world hop) destroys the window, because its 
 | `src/methods/recommendations.lua` | Candidate filtering, ordering and rotation for Recommend for me |
 | `src/methods/custom_draft.lua` | The custom activity editor's working copy: loading drops from a monster or thieving target, the three row states, drops left out at the limit, Duplicate as custom and the preview |
 | `src/ui/method_editor.lua` | The custom activity editor screen (the activity page's tabs plus Outputs and Supplies, profit band, item table, searches that wait for a pause in typing) |
-| `src/methods/custom_methods.lua` | Custom activities: record checks and size limits, conversion to the shared method shape, and storage. Saved ones show in the Custom activities section |
+| `src/methods/custom_methods.lua` | Custom activities: record checks and size limits, conversion to the shared method shape, and storage. Saved ones show in Browse (Show: Custom only lists just them) and Favourites |
 | `src/storage/preferences.lua` | Every saved setting (keys below) |
 | `src/storage/account_snapshot.lua` | Saved catalogue-relevant item counts per profile (stands in for a closed bank) |
 | `src/data/method_data.lua`, `monster_data.lua` | Readers for the packed generated data in `data/` |
@@ -78,7 +78,7 @@ There is no gameplay polling. Late button callbacks are ignored using a per-scre
 - **Dropdowns** (`dropdown.lua`): entry IDs must count from 0, and the selection is read one tick after the change hook with `GetEntrySelected(id)`, because `selectedEntries` returned numbers that didn't match our IDs.
 - **Resize** (`workbench.lua`): the native `ONRESIZE` hook didn't fire for PrettyUI window resizes, so the visible window's content size is compared once per tick, and the screen is rebuilt after it holds for 15 ticks.
 - **No `utf8` global** in the client; the tests run with it removed.
-- **Native dynamic IDs**: the client has 4,096 shared by every plugin, and PrettyUI builds each tooltip up front (about 11 IDs each), so activity pages draw in steps and use tooltips sparingly. The Mega Shop Run guide is left out of the catalogue because its page alone ran out of IDs. Custom activities are capped (40 outputs, 15 supplies) so their page stays under 60% of that page's tooltips: their rows keep the item icon's tooltip but not a per-row price note, and the editor draws 8 rows at a time, with tooltips only on each row's item icon, remove button and (drops with a note) On/Off button. On a custom page, item requirements show the item's picture beside a line that names it, and item groups list their items in the line, so neither adds a tooltip; the budget test includes a full requirements list. The test fake counts parts and tooltips (src/tests/custom_editor.lua); that's a relative measure, not the client's real ID count.
+- **Native dynamic IDs**: the client has 4,096 shared by every plugin, and PrettyUI builds each tooltip up front (about 11 IDs each), so activity pages draw in steps and use tooltips sparingly. The Mega Shop Run guide is left out of the catalogue because its page alone ran out of IDs. Custom activities are capped (40 outputs, 15 supplies) so their page stays under 60% of that page's tooltips: their rows keep the item icon's tooltip but not a per-row price note, and the editor draws 8 rows at a time, with tooltips only on each row's item icon, remove button and (drops with a note) On/Off button. Each row's "About 2.4 an hour" line is plain text, with no tooltip. On a custom page, item requirements show the item's picture beside a line that names it, and item groups list their items in the line, so neither adds a tooltip; the budget test includes a full requirements list. The test fake counts parts and tooltips (src/tests/custom_editor.lua); that's a relative measure, not the client's real ID count.
 - **Item IDs** are checked against the client's own item name before an icon is shown or ownership counts.
 
 ### Requirement checks and their limits

@@ -20,6 +20,7 @@
 -- per remove button. Tests measure both (see README "Native dynamic IDs").
 local CustomMethods = require("src/methods/custom_methods")
 local Draft = require("src/methods/custom_draft")
+local Income = require("src/methods/income")
 local ItemIcon = require("src/ui/item_icon")
 local ItemNames = require("src/data/item_names")
 local Style = require("src/ui/view_style")
@@ -38,10 +39,19 @@ local BAND_HEIGHT = 104
 local RESULT_HEIGHT = 30
 
 -- The item table, drawn like the activity page's: a shaded heading band, then
--- rows of alternating shades, ROW_STEP apart.
+-- rows of alternating shades, ROW_GAP apart.
+-- Rows are tall enough for a grey "About 2.4 an hour" line under the item's
+-- name. Daily/weekly rows have no such line, so they keep the shorter height.
+-- Every box and button is centred in its row either way, so they line up.
 local TABLE_TOP = 36
-local ROW_HEIGHT = 44
-local ROW_STEP = 46
+local ROW_HEIGHT = 58
+local SHORT_ROW_HEIGHT = 44
+local ROW_GAP = 2
+
+-- The hourly line's smaller font (the one Browse uses for an activity's
+-- version), and the height of its one line.
+local HOURLY_FONT = "MUSEO_SANS_11PT_REGULAR"
+local HOURLY_HEIGHT = 16
 
 -- How many Logic ticks of no typing before a search runs (same as Browse).
 local SEARCH_SETTLE_TICKS = 12
@@ -83,12 +93,8 @@ local RECURRENCES = {
     { id = "month", label = "Every month" },
 }
 
-local UNITS = {
-    { id = "kills/hour", label = "Kills per hour" },
-    { id = "actions/hour", label = "Actions per hour" },
-}
-
--- The basis button cycles through these.
+-- A row's Counted button cycles through these ("Each trip" only while the
+-- player banks between trips).
 local BASES = { "action", "trip", "hour" }
 
 -- The draft's lists of lines (steps, income notes, getting there) as lists.
@@ -216,29 +222,104 @@ local function parseNumber(text, fraction)
     end
 end
 
-local function basisLabel(basis, category)
-    if category == "recurring" then
-        return "Per run"
+-- "kill", "action" or "run": what one of this activity's counts is. The rate's
+-- unit decides (not the category), so an older Skilling activity that was saved
+-- counting kills still says "kill".
+local function actionWord(draft)
+    if draft.category == "recurring" then
+        return "run"
+    end
+
+    return draft.rate.unit == "kills/hour" and "kill" or "action"
+end
+
+-- The plural, for "About how many kills an hour?".
+local function actionsWord(draft)
+    return actionWord(draft) .. "s"
+end
+
+-- What a row's Counted button says: "Each kill", "Each trip", "Each hour"...
+local function basisLabel(basis, draft)
+    if draft.category == "recurring" then
+        return "Each run"
     end
 
     if basis == "trip" then
-        return "Per trip"
+        return "Each trip"
     elseif basis == "hour" then
-        return "Per hour"
+        return "Each hour"
     end
 
-    return category == "pvm" and "Per kill" or "Per action"
+    return "Each " .. actionWord(draft)
 end
 
 -- "per kill", "per run" or "per action", for sentences.
-local function perWhat(category)
-    if category == "pvm" then
-        return "per kill"
-    elseif category == "recurring" then
-        return "per run"
+local function perWhat(draft)
+    return "per " .. actionWord(draft)
+end
+
+-- Whether the player banks between trips ("Do you bank between trips?"). It
+-- lives on the editor state, not the draft, because it's only a question: the
+-- saved activity just has (or hasn't) a kills per trip number and per-trip
+-- rows. Worked out from those the first time it's asked.
+local function tripsOn(state)
+    if state.trips == nil then
+        state.trips = Draft.usesTrips(state.draft)
     end
 
-    return "per action"
+    return state.trips
+end
+
+-- A short, readable amount for the hourly line: whole numbers once they're
+-- big, a couple of decimals for small ones (0.25 food a kill).
+local function roughNumber(value)
+    if value >= 100 then
+        return Style.number(value, 0)
+    end
+
+    if value >= 1 then
+        -- One decimal, but "12" rather than "12.0".
+        return (Style.number(value, 1):gsub("%.0$", ""))
+    end
+
+    -- Two significant figures for small amounts, so 1/5000 doesn't read as 0.
+    local text = string.format("%.2g", value)
+
+    -- %g switches to "1e-05" for really tiny ones; write those out in full.
+    if text:find("e") then
+        text = string.format("%.8f", value):gsub("0+$", ""):gsub("%.$", "")
+    end
+
+    return text
+end
+
+-- The grey line under a row's boxes: what the row comes to over an hour (or,
+-- for an hourly row, per kill/action), so the player can see straight away
+-- whether they picked the right "Each ...". Blank when it can't be worked out
+-- yet (no quantity, no kills an hour, no kills per trip) or the row isn't counted.
+local function hourlyText(row, draft)
+    local rate = draft.rate.default
+
+    if draft.category == "recurring" or row.quantity == nil or row.state == "off" or row.state == "needs" then
+        return ""
+    end
+
+    if type(rate) ~= "number" or rate <= 0 then
+        return ""
+    end
+
+    -- An hourly row: show it per kill/action instead (an hour is already shown).
+    if row.basis == "hour" then
+        return "About " .. roughNumber(row.quantity / rate) .. " a " .. actionWord(draft)
+    end
+
+    local times = Income.timesPerHour(row.basis, rate, draft.actions_per_trip)
+
+    if times == nil then
+        return ""
+    end
+
+    return "About " .. roughNumber(row.quantity * times) .. " an hour"
 end
 
 -- How tall a text box must be for `text` to wrap inside `width`.
@@ -893,30 +974,45 @@ function MethodEditor.income(page, state, tools)
     })
 
     -- Category. Switching between PvM, Skilling and Production only changes
-    -- which buttons are lit, so it happens in place (no redraw, no flicker).
-    -- Daily/weekly has different boxes below, so going to or from it redraws.
+    -- which buttons are lit and a few words (kills or actions), so it happens
+    -- in place (no redraw, no flicker). Daily/weekly has different boxes below,
+    -- so going to or from it redraws.
     page:AddText({ text = "Category", colour = Style.gold, marginTop = 6 })
 
-    local categoryButtons, unitButtons = {}, {}
-    local tripLabel
+    local categoryButtons = {}
+    local questionLabel, tripLabel
+
+    -- "About how many kills an hour?" and "Kills per trip", for the category now.
+    local function questionText()
+        return "About how many " .. actionsWord(draft) .. " an hour?"
+    end
+
+    local function tripText()
+        local word = actionsWord(draft)
+        return word:sub(1, 1):upper() .. word:sub(2) .. " per trip"
+    end
 
     local function light()
         for id, button in pairs(categoryButtons) do
             button:SetActive(id == draft.category)
         end
 
-        for id, button in pairs(unitButtons) do
-            button:SetActive(id == draft.rate.unit)
+        if questionLabel then
+            questionLabel.content = questionText()
         end
 
         if tripLabel then
-            tripLabel.content = (draft.category == "pvm" and "Kills" or "Actions") .. " per trip"
+            tripLabel.content = tripText()
         end
     end
 
     for index, category in ipairs(CATEGORIES) do
         local redraw = change(function()
             Draft.setCategory(draft, category.id)
+
+            -- Daily/weekly has no trips (setCategory clears them), so ask
+            -- again from what the draft now has.
+            state.trips = nil
         end)
 
         categoryButtons[category.id] = page:AddSimpleButton(category.label, guarded(function(...)
@@ -956,29 +1052,13 @@ function MethodEditor.income(page, state, tools)
 
         page:AddText({ text = "Default runs to count (usually 1)", colour = Style.muted })
     else
-        page:AddText({ text = "Throughput", colour = Style.gold, marginTop = 6 })
-
-        -- Also in place: only the lit button changes. A thieving target is
-        -- never killed, so it only counts actions (pickpockets, steals).
-        local thieving = draft.source and draft.source.kind == "thieving"
-        local shown = 0
-
-        for _, unit in ipairs(UNITS) do
-            if not (thieving and unit.id == "kills/hour") then
-                shown = shown + 1
-
-                unitButtons[unit.id] = page:AddSimpleButton(unit.label, guarded(function()
-                    draft.rate.unit = unit.id
-                    light()
-                    updatePreview()
-                end), { width = 160, height = 30, inline = shown > 1, active = draft.rate.unit == unit.id })
-            end
-        end
-
-        page:AddText({ text = "Default rate (you can still set your own on the activity page)", colour = Style.muted })
+        -- One plain question. Whether it's kills or actions follows the
+        -- category (a thieving target always counts actions: you pickpocket it).
+        questionLabel = page:AddText({ text = questionText(), colour = Style.gold, marginTop = 6 })
+        page:AddText({ text = "Players can change this to their own speed on the activity page.", colour = Style.muted })
     end
 
-    tools.numberField(page, { text = numberText(draft.rate.default), placeholder = "Rate", maxLength = 12, width = 160, height = 30 },
+    tools.numberField(page, { text = numberText(draft.rate.default), placeholder = "e.g. 300", maxLength = 12, width = 160, height = 30 },
         "decimal", function(text)
             local value = parseNumber(text)
 
@@ -989,27 +1069,35 @@ function MethodEditor.income(page, state, tools)
             updatePreview()
         end)
 
-    -- Kills/actions per trip only matters once a row is per trip.
-    local usesTrips = false
+    -- Trips. Asked up front, so the kills per trip box is right here instead of
+    -- only turning up after a row on another tab was set to "Each trip".
+    -- Daily/weekly counts runs, so it has no trips.
+    if draft.category ~= "recurring" then
+        local trips = tripsOn(state)
 
-    for _, side in ipairs({ "outputs", "supplies" }) do
-        for _, row in ipairs(draft[side]) do
-            usesTrips = usesTrips or row.basis == "trip"
+        page:AddText({ text = "Do you bank between trips?", colour = Style.gold, marginTop = 6 })
+
+        page:AddSimpleButton("No", change(function()
+            -- Per-trip rows become per kill/action with the same hourly amount.
+            Draft.stopTrips(draft)
+            state.trips = false
+        end), { width = 100, height = 30, active = not trips })
+
+        page:AddSimpleButton("Yes", change(function()
+            state.trips = true
+        end), { width = 100, height = 30, inline = true, active = trips })
+
+        if trips then
+            tripLabel = page:AddText({ text = tripText(), colour = Style.gold, marginTop = 6 })
+            page:AddText({ text = "Rows counted \"Each trip\" use this to work out trips an hour.", colour = Style.muted })
+
+            tools.numberField(page, { text = numberText(draft.actions_per_trip), placeholder = "e.g. 25",
+                maxLength = 12, width = 160, height = 30 }, "decimal", function(text)
+                    local value = parseNumber(text)
+                    draft.actions_per_trip = value and value > 0 and value or nil
+                    updatePreview()
+                end)
         end
-    end
-
-    if usesTrips then
-        tripLabel = page:AddText({ text = (draft.category == "pvm" and "Kills" or "Actions") .. " per trip",
-            colour = Style.gold, marginTop = 6 })
-        tools.numberField(page, { text = numberText(draft.actions_per_trip), maxLength = 12, width = 160, height = 30 },
-            "decimal", function(text)
-                local value = parseNumber(text)
-                draft.actions_per_trip = value and value > 0 and value or nil
-                updatePreview()
-            end)
-    elseif draft.actions_per_trip ~= nil then
-        -- Left over from rows that were per trip: no longer used.
-        draft.actions_per_trip = nil
     end
 
     -- The Income tab's Notes, under the tables on the activity page.
@@ -1065,7 +1153,7 @@ end
 -- ---- Outputs and Supplies tabs ----------------------------------------------------
 
 -- The table's columns, right to left, with a clear gap between each. x is from
--- the panel's right edge. Supplies have no Counted column, so theirs shift right.
+-- the panel's right edge. Supplies have no Include column, so theirs shift right.
 local COLUMN_GAP = 14
 
 local function tableColumns(side)
@@ -1079,13 +1167,15 @@ local function tableColumns(side)
 
     column("remove", 28)
 
+    -- Include (outputs only): a drop's On/Off switch.
     if side == "outputs" then
-        column("counted", 58)
+        column("include", 58)
     end
 
-    -- Wide enough for a price like 12,345,678, "Per action" and a 1/12,000 drop.
+    -- Wide enough for a price like 12,345,678, "Each action" and a 1/12,000 drop.
+    -- "per" is the Counted column (each kill, each trip or each hour).
     column("price", 130)
-    column("per", 100)
+    column("per", 110)
     column("quantity", 100)
 
     -- The item's name runs from beside its icon up to the quantity column.
@@ -1106,11 +1196,38 @@ function MethodEditor.rows(page, state, side, tools)
     local first = (state.pages[side] - 1) * ROWS_PER_PAGE + 1
     local last = math.min(#rows, first + ROWS_PER_PAGE - 1)
 
-    page:AddText({
-        text = side == "outputs" and "What you get. Quantities are per kill/action, per trip or per hour; type 1/50 for a 1 in 50 drop."
-            or "What you use up. Quantities are per kill/action, per trip or per hour.",
-        colour = Style.muted,
-    })
+    -- What the table means, in the activity's own words ("each kill", "each
+    -- trip" only when they bank). Daily/weekly rows are all for one run.
+    local recurring = draft.category == "recurring"
+    local trips = not recurring and tripsOn(state)
+    local word = actionWord(draft)
+    local choices = trips and ("each " .. word .. ", each trip or each hour") or ("each " .. word .. " or each hour")
+    local intro
+
+    if recurring then
+        intro = side == "outputs" and "What you get from one run. Type 1/50 for a 1 in 50 chance."
+            or "What you use up on one run."
+    else
+        intro = (side == "outputs" and "What you get." or "What you use up.")
+            .. " Type how many, then pick whether that's " .. choices .. "."
+            .. (side == "outputs" and " Type 1/50 for a 1 in 50 drop." or "")
+    end
+
+    page:AddText({ text = intro, colour = Style.muted })
+
+    -- The grey "About ... an hour" lines need a speed (and, for trips, kills
+    -- per trip). Say once what's missing here rather than on every row.
+    if not recurring then
+        local rate = draft.rate.default
+
+        if type(rate) ~= "number" or rate <= 0 then
+            page:AddText({ text = "Fill in how many " .. actionsWord(draft)
+                .. " you do an hour on the Income tab to see what each row comes to.", colour = Style.muted })
+        elseif trips and draft.actions_per_trip == nil then
+            page:AddText({ text = "Fill in " .. actionsWord(draft)
+                .. " per trip on the Income tab to see what \"Each trip\" rows come to.", colour = Style.muted })
+        end
+    end
 
     -- ---- Add a row (above the table) ----
     if #rows >= limit then
@@ -1125,7 +1242,7 @@ function MethodEditor.rows(page, state, side, tools)
                 page:AddSimpleButton("Custom item", change(function()
                     rows[#rows + 1] = {
                         label = side == "outputs" and "Other loot" or "Other cost", pricing = "fixed", unit_value = 0,
-                        quantity = 1, basis = draft.category == "recurring" and "action" or "hour",
+                        quantity = 1, basis = Draft.newRowBasis(draft, side, trips),
                         state = side == "outputs" and "included" or nil, custom = true,
                     }
                     state.pages[side] = math.ceil(#rows / ROWS_PER_PAGE)
@@ -1134,7 +1251,8 @@ function MethodEditor.rows(page, state, side, tools)
 
             pick = function(item)
                 rows[#rows + 1] = {
-                    label = item.label, item_id = item.id, pricing = "ge", quantity = 1, basis = "action",
+                    label = item.label, item_id = item.id, pricing = "ge", quantity = 1,
+                    basis = Draft.newRowBasis(draft, side, trips),
                     state = side == "outputs" and "included" or nil,
                 }
                 state.pages[side] = math.ceil(#rows / ROWS_PER_PAGE)
@@ -1197,7 +1315,7 @@ function MethodEditor.rows(page, state, side, tools)
 
                 page:AddText({
                     text = row.label .. (worth > 0 and ("  (about " .. Style.number(worth, worth < 10 and 1 or 0)
-                        .. " GP " .. perWhat(draft.category) .. ")") or ""),
+                        .. " GP " .. perWhat(draft) .. ")") or ""),
                     inline = true, width = 420, height = 28, colour = Style.muted,
                 })
             end
@@ -1216,7 +1334,11 @@ function MethodEditor.table(page, state, side, tools, first, last)
     local guarded, change, updatePreview = tools.guarded, tools.change, tools.updatePreview
     local rows = draft[side]
     local columns = tableColumns(side)
-    local height = TABLE_TOP + (last - first + 1) * ROW_STEP + 6
+    -- Rows with an hourly line are taller (see ROW_HEIGHT).
+    local hasHourly = draft.category ~= "recurring"
+    local rowHeight = hasHourly and ROW_HEIGHT or SHORT_ROW_HEIGHT
+    local rowStep = rowHeight + ROW_GAP
+    local height = TABLE_TOP + (last - first + 1) * rowStep + 6
     local panel = tools.fitter:add(page:AddPanel({ height = height, scrollable = false, marginTop = 6 }), height)
 
     -- Column headings on a shaded band, like the activity page.
@@ -1231,55 +1353,76 @@ function MethodEditor.table(page, state, side, tools, first, last)
 
     heading("Item", { x = 20, width = 200 })
     heading("Qty", columns.quantity)
-    heading("Per", columns.per)
+    heading("Counted", columns.per)
     heading("Price each", columns.price, side == "outputs"
         and "Starts at the GE Price Library's instant-sell price (before tax). Type your own to use it instead; clear the box to go back to the live price."
         or "Starts at the GE Price Library's instant-buy price. Type your own to use it instead; clear the box to go back to the live price.")
 
-    if columns.counted then
-        heading("Counted", columns.counted)
+    if columns.include then
+        heading("Include", columns.include)
     end
+
+    -- "Each trip" is only offered while the player banks between trips.
+    local trips = draft.category ~= "recurring" and tripsOn(state)
 
     for index = first, last do
         local row = rows[index]
-        local y = TABLE_TOP + (index - first) * ROW_STEP
-        local middle = y + 10
+        local y = TABLE_TOP + (index - first) * rowStep
+
+        -- Everything on the right is centred on the row's middle: 28-tall boxes
+        -- and buttons at `control`, 24-tall labels at `middle`.
+        local centre = y + math.floor(rowHeight / 2)
+        local control = centre - 14
+        local middle = centre - 12
 
         Style.rectangle(panel, {
-            x = 12, y = y, width = -24, widthAnchor = 1, height = ROW_HEIGHT,
+            x = 12, y = y, width = -24, widthAnchor = 1, height = rowHeight,
             colour = (index - first) % 2 == 1 and 0x292A25FF or 0x24251FFF,
         })
 
-        -- The item's icon (a coin for a custom item, which is just GP).
+        -- The item's icon (a coin for a custom item, which is just GP), centred too.
         if row.item_id then
-            ItemIcon.add(panel, row.item_id, { x = 14, y = y + 2 }, row.label)
+            ItemIcon.add(panel, row.item_id, { x = 14, y = centre - 20 }, row.label)
         else
-            Style.coins(panel, { x = 22, y = y + 10, size = 24 })
+            Style.coins(panel, { x = 22, y = centre - 12, size = 24 })
         end
 
         -- Name: only a custom item's can be changed; items and drops keep theirs.
+        -- The name is centred on the icon, like everything else in the row; the
+        -- small hourly line hangs just below it (see further down).
+        local nameBottom
+
         if row.custom then
             panel:AddTextField({
-                text = row.label, maxLength = CustomMethods.LIMITS.label, x = columns.name.x, y = y + 8,
+                text = row.label, maxLength = CustomMethods.LIMITS.label, x = columns.name.x, y = control,
                 width = columns.name.width, widthAnchor = 1, height = 28,
                 onChange = guarded(function(_, _, text)
                     row.label = text
                     updatePreview()
                 end),
             })
+
+            -- Tucked just under the box, so the line still fits in the row.
+            nameBottom = control + 26
+        elseif hasHourly then
+            -- One line, centred on the icon, so the hourly line fits underneath.
+            panel:AddText({ text = row.label, x = columns.name.x, y = middle, width = columns.name.width, widthAnchor = 1,
+                height = 24 })
+
+            nameBottom = middle + 22
         else
-            -- Two lines' room, so a long name wraps instead of running on.
+            -- No hourly line: two lines' room, so a long name wraps instead of running on.
             panel:AddText({ text = row.label, x = columns.name.x, y = y + 2, width = columns.name.width, widthAnchor = 1,
-                height = ROW_HEIGHT - 4 })
+                height = rowHeight - 4 })
         end
 
-        -- Counted (outputs only): drops can be switched on and off, with the
+        -- Include (outputs only): drops can be switched on and off, with the
         -- drop's note (e.g. "Only on a Slayer task") on hover; a drop the Wiki
         -- gave no number for waits for one. Rows you added always count.
         local countedLabel
 
-        if columns.counted then
-            local column = columns.counted
+        if columns.include then
+            local column = columns.include
 
             if row.state == "needs" then
                 countedLabel = panel:AddText({ text = "Needs qty", x = column.x, xAnchor = 1, y = middle,
@@ -1287,7 +1430,7 @@ function MethodEditor.table(page, state, side, tools, first, last)
             elseif fromSource(row) then
                 panel:AddSimpleButton(row.state == "off" and "Off" or "On", change(function()
                     row.state = row.state == "off" and "included" or "off"
-                end), { x = column.x, xAnchor = 1, y = y + 8, width = column.width, height = 28,
+                end), { x = column.x, xAnchor = 1, y = control, width = column.width, height = 28,
                     active = row.state ~= "off", tooltip = row.note })
             else
                 countedLabel = panel:AddText({ text = "Yes", x = column.x, xAnchor = 1, y = middle,
@@ -1295,11 +1438,24 @@ function MethodEditor.table(page, state, side, tools, first, last)
             end
         end
 
-        -- Quantity: a number, or a rate like 1/50. Typing one into a row that
-        -- needs it starts counting it.
+        -- The small grey line under the item's name: what this row comes to an
+        -- hour (see hourlyText). It's in the smaller font so it reads as a note,
+        -- not a second name. Typing a quantity updates it in place. Daily/weekly
+        -- rows are just "each run", so they don't get one.
+        local hourly
+
+        if hasHourly then
+            hourly = Style.setFont(panel:AddText({
+                text = hourlyText(row, draft), x = columns.name.x, y = nameBottom,
+                width = columns.name.width, widthAnchor = 1, height = HOURLY_HEIGHT, colour = Style.muted,
+            }), HOURLY_FONT)
+        end
+
+        -- Quantity: a number, or a drop chance like 1/50. Typing one into a row
+        -- that needs it starts counting it.
         tools.numberField(panel, {
             text = numberText(row.quantity), placeholder = "Qty", maxLength = 16,
-            x = columns.quantity.x, xAnchor = 1, y = y + 8, width = columns.quantity.width, height = 28,
+            x = columns.quantity.x, xAnchor = 1, y = control, width = columns.quantity.width, height = 28,
         }, "rate", function(text)
             local value = parseNumber(text, true)
             row.quantity = value
@@ -1315,6 +1471,10 @@ function MethodEditor.table(page, state, side, tools, first, last)
                 countedLabel.rgba = row.state == "needs" and Style.bad or Style.muted
             end
 
+            if hourly then
+                hourly.content = hourlyText(row, draft)
+            end
+
             updatePreview()
         end)
 
@@ -1327,7 +1487,7 @@ function MethodEditor.table(page, state, side, tools, first, last)
 
             tools.numberField(panel, {
                 text = numberText(row.price or live), placeholder = live and numberText(live) or "No price",
-                maxLength = 14, x = columns.price.x, xAnchor = 1, y = y + 8, width = columns.price.width, height = 28,
+                maxLength = 14, x = columns.price.x, xAnchor = 1, y = control, width = columns.price.width, height = 28,
             }, "decimal", function(text)
                 local value = parseNumber(text)
 
@@ -1342,7 +1502,7 @@ function MethodEditor.table(page, state, side, tools, first, last)
         else
             tools.numberField(panel, {
                 text = numberText(row.unit_value), placeholder = "GP each", maxLength = 14,
-                x = columns.price.x, xAnchor = 1, y = y + 8, width = columns.price.width, height = 28,
+                x = columns.price.x, xAnchor = 1, y = control, width = columns.price.width, height = 28,
             }, "decimal", function(text)
                 row.unit_value = parseNumber(text)
                 updatePreview()
@@ -1350,23 +1510,31 @@ function MethodEditor.table(page, state, side, tools, first, last)
         end
 
         if draft.category == "recurring" then
-            panel:AddText({ text = "Per run", x = columns.per.x, xAnchor = 1, y = middle, width = columns.per.width,
-                height = 24, colour = Style.muted })
+            panel:AddText({ text = basisLabel(row.basis, draft), x = columns.per.x, xAnchor = 1, y = middle,
+                width = columns.per.width, height = 24, colour = Style.muted })
         else
-            -- Cycles per kill/action -> per trip -> per hour.
-            panel:AddSimpleButton(basisLabel(row.basis, draft.category), change(function()
-                for position, basis in ipairs(BASES) do
+            -- Cycles each kill/action -> each trip -> each hour, skipping
+            -- "Each trip" when the player doesn't bank between trips.
+            panel:AddSimpleButton(basisLabel(row.basis, draft), change(function()
+                local position = 1
+
+                for candidate, basis in ipairs(BASES) do
                     if basis == row.basis then
-                        row.basis = BASES[position % #BASES + 1]
-                        break
+                        position = candidate
                     end
                 end
-            end), { x = columns.per.x, xAnchor = 1, y = y + 8, width = columns.per.width, height = 28 })
+
+                repeat
+                    position = position % #BASES + 1
+                until trips or BASES[position] ~= "trip"
+
+                row.basis = BASES[position]
+            end), { x = columns.per.x, xAnchor = 1, y = control, width = columns.per.width, height = 28 })
         end
 
         Style.iconButton(panel, "trash", "Remove", "Remove " .. row.label, change(function()
             table.remove(rows, index)
-        end), { right = -columns.remove.x - columns.remove.width, y = y + 8 })
+        end), { right = -columns.remove.x - columns.remove.width, y = control })
     end
 end
 

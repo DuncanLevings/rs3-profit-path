@@ -17,6 +17,7 @@ local MethodView = require("src/ui/method_view")
 local BrowseView = require("src/ui/browse_view")
 local MethodEditor = require("src/ui/method_editor")
 local Draft = require("src/methods/custom_draft")
+local Style = require("src/ui/view_style")
 local UI = {}
 
 -- Window resizing. PrettyUI views size their inner content once, when they're
@@ -225,25 +226,35 @@ function UI.new(library, account, calculator, browser)
                         return browser.favourites[self.method.id] and "Remove favourite" or "Add favourite"
                     end
 
+                    -- A boxed button, like a custom activity's Edit and Delete beside
+                    -- it: a gold star once it's a favourite, a silver one when not.
+                    -- The icon can't be swapped on a drawn button, so a click draws
+                    -- a fresh button in the same place (the old one is destroyed
+                    -- first, like any redraw from inside a click).
+                    local drawFavourite
+
                     -- Reload favourites first in case the character changed while this
                     -- method was open. A save error shows on the Income status line.
-                    favouriteButton = view:AddSpriteButton("STAR", guarded(function()
+                    local function toggleFavourite()
                         browser:loadFavourites()
                         browser:toggleFavourite(self.method)
 
-                        favouriteButton:SetTooltip(favouriteLabel())
-                        favouriteButton:SetDisabled(not browser.favourites[self.method.id])
+                        favouriteButton:Destroy()
+                        drawFavourite()
 
                         calculator.message = browser.message
                         self.methodRefresh()
-                    end), {
-                        absolute = true, x = -36, xAnchor = 1, y = 10, size = 24,
-                        tooltip = favouriteLabel(),
+                    end
 
-                        -- "disabled" is PrettyUI's unlit toggle look, not unclickable.
-                        toggleable = true,
-                        disabled = not browser.favourites[self.method.id],
-                    })
+                    drawFavourite = function()
+                        local favourite = browser.favourites[self.method.id] == true
+
+                        favouriteButton = Style.iconButton(view, favourite and "star_filled" or "star_empty",
+                            favourite and "Unstar" or "Star", favouriteLabel(), guarded(toggleFavourite),
+                            { right = MethodView.FAVOURITE_RIGHT, y = MethodView.HEADER_ICON_Y, absolute = true })
+                    end
+
+                    drawFavourite()
 
                     -- Every catalogue entry with the same title is a version of
                     -- this method; the page lets the player switch between them.
@@ -277,7 +288,7 @@ function UI.new(library, account, calculator, browser)
                             navigate("editor")
                         end,
 
-                        -- Deleted: back to the custom activities list.
+                        -- Deleted: back to the list, which no longer has it.
                         onDelete = self.method.record and function()
                             local deleted, problem = calculator:deleteCustom(self.method.record.id)
 
@@ -285,7 +296,6 @@ function UI.new(library, account, calculator, browser)
                                 return problem or "Couldn't delete it. Try again."
                             end
 
-                            browser.section = "custom"
                             navigate("browse")
                         end,
 
@@ -320,7 +330,6 @@ function UI.new(library, account, calculator, browser)
                         -- Saved: open the activity's page. Deleted: back to the list.
                         done = function(saved)
                             self.editor = nil
-                            browser.section = "custom"
 
                             local method = saved and browser:findMethod(saved.id)
 

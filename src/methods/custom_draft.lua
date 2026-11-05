@@ -143,7 +143,9 @@ end
 
 -- Changes a draft's category and keeps the rest consistent with it:
 --   * daily/weekly counts runs (default 1), every row per run, and has a how-often;
---   * the others count kills (PvM) or actions per hour;
+--   * the others count kills (PvM) or actions (everything else) per hour. The
+--     editor has no separate kills/actions choice, so the category decides. A
+--     saved activity keeps whatever it was saved with until its category changes;
 --   * "No requirements needed" only exists for production and daily/weekly.
 function Draft.setCategory(draft, category)
     local was = draft.category
@@ -169,20 +171,73 @@ function Draft.setCategory(draft, category)
             draft.rate = { unit = "actions/hour", default = 0 }
         end
 
-        -- A new draft follows its category; a player's own choice is kept.
-        if was == nil or draft.rate.default == 0 and #draft.outputs == 0 then
-            draft.rate.unit = category == "pvm" and "kills/hour" or "actions/hour"
-        end
-
-        -- A thieving target is never killed: always actions per hour.
-        if draft.source and draft.source.kind == "thieving" then
-            draft.rate.unit = "actions/hour"
-        end
+        -- A thieving target is never killed (you pickpocket it), so it always
+        -- counts actions, even filed under PvM.
+        local thieving = draft.source and draft.source.kind == "thieving"
+        draft.rate.unit = category == "pvm" and not thieving and "kills/hour" or "actions/hour"
     end
 
     if category ~= "production" and category ~= "recurring" then
         draft.no_requirements = nil
     end
+end
+
+-- ---- Trips ----------------------------------------------------------------------
+-- "Do you bank between trips?" on the editor's Income tab. A draft counts in
+-- trips when it has a kills/actions per trip number, or any row is per trip.
+
+function Draft.usesTrips(draft)
+    if draft.actions_per_trip ~= nil then
+        return true
+    end
+
+    for _, side in ipairs({ "outputs", "supplies" }) do
+        for _, row in ipairs(draft[side]) do
+            if row.basis == "trip" then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+-- Switches trips off ("No"). Per-trip rows become per kill/action, with their
+-- quantity divided by kills per trip so every row's hourly amount stays the
+-- same: 8 food a trip at 10 kills a trip is 0.8 food a kill.
+--
+-- Without a kills per trip number there's nothing to divide by. Those rows
+-- couldn't be priced anyway (the editor said so), so they just keep their
+-- number and become per kill; the hourly line shows what that now means.
+function Draft.stopTrips(draft)
+    local perTrip = draft.actions_per_trip
+    local canConvert = type(perTrip) == "number" and perTrip > 0 and perTrip < math.huge
+
+    for _, side in ipairs({ "outputs", "supplies" }) do
+        for _, row in ipairs(draft[side]) do
+            if row.basis == "trip" then
+                row.basis = "action"
+
+                if canConvert and row.quantity ~= nil then
+                    row.quantity = row.quantity / perTrip
+                end
+            end
+        end
+    end
+
+    draft.actions_per_trip = nil
+end
+
+-- What a newly added row is counted per. Drops and other outputs usually come
+-- each kill/action; supplies are usually used up each trip (food, potions) when
+-- the player banks, otherwise over an hour. Daily/weekly rows are always per run
+-- (stored as "action", one action being one run).
+function Draft.newRowBasis(draft, side, trips)
+    if draft.category == "recurring" or side == "outputs" then
+        return "action"
+    end
+
+    return trips and "trip" or "hour"
 end
 
 -- Source titles matching `query`, for the picker. kind is "monster" or "thieving".

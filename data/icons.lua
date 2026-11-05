@@ -22,6 +22,13 @@ return {
     -- seen in game; the buttons fall back to text.
     trash = "AIF_COMBAR_TRASHCAN_0",
 
+    -- The activity page's boxed favourite button: gold once it's a favourite,
+    -- silver when it isn't. These are the stars PrettyUI's own STAR sprite
+    -- button draws (seen in game before the button was boxed). rsprite's
+    -- ICON_STAR_EMPTY drew as a black star in game, so it isn't used.
+    star_filled = "RAND_SPEEDRUN_STAR_GOLD_0",
+    star_empty = "RAND_SPEEDRUN_STAR_SILVER_0",
+
     -- Same stopwatch-reset art PrettyUI uses for its UNDO sprite button.
     reset = "RS3_ICON_STOPWATCH_RESET_0",
 

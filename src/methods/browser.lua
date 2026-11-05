@@ -55,9 +55,14 @@ function Browser.new(methods, preferences, estimateMethod)
         difficulty = "any",
         intensity = "any",
 
-        -- Saved sort choice (a device-wide setting).
+        -- Which activities to show: "all", or just "custom" (the player's own).
+        -- Not saved either, like the other filters.
+        origin = "all",
+
+        -- Saved sort choice (a device-wide setting). Lists are always highest
+        -- first; the saved setting still has a direction field, from when there
+        -- was a Lowest first choice, but it's no longer used.
         sort = settings.sort,
-        descending = settings.descending,
 
         -- Profit estimates by method ID, and the latest problem to show the player.
         estimates = {},
@@ -86,13 +91,13 @@ function Browser.new(methods, preferences, estimateMethod)
 
     -- Store sort changes on selection, never on a frame or while typing search.
     -- A failed save leaves the old ordering selected and gives the UI the reason.
-    function self:setSort(key, descending)
-        local ok, problem = preferences:saveBrowser({ sort = key, descending = descending })
+    function self:setSort(key)
+        -- `descending` stays in the saved setting so its format doesn't change.
+        local ok, problem = preferences:saveBrowser({ sort = key, descending = true })
         self.message = problem
 
         if ok then
             self.sort = key
-            self.descending = descending
             self.scroll = 0
             self.page = 1
         end
@@ -246,17 +251,10 @@ function Browser.new(methods, preferences, estimateMethod)
             local matchesCategory = self.category == "all" or method.category == self.category
             -- Hidden methods aren't filtered out here on purpose: they stay
             -- browsable (and favouritable). Only recommendations skip them.
-            -- Custom activities live in their own section (and Favourites), never
-            -- in Browse: players asked to keep their own recipes apart.
-            local matchesSection
-
-            if self.section == "favourites" then
-                matchesSection = self.favourites[method.id]
-            elseif self.section == "custom" then
-                matchesSection = method.origin == "custom"
-            else
-                matchesSection = method.origin ~= "custom"
-            end
+            -- Custom activities sit in the same lists as bundled ones; Show:
+            -- Custom only narrows to the player's own.
+            local matchesSection = self.section ~= "favourites" or self.favourites[method.id]
+            local matchesOrigin = self.origin ~= "custom" or method.origin == "custom"
 
             local matchesFilters = matchesLevel(self.difficulty, method.difficulty)
                 and matchesLevel(self.intensity, intensityLevel[method.intensity])
@@ -267,14 +265,15 @@ function Browser.new(methods, preferences, estimateMethod)
 
             local searchable = (method.title .. " " .. (method.variant or "") .. " " .. method.source_category):lower()
 
-            if matchesCategory and matchesSection and matchesFilters and matchesAccess and searchable:find(query, 1, true) then
+            if matchesCategory and matchesSection and matchesOrigin and matchesFilters and matchesAccess
+                and searchable:find(query, 1, true) then
                 rows[#rows + 1] = method
             end
         end
 
         table.sort(rows, function(left, right)
-            -- Recurring (per-run) methods always come after hourly ones, in both
-            -- directions: a 2-minute daily's "per run" isn't comparable to per hour.
+            -- Recurring (per-run) methods always come after hourly ones: a
+            -- 2-minute daily's "per run" isn't comparable to per hour.
             local leftRuns = perRun(left)
 
             if leftRuns ~= perRun(right) then
@@ -284,18 +283,13 @@ function Browser.new(methods, preferences, estimateMethod)
             local a = sortValue(left, self.estimates, self.sort)
             local b = sortValue(right, self.estimates, self.sort)
 
-            -- Missing estimates go last in BOTH directions. Reversing an
-            -- ascending array would put them first.
+            -- Highest first, and missing estimates always last.
             if a == nil or b == nil then
                 if a ~= b then
                     return a ~= nil
                 end
             elseif a ~= b then
-                if self.descending then
-                    return a > b
-                end
-
-                return a < b
+                return a > b
             end
 
             if left.title ~= right.title then

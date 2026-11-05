@@ -26,7 +26,7 @@ return function(test, equal, client, pretty)
         return table.concat(values, ",")
     end
 
-    test("profit and ROI sorts keep unknowns last in either direction with stable ties", function()
+    test("profit and ROI sort highest first, unknowns last, with stable ties", function()
         client()
 
         local source = methods()
@@ -38,19 +38,21 @@ return function(test, equal, client, pretty)
             unknown = { status = "partial", profit = 999999, roi = 999999 },
         }
 
-        browser:setSort("profit", true)
+        browser:setSort("profit")
         equal(ids(browser:rows()), "b,a,z,unknown")
 
-        browser:setSort("profit", false)
-        equal(ids(browser:rows()), "a,z,b,unknown")
-
-        browser:setSort("roi", true)
+        browser:setSort("roi")
         equal(ids(browser:rows()), "z,b,a,unknown")
 
-        browser:setSort("roi", false)
-        equal(ids(browser:rows()), "a,b,z,unknown")
-
         equal(source[1].id, "z", "Never rearrange source records")
+
+        -- An old "Lowest first" save is ignored: lists are always highest first.
+        local state = client()
+        state.db["profit-path.browser.v1"] = { schema = 1, sort = "profit", descending = false }
+
+        local old = Browser.new(methods(), Preferences.new(PersistentDB), function() end)
+        old.estimates = browser.estimates
+        equal(ids(old:rows()), "b,a,z,unknown")
     end)
 
     -- Difficulty and intensity are filters now, not sorts. "Moderate" and "Medium"
@@ -166,20 +168,21 @@ return function(test, equal, client, pretty)
         local browser = Browser.new(methods(), prefs, function() end)
         state.failWrite = true
 
-        equal(browser:setSort("roi", true), false)
+        equal(browser:setSort("roi"), false)
         equal(browser.sort, "profit")
-        equal(browser.descending, false)
         assert(browser.message:find("could not be saved", 1, true))
 
         equal(browser:toggleFavourite(browser.methods[1]), false)
         equal(browser.favourites.z, nil)
 
         state.failWrite = false
-        assert(browser:setSort("roi", true))
+        assert(browser:setSort("roi"))
 
         local restored = Browser.new(methods(), Preferences.new(PersistentDB), function() end)
         equal(restored.sort, "roi")
-        equal(restored.descending, true)
+
+        -- The saved setting keeps its direction field (always true now).
+        equal(state.db["profit-path.browser.v1"].descending, true)
     end)
 
     -- The list is the rightmost nested view; the header's text field must survive
@@ -1034,7 +1037,7 @@ return function(test, equal, client, pretty)
 
         local header = prettyui.views[2].children[2]
         local sort = header.nativeLists[1]
-        local direction = header.nativeLists[2]
+        local show = header.nativeLists[2]
         equal(sort.stylesheetID, id.StyleSheet.DROPDOWN_DEFAULT)
 
         -- Several hooks can arrive before the native collection catches up.
@@ -1042,10 +1045,15 @@ return function(test, equal, client, pretty)
         sort:SetEntrySelected(2, true)
 
         sort:SetEntrySelected(1, true)
-        direction:SetEntrySelected(1, true)
         Event.Logic.emit({})
         equal(state.db["profit-path.browser.v1"].sort, "roi")
-        equal(state.db["profit-path.browser.v1"].descending, false)
+        equal(state.db["profit-path.browser.v1"].descending, true)
+
+        -- The second dropdown is Show, not a sort direction any more.
+        equal(show.entries["Custom only"], 1)
+        equal(show.entries["Bundled only"], nil)
+        equal(show.entries["Lowest first"], nil)
+        equal(show.selectedID, 0, "Show starts on All")
 
         -- Only Profit and ROI to sort by; intensity, requirements and difficulty
         -- (last) are their own filter dropdowns. Entry 3 under difficulty is "Hard" (IDs count from 0), and none of the
@@ -1071,7 +1079,7 @@ return function(test, equal, client, pretty)
         end
 
         -- Captions say which group each dropdown belongs to.
-        for _, caption in ipairs({ "SORT BY", "DIFFICULTY", "INTENSITY", "REQUIREMENTS" }) do
+        for _, caption in ipairs({ "SORT BY", "SHOW", "DIFFICULTY", "INTENSITY", "REQUIREMENTS" }) do
             assert(shownText():find(caption, 1, true), "Missing caption " .. caption)
         end
 

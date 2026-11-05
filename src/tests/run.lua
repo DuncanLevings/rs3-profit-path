@@ -427,6 +427,25 @@ local function pretty()
         error("No live button: " .. label)
     end
 
+    -- Picks `label` in whichever live dropdown has that entry (e.g. Browse's
+    -- Show: "Custom only"), then lets one Logic tick pass, as the client
+    -- delivers the choice a little later (see dropdown.lua).
+    function library:chooseEntry(label)
+        for index = #self.allViews, 1, -1 do
+            local view = self.allViews[index]
+
+            for _, list in ipairs(not view.destroyed and view.nativeLists or {}) do
+                if list.entries[label] then
+                    list:SetEntrySelected(list.entries[label], true)
+                    Event.Logic.emit({})
+                    return
+                end
+            end
+        end
+
+        error("No live dropdown entry: " .. label)
+    end
+
     -- Method actions share a short label; identify the containing row by its
     -- title, just as a player would, rather than assuming a list position.
     function library:findMethod(title)
@@ -522,6 +541,8 @@ local function pretty()
             -- PrettyUI exposes SetText on its button; keep the lookup in sync.
             local button = {
                 active = options and options.active == true, sprite = sprite,
+                -- Kept so a test can check where a button was placed.
+                options = options,
                 disabled = options and options.disabled == true,
                 -- PrettyUI's native layer; anything drawn on it belongs to this view.
                 root = { testOwner = self },

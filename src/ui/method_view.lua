@@ -749,20 +749,27 @@ end
 -- versions (e.g. elder logs with or without wood spirits). The title and dropdown
 -- are centred together as one unit, the dropdown right after the title. Picking
 -- another version calls onVersion(method). Returns a release() for the dropdown's
--- pending callback (a no-op when there's no dropdown).
+-- pending callback (a no-op when there's no dropdown), and the title label when
+-- there's just the one title (so Delete can put its warning there).
+--
+-- `inset` is how much room to keep clear at each side, so the title stays
+-- centred but never runs under the header's icons (default 44: Back on the
+-- left, the favourite star on the right).
 local VERSION_GAP = 10
 
-local function mountTitle(view, method, guarded, versions, onVersion)
+local function mountTitle(view, method, guarded, versions, onVersion, inset)
+    inset = inset or 44
+
     -- One version: the usual centred "Title - Version" text.
     if not versions or #versions < 2 then
         local title = method.title .. (method.variant and " - " .. method.variant or "")
 
-        view:AddTitle({
-            text = title, absolute = true, x = 44, y = 10, width = -88, widthAnchor = 1, height = 28,
+        local label = view:AddTitle({
+            text = title, absolute = true, x = inset, y = 10, width = -2 * inset, widthAnchor = 1, height = 28,
             alignHorizontal = ui.AlignMode.CENTRE,
         })
 
-        return function() end
+        return function() end, label
     end
 
     -- Several versions: the title alone, then the dropdown. Work out the pair's
@@ -812,6 +819,80 @@ local function mountTitle(view, method, guarded, versions, onVersion)
     return release
 end
 
+-- ---- Edit and Delete in the header (custom activities) ------------------------
+-- Right to left: the favourite star (the workbench draws it, FAVOURITE_RIGHT
+-- in from the right edge), Edit, then Delete, all the same boxed buttons.
+-- There's a wide gap between each, so a click meant for one can't land on its
+-- neighbour.
+MethodView.FAVOURITE_RIGHT = 12
+MethodView.HEADER_ICON_Y = 8
+
+local HEADER_ICON_GAP = 32
+local HEADER_ICON_Y = MethodView.HEADER_ICON_Y
+
+-- Where the star's box ends on the left. Both stars are the same size, but
+-- if one fell back to text, its button would be wider, so take the wider.
+local function starLeft()
+    local width = math.max(Style.iconButtonWidth("star_filled"), Style.iconButtonWidth("star_empty"))
+    return MethodView.FAVOURITE_RIGHT + width
+end
+
+-- Where Edit and Delete go (distance in from the right edge), and how much room
+-- the title must keep clear at each side to stay centred without overlapping.
+local function headerIconPlaces(withDelete)
+    local places = { edit = starLeft() + HEADER_ICON_GAP }
+    local leftEdge = places.edit + Style.iconButtonWidth("edit")
+
+    if withDelete then
+        places.delete = leftEdge + HEADER_ICON_GAP
+        leftEdge = places.delete + Style.iconButtonWidth("trash")
+    end
+
+    places.inset = leftEdge + 12
+    return places
+end
+
+-- Draws Edit and (if allowed) Delete. Delete can't be undone, so the first
+-- click only arms it: the page title turns red and says to click again. The
+-- title is in the header, so the warning shows whichever tab is open.
+local function mountHeaderIcons(view, places, titleLabel, guarded, options)
+    Style.iconButton(view, "edit", "Edit", "Edit this custom activity", guarded(options.onEdit),
+        { right = places.edit, y = HEADER_ICON_Y, absolute = true })
+
+    if not places.delete then
+        return
+    end
+
+    local armed = false
+
+    -- Puts a message in the title's place, in red. (No title label means the
+    -- warning can't be shown, so Delete then never arms: it just won't delete.)
+    local function warn(text)
+        titleLabel.content = text
+        titleLabel.rgba = Style.bad
+    end
+
+    Style.iconButton(view, "trash", "Delete", "Delete this custom activity", guarded(function()
+        if not titleLabel then
+            return
+        end
+
+        if not armed then
+            armed = true
+            warn("Click the bin again to delete")
+            return
+        end
+
+        local problem = options.onDelete()
+
+        -- Still here: it didn't delete. Say why, and make them ask again.
+        if problem then
+            armed = false
+            warn(tostring(problem))
+        end
+    end), { right = places.delete, y = HEADER_ICON_Y, absolute = true })
+end
+
 -- Builds the whole method screen inside `view`. `guarded` comes from the workbench:
 -- wrap every callback with it, so clicks on a screen we've left are ignored.
 --
@@ -831,7 +912,16 @@ function MethodView.mount(view, method, calculator, guarded, options)
     options = options or {}
 
     local activeTab = options.activeTab or 1
-    local releaseTitle = mountTitle(view, method, guarded, options.versions, options.onVersion)
+
+    -- A custom activity has Edit and Delete in the header, left of the
+    -- favourite star, so the title keeps clear of them too.
+    local headerIcons = method.origin == "custom" and options.onEdit and headerIconPlaces(options.onDelete ~= nil)
+    local releaseTitle, titleLabel = mountTitle(view, method, guarded, options.versions, options.onVersion,
+        headerIcons and headerIcons.inset)
+
+    if headerIcons then
+        mountHeaderIcons(view, headerIcons, titleLabel, guarded, options)
+    end
 
     -- buildTab[index] draws that tab's contents; it's set further down and cleared
     -- once the tab is drawn (see ROWS_PER_STEP at the top for why it waits).
@@ -1026,38 +1116,9 @@ function MethodView.mount(view, method, calculator, guarded, options)
         income:AddText({ text = assumption, colour = Style.muted })
     end
 
-    -- At the bottom of the page, an icon button: Edit for custom activities, or
-    -- Duplicate as custom for bundled hourly ones.
-    if method.origin == "custom" and options.onEdit then
-        Style.iconButton(income, "edit", "Edit", "Edit this custom activity", guarded(options.onEdit), "line")
-
-        -- Delete sits beside Edit. It can't be undone, so the first click only
-        -- asks for a second one (the note beside it says so).
-        if options.onDelete then
-            local armed = false
-            local confirm
-
-            Style.iconButton(income, "trash", "Delete", "Delete this custom activity", guarded(function()
-                if not armed then
-                    armed = true
-                    confirm.content = "Click the bin again to delete this activity. This can't be undone."
-                    confirm.rgba = Style.bad
-                    return
-                end
-
-                local problem = options.onDelete()
-
-                -- Still here: it didn't delete. Say why.
-                if problem then
-                    armed = false
-                    confirm.content = tostring(problem)
-                    confirm.rgba = Style.bad
-                end
-            end))
-
-            confirm = income:AddText({ text = "", inline = true, width = 460, height = 28, colour = Style.muted })
-        end
-    elseif method.origin ~= "custom" and options.onDuplicate and method.category ~= "recurring" then
+    -- At the bottom of the page, bundled hourly activities get Duplicate as
+    -- custom. (A custom activity's Edit and Delete are in the header instead.)
+    if method.origin ~= "custom" and options.onDuplicate and method.category ~= "recurring" then
         Style.iconButton(income, "edit", "Duplicate", "Duplicate as custom for editing", guarded(options.onDuplicate), "line")
     end
 

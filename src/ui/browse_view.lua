@@ -24,12 +24,14 @@ local sortEntries = { { id = 0, label = "Profit" }, { id = 1, label = "ROI" } }
 local sortNames = { [0] = "profit", [1] = "roi" }
 local sortIDs = { profit = 0, roi = 1 }
 
--- Direction: entry 0 is "Highest first" (descending), entry 1 "Lowest first".
-local directionEntries = { { id = 0, label = "Highest first" }, { id = 1, label = "Lowest first" } }
-
-local function directionID(descending)
-    return descending and 0 or 1
-end
+-- Show: every activity, or only your own custom ones. Lists are always sorted
+-- highest first, so this took the old direction slot.
+local originEntries = {
+    { id = 0, label = "All" },
+    { id = 1, label = "Custom only" },
+}
+local originValues = { [0] = "all", [1] = "custom" }
+local originIDs = { all = 0, custom = 1 }
 
 -- Filter dropdowns: entry 0 is "Any", then one entry per level. A caption above
 -- each dropdown says which filter it is, so the entries don't need to repeat it.
@@ -98,11 +100,11 @@ local PAGE_SIZE = 10
 -- Recommend for me and My account aren't lists of methods: they have no search
 -- box, sort or filters, and their page takes the whole column.
 local function isList(section)
-    return section == "browse" or section == "favourites" or section == "custom"
+    return section == "browse" or section == "favourites"
 end
 
 -- Each list's heading.
-local listHeadings = { browse = "Browse activities", favourites = "Favourites", custom = "Custom activities" }
+local listHeadings = { browse = "Browse activities", favourites = "Favourites" }
 
 -- A button just wide enough for the longest of `labels` (measured in the button
 -- font, so the client never clips one), so a set of choices lines up.
@@ -162,12 +164,13 @@ end
 
 -- `guarded` checks the screen's lifetime. Row callbacks also check a local
 -- generation because searching replaces rows without replacing the whole screen.
--- `extra` (optional): { onNewCustom = function() end } for the Custom activities list.
+-- `extra` (optional): { onNewCustom = function() end }, which opens the custom
+-- activity editor (the sidebar's Create activity button).
 function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
     local sidebar, header, results
     local rowGeneration = 0
     local closed = false
-    local sortControl, directionControl
+    local sortControl
     local heading
     local sectionButtons, categoryButtons = {}, {}
 
@@ -191,7 +194,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
     local headerHeight = wrapFilters and 202 or 144
     local resultsY = headerHeight + 6
 
-    -- Slots 0/1 sort; slots 2/3/4 filter. Only filters wrap on small windows.
+    -- Slot 0 sorts, slot 1 is Show; slots 2/3/4 filter. Only slots 2-4 wrap on
+    -- small windows.
     local function slotX(slot)
         if wrapFilters and slot >= 2 then
             return 10 + (slot - 2) * DROPDOWN_STEP
@@ -942,18 +946,19 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
         end
 
         -- Saved custom activities that couldn't be read (they're still saved).
-        if browser.section == "custom" and browser.customWarning then
+        if browser.customWarning then
             results:AddText({ text = browser.customWarning, colour = Style.bad })
         end
 
-        -- Custom activities: start a new one from here.
-        if browser.section == "custom" and extra and extra.onNewCustom then
-            results:AddSimpleButton("New activity", rowAction(extra.onNewCustom), { width = 160, height = 30 })
-        end
-
-        if #rows == 0 and browser.section == "custom" and browser.customCount == 0 then
+        -- Show: Custom only, with none made yet: say how to make one, with the
+        -- same Create activity as the sidebar.
+        if #rows == 0 and browser.origin == "custom" and (browser.customCount or 0) == 0 then
             results:AddTitle("No custom activities yet")
             results:AddText("Make your own: start from a monster's or thieving target's drops, or from nothing.")
+
+            if extra and extra.onNewCustom then
+                results:AddSimpleButton("Create activity", rowAction(extra.onNewCustom), { width = 160, height = 30 })
+            end
         elseif #rows == 0 then
             results:AddTitle("No matching activities")
             results:AddText("Try another activity or search. Add favourites from Browse to keep them here.")
@@ -1246,9 +1251,16 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             showSection("favourites")
         end), { width = 158, height = 32 })
 
-        sectionButtons.custom = sidebar:AddSimpleButton("Custom activities", guarded(function()
-            showSection("custom")
-        end), { width = 158, height = 32 })
+        -- Create activity is an action, not a list: it opens the custom activity
+        -- editor, so it never lights up as the page you're on. Your own
+        -- activities show in Browse with everything else (Show: Custom only
+        -- narrows to them).
+        if extra and extra.onNewCustom then
+            sidebar:AddSimpleButton("Create activity", guarded(function()
+                stopFinding()
+                extra.onNewCustom()
+            end), { width = 158, height = 32 })
+        end
 
         sectionButtons.account = sidebar:AddSimpleButton("My account", guarded(function()
             showSection("account")
@@ -1317,8 +1329,9 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             })
 
             -- Small captions over the dropdowns, in the same muted capitals as the
-            -- sidebar headings: one "Sort by" over the sort pair, one per filter.
-            header:AddText({ text = "SORT BY", x = slotX(0), y = captionY(0), width = DROPDOWN_STEP * 2, height = 22, colour = Style.muted })
+            -- sidebar headings: one per dropdown.
+            header:AddText({ text = "SORT BY", x = slotX(0), y = captionY(0), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
+            header:AddText({ text = "SHOW", x = slotX(1), y = captionY(1), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
             header:AddText({ text = "INTENSITY", x = slotX(2), y = captionY(2), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
             header:AddText({ text = "REQUIREMENTS", x = slotX(3), y = captionY(3), width = DROPDOWN_WIDTH, height = 22, colour = Style.muted })
 
@@ -1363,20 +1376,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
                     return
                 end
 
-                if not browser:setSort(sortNames[selectedID], browser.descending) then
+                if not browser:setSort(sortNames[selectedID]) then
                     sortControl:SetEntrySelected(sortIDs[browser.sort], true)
-                end
-
-                renderResults()
-            end)
-
-            directionControl = dropdown(directionEntries, directionID(browser.descending), 1, function(selectedID)
-                if selectedID == directionID(browser.descending) then
-                    return
-                end
-
-                if not browser:setSort(browser.sort, selectedID == directionID(true)) then
-                    directionControl:SetEntrySelected(directionID(browser.descending), true)
                 end
 
                 renderResults()
@@ -1384,6 +1385,14 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
 
             -- Filters aren't saved, so there's no failed write to undo here: just
             -- remember the choice and redraw from the top.
+            dropdown(originEntries, originIDs[browser.origin] or 0, 1, function(selectedID)
+                local value = originValues[selectedID]
+
+                if value and value ~= browser.origin then
+                    browser.origin = value
+                    filterChanged()
+                end
+            end)
             dropdown(intensityEntries, entryFor(intensityValues, browser.intensity), 2, function(selectedID)
                 local value = intensityValues[selectedID]
 

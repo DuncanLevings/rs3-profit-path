@@ -440,13 +440,19 @@ function CustomMethods.validate(record)
         end
     end
 
-    -- Kills/actions per trip: needed exactly when a row is per trip.
-    if usesTrips then
-        if not (nonNegativeFinite(record.actions_per_trip) and record.actions_per_trip > 0) then
-            problems[#problems + 1] = "Per-trip rows need a number of kills/actions per trip greater than 0."
-        end
-    elseif record.actions_per_trip ~= nil then
-        problems[#problems + 1] = "Kills/actions per trip is only used with per-trip rows."
+    -- Kills/actions per trip: needed when a row is per trip. It may also be
+    -- saved without any per-trip rows yet (the editor's "Do you bank between
+    -- trips? Yes" keeps it); the income maths simply doesn't use it then. It
+    -- still has to be a sensible number, and daily/weekly has no trips at all.
+    local perTrip = record.actions_per_trip
+    local perTripOk = nonNegativeFinite(perTrip) and perTrip > 0
+
+    if usesTrips and not perTripOk then
+        problems[#problems + 1] = "Per-trip rows need a number of kills/actions per trip greater than 0."
+    elseif perTrip ~= nil and not perTripOk then
+        problems[#problems + 1] = "Kills/actions per trip must be a number greater than 0."
+    elseif perTrip ~= nil and record.category == "recurring" then
+        problems[#problems + 1] = "Daily/weekly activities don't have trips."
     end
 
     -- Requirements: Required and Recommended lists, with one shared limit.

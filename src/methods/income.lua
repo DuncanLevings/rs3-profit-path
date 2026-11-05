@@ -255,6 +255,31 @@ function Income.usesTrips(model)
     return false
 end
 
+-- How many times a row's quantity happens in an hour, for a row counted per
+-- `basis` (see the list above Income.calculate). `rate` is kills/actions an
+-- hour; `actionsPerTrip` is only needed for per-trip rows. Returns nil when a
+-- per-trip row has no sensible kills/actions per trip to divide by.
+--
+-- The editor uses this too (each row's "About 2.4 an hour" line), so what the
+-- editor shows can't drift from what the activity page works out.
+function Income.timesPerHour(basis, rate, actionsPerTrip)
+    if basis == "action" then
+        return rate
+    end
+
+    if basis == "trip" then
+        -- A trip is actionsPerTrip actions, so trips an hour = rate / that.
+        if not nonNegativeFinite(actionsPerTrip) or actionsPerTrip == 0 then
+            return nil
+        end
+
+        return rate / actionsPerTrip
+    end
+
+    -- "hour": a fixed amount an hour, whatever the rate.
+    return 1
+end
+
 -- Works out the hourly numbers for a method at a given rate (e.g. smelts/hour).
 --
 -- `model` is the method's income data, already checked when the catalogue was built,
@@ -300,17 +325,10 @@ function Income.calculate(model, rate, quotes)
     -- Set if a silly-big rate pushes any number to infinity; we report that below.
     local overflow = false
 
-    -- How many times one row's quantity happens per hour (see the basis list above).
+    -- How many times one row's quantity happens per hour (see the basis list
+    -- above). Per-trip numbers were checked just above, so this is never nil here.
     local function perHour(line)
-        if line.basis == "action" then
-            return rate
-        end
-
-        if line.basis == "trip" then
-            return tripsPerHour
-        end
-
-        return 1
+        return Income.timesPerHour(line.basis, rate, model.actions_per_trip)
     end
 
     -- Prices every row on one side of the recipe. `side` is "high" for supplies and
