@@ -460,8 +460,8 @@ function UI.new(library, account, calculator, browser)
             return false, problem
         end
 
-        -- Opening is the price-refresh boundary. Hidden windows retain their
-        -- controls, draft rate and tab; only captured prices and labels change.
+        -- Reopening is when prices get refreshed. A hidden window keeps its
+        -- controls, draft rate and tab; only the prices and labels update.
         if self.window then
             local wasHidden = not self.interactive
             self.interactive = true
@@ -500,8 +500,7 @@ function UI.new(library, account, calculator, browser)
 
         local ok, failure = pcall(function()
             self.window = library.Window.new(gameArea, {
-                -- Keep the title short; My account shows the character/profile
-                -- binding.
+                -- Keep the title short; My account shows whose settings these are.
                 title = "Profit Path",
                 width = width,
                 height = height,
@@ -562,8 +561,7 @@ function UI.new(library, account, calculator, browser)
         self.launcher = launcher
 
         local ok, failure = pcall(function()
-            -- Leave the ribbon clear unless opening fails. The message belongs
-            -- below the button, without an empty gap above the action.
+            -- Only shown if opening fails, under the button.
             local status
 
             -- SimpleButton uses a fixed width; it does not apply widthAnchor.

@@ -85,22 +85,21 @@ if recipes is not None:
 
 catalogue.verify_methods(monsters, recipes)
 
-# GE item names and thieving loot for custom activities: not used by the plugin
-# yet, but their packed files must match their sources and read back exactly.
+# GE item names and thieving loot for the custom activity editor: their packed
+# files must match their sources and read back exactly.
 catalogue.verify_drop_sources()
 
 # Quests and unlocks for the custom activity editor's requirement search: the
 # packed file matches its research, and every unlock is something the game checks.
 catalogue.verify_unlocks()
 
-# The Wiki guide snapshot (catalogue-source/wiki) isn't used by the plugin yet, but
-# it must stay a clean, consistent import until it is.
+# The Wiki guide snapshot (catalogue-source/wiki) must stay a clean, consistent import.
 import wiki_methods
 
 print(f"Verified {wiki_methods.verify_snapshot()} Wiki guides in the snapshot.")
 
 # Merged with our research, every imported guide must pass the same checks as a
-# curated method. (The plugin still loads only the curated ones until step 4.)
+# curated method.
 import merge_methods
 
 print(f"Verified {merge_methods.verify_merge(monsters, recipes)} merged methods (curated + Wiki).")

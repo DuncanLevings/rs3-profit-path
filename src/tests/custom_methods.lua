@@ -1,6 +1,6 @@
--- Custom activities (Phase 9, slice 2): checking saved records, turning them into
--- methods the calculator understands, and storing them. There's no UI yet. The
--- records here are made-up fixtures, not real activities.
+-- Custom activities: checking saved records, turning them into methods the
+-- calculator understands, storing them, and how Browse lists them. The records
+-- here are made-up fixtures, not real activities.
 return function(test, equal, client, pretty)
     local CustomMethods = require("src/methods/custom_methods")
     local Income = require("src/methods/income")
@@ -547,7 +547,7 @@ return function(test, equal, client, pretty)
         equal(pool[2].method.id, "bundled")
     end)
 
-    -- The sidebar section (slice 3) -------------------------------------------------
+    -- Custom activities in Browse ----------------------------------------------------
 
     -- Every text currently drawn in a fake view, as one string to search.
     local function screenText(view)

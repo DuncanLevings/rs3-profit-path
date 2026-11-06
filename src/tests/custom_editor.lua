@@ -1,4 +1,4 @@
--- The custom activity editor (Phase 9, slice 4): loading drops from a source,
+-- The custom activity editor: loading drops from a source,
 -- the three row states, left-out drops, Duplicate as custom, the editor screen,
 -- and how many native parts its pages use. Sources are the real bundled data
 -- (data/monsters.lua, data/thieving.lua); prices are made-up fixtures.

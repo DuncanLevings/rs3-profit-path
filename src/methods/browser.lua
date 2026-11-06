@@ -33,8 +33,8 @@ local function matchesLevel(chosen, value)
     return chosen == "any" or chosen == value
 end
 
--- Keep this window's browsing state in memory. Only explicit sort and favourite
--- changes go to storage; search and scrolling don't produce database writes.
+-- This window's browsing state, kept in memory. Only sort and favourite changes
+-- are saved; searching and scrolling never write anything.
 function Browser.new(methods, preferences, estimateMethod)
     local settings, warning = preferences:loadBrowser()
     local self = {
@@ -74,8 +74,8 @@ function Browser.new(methods, preferences, estimateMethod)
     -- Reload profile favourites and recommendation exclusions on opening or
     -- returning from an activity, in case the character changed.
     function self:loadFavourites()
-        -- A profile switch also changes every personal rate. Old list estimates
-        -- must go even when this reload came from the detail's favourite button.
+        -- A different profile means different saved rates, so the old estimates
+        -- have to go (even when it was the favourite button that noticed).
         if self.profile and self.profile ~= preferences.profile then
             self.estimates = {}
         end
@@ -87,8 +87,8 @@ function Browser.new(methods, preferences, estimateMethod)
         self.profile = preferences.profile
     end
 
-    -- Store sort changes on selection, never on a frame or while typing search.
-    -- A failed save leaves the old ordering selected and gives the UI the reason.
+    -- Saves the sort when it's picked. If the save fails, the old sort stays
+    -- and the UI gets the reason.
     function self:setSort(key)
         -- `descending` stays in the saved setting so its format doesn't change.
         local ok, problem = preferences:saveBrowser({ sort = key, descending = true })
@@ -103,8 +103,8 @@ function Browser.new(methods, preferences, estimateMethod)
         return ok
     end
 
-    -- Only update the displayed star after storage succeeds. There's no pretend
-    -- "saved" state if the native database refuses the write.
+    -- The star only changes once the save worked, so it never shows a
+    -- favourite that wasn't saved.
     function self:toggleFavourite(method)
         local selected = not self.favourites[method.id]
         local ok, problem = preferences:saveFavourite(method.id, selected)
@@ -225,8 +225,8 @@ function Browser.new(methods, preferences, estimateMethod)
         end
     end
 
-    -- Uses the already-captured method quotes on Back. Discard an unsaved draft:
-    -- list comparisons use each method's saved rate (or its source default).
+    -- Back from an activity page: reuse the prices it already has. Any unsaved
+    -- rate is dropped, since lists use saved rates (or the source default).
     function self:returnFromMethod(method, quotes)
         if self.profile ~= preferences.profile then
             self:loadFavourites()
@@ -243,8 +243,8 @@ function Browser.new(methods, preferences, estimateMethod)
 
         for _, method in ipairs(methods) do
             local matchesCategory = self.category == "all" or method.category == self.category
-            -- Recommendation exclusions remain browsable and favouritable. Custom
-            -- activities share these lists; Show: Custom only filters by origin.
+            -- Activities hidden from Recommend for me still show here. Show:
+            -- Custom only narrows the list to the player's own.
             local matchesSection = self.section ~= "favourites" or self.favourites[method.id]
             local matchesOrigin = self.origin ~= "custom" or method.origin == "custom"
 

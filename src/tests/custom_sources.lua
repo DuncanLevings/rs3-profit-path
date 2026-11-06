@@ -1,7 +1,6 @@
--- Tests for the custom activity data readers (Phase 9), using the real shipped
--- files data/ge_items.lua and data/thieving.lua. src/tests/run.lua loads this file
--- and passes in its helpers. Nothing in the plugin uses these readers yet; the
--- editor will. The expected values come from the 4 Nov Wiki import.
+-- Tests for the data readers behind the custom activity editor (item search and
+-- thieving loot), using the real shipped data/ge_items.lua and data/thieving.lua.
+-- The expected values come from the 4 Nov Wiki import.
 return function(test, equal)
     local ItemNames = require("src/data/item_names")
     local Thieving = require("src/data/thieving_data")

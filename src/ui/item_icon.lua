@@ -5,8 +5,8 @@ local definitions = require("src/data/method_data").items
 local ItemNames = require("src/data/item_names")
 local ItemIcon = {}
 
--- Check the native item's name before showing it. A bad ID must never display
--- some unrelated picture. Keep native property access inside the protected read.
+-- Checks the client's name for the item before using its picture, so a bad
+-- ID never shows some unrelated item.
 function ItemIcon.resolve(itemId)
     -- The bundled catalogue's name first; custom activities can use any GE item,
     -- so fall back to the GE item list's name.
@@ -25,8 +25,7 @@ function ItemIcon.resolve(itemId)
     return ok and object or nil, expected
 end
 
--- Fixed source icons and the changing owned-match slot share the same native
--- identity check, so a stale/bad ID never displays another item's picture.
+-- Adds an item's picture (checked by resolve above).
 -- `name` is optional: what to call a row that has no item at all (the Wiki's
 -- "Rare drop table", say), instead of "Unknown item".
 --

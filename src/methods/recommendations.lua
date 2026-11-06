@@ -1,12 +1,10 @@
--- Filters, orders and rotates suggestions; owns no native UI controls.
--- Use Required access, chosen activity, exclusions, profit and solo/group
--- preferences. Recommended gear is guidance only. Custom activities need every
--- Required check confirmed.
--- PvM must fit comfort, or be one level higher when learning is enabled. Order by
--- comfort, solo preference, confirmed checks and profit, then choose the first
--- unseen activity.
--- Save history per profile. Start a new cycle after every match has appeared,
--- avoiding an immediate repeat when alternatives exist.
+-- Recommend for me's logic: which activities qualify, in what order, and which
+-- one to suggest next. No UI in here.
+-- An activity qualifies when its Required checks are met (custom ones need every
+-- check confirmed), it isn't hidden, and PvM fits the player's comfort (or is one
+-- level above, if they want learning opportunities). Recommended gear is only
+-- advice, so it never rules anything out.
+-- Suggestions rotate through every match before repeating, saved per profile.
 local Recommendations = {}
 
 -- PvM comfort is a level on the same 1-10 ladder as the researched difficulty
@@ -254,9 +252,8 @@ end
 function Recommendations.new(methods, browser, preferences)
     local self = { activity = nil, current = {}, notice = nil }
 
-    -- Rebuild the known-ID map when needed: custom activities can change while
-    -- open. Use it to keep saved rotation history bounded to the current
-    -- catalogue.
+    -- Every current activity ID, rebuilt when needed (custom ones can come and go
+    -- while the window is open). Saved history drops IDs that aren't in here.
     local function known()
         local categories = {}
 

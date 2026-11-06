@@ -79,8 +79,7 @@ local function requirementIcons(definition)
     local function collect(requirement)
         local icon = requirement.display_icon
 
-        -- Combat level has no icon: the Skills tab's badge isn't a sprite the
-        -- plugin can find, and a stand-in looked wrong.
+        -- Combat level has no icon: the Skills tab's badge isn't a sprite we can find.
         if requirement.kind == "skill" then
             icon = "skill_" .. requirement.skill:lower()
         end
@@ -194,8 +193,8 @@ local function mountRequirements(parent, method, calculator, fitter)
         end
     end
 
-    -- Uncheckable advice belongs in the same Required/Recommended layout, but
-    -- stays neutral. Moving it into a panel mustn't turn advice into a verdict.
+    -- Advice we can't check goes in the same Required/Recommended panels, but
+    -- stays uncoloured: it's not a pass or a fail.
     for _, note in ipairs(method.requirements.notes or {}) do
         local entries = groups.Other[1]
         entries[#entries + 1] = { definition = { text = note }, displayOnly = true }
@@ -424,8 +423,8 @@ local function mountRequirements(parent, method, calculator, fitter)
         end
     end
 
-    -- Apply the shared verdict to text and update the owned-equipment match.
-    -- Only a changed match creates/removes its small slot; the rate field stays put.
+    -- Recolour each check and update its owned-gear slot. A slot is only remade
+    -- when its match changes.
     local function refreshRequirements()
         local required, suggested = calculator:requirements()
 
@@ -498,8 +497,7 @@ local function mountRequirements(parent, method, calculator, fitter)
 
                 update.matchText:SetPos(62, update.matchTextY or Style.middle(update.matchY, 40, 30))
 
-                -- An empty slot speaks for itself; the group's coverage note was
-                -- just clutter next to it.
+                -- No extra note: the empty slot already says it.
                 local description = ""
 
                 if object then
@@ -540,9 +538,9 @@ local function mountRequirements(parent, method, calculator, fitter)
         end
     end
 
-    -- Colour cached ownership: green for live presence, gold for saved presence,
-    -- red for last-checked absence, grey for unknown. Unverified item IDs stay
-    -- grey; saved evidence is not a live access check.
+    -- Colour item borders by ownership: green = there now, gold = seen there
+    -- earlier, red = not there when last checked, grey = unknown. An item ID we
+    -- couldn't verify stays grey.
     local function refreshOwnership()
         local ownership = calculator:ownership()
 
@@ -576,13 +574,12 @@ local function mountRequirements(parent, method, calculator, fitter)
     return refreshRequirements, refreshOwnership
 end
 
--- Draw an Inputs or Outputs table with right-aligned quantities and GP values.
--- The heading total gets a coin; moneyColour distinguishes costs from earnings.
--- Returns update() for values and addRows(limit) for staged drawing. Reserve the
--- full height up front so later rows do not shift the layout.
--- Recreate unavailable-value labels only when their tooltip reason changes. quiet
--- skips those row tooltips on custom pages to keep within the native ID budget;
--- missing prices still appear in the status line.
+-- Draws an Inputs or Outputs table: right-aligned quantities and GP values, with
+-- the total (and a coin) in the heading. Returns update() for the values and
+-- addRows(limit) to draw rows a batch at a time. The full height is reserved up
+-- front so later rows don't shift the layout.
+-- `quiet` skips the per-row tooltips on custom pages to stay in the native ID
+-- budget (missing prices still show in the status line).
 local function itemTable(panel, definitions, moneyColour, period, quiet)
     -- Recurring (daily/weekly) methods count per run instead of per hour.
     local perRun = period == "run"
@@ -900,9 +897,8 @@ function MethodView.mount(view, method, calculator, guarded, options)
             end
         end),
 
-        -- x = 0 matters: without it PrettyUI starts absolute items at its 14-unit
-        -- default padding, which pushed the tabs right while keeping them full
-        -- width (an extra gap on the left, and the right edge cut off).
+        -- x = 0 matters: otherwise PrettyUI adds its 14-unit default padding
+        -- and the tabs spill off the right edge.
         absolute = true, x = 0, y = HEADER_HEIGHT,
         width = 0, height = -HEADER_HEIGHT, widthAnchor = 1, heightAnchor = 1,
     })
@@ -938,9 +934,8 @@ function MethodView.mount(view, method, calculator, guarded, options)
         income:AddText({ text = "Reason: " .. method.warning, colour = Style.gold, marginBottom = 4 })
     end
 
-    -- Top row: a small rate panel on the left, the profit panel filling the rest.
-    -- The rate sits beside the number it changes, so editing it and watching the
-    -- profit move happen in one place.
+    -- Top row: a small rate panel on the left, the profit panel filling the rest,
+    -- so you can watch the profit move as you edit the rate.
     local ratePanel = incomeFitter:add(income:AddPanel({
         height = TOP_ROW_HEIGHT, width = RATE_WIDTH, scrollable = false, marginTop = 4, marginBottom = 6,
     }), TOP_ROW_HEIGHT, { fixed = RATE_WIDTH })
@@ -1006,9 +1001,8 @@ function MethodView.mount(view, method, calculator, guarded, options)
     local profitLabel = perRun and "Profit per run (after tax)" or "Profit per hour (after tax)"
     summary:AddText({ text = profitLabel, x = TOP_INSET, y = FIRST_LINE_Y, width = 200, colour = Style.muted })
 
-    -- Unsaved changes and errors show at the top right of the profit panel, right
-    -- beside the rate box, so they're hard to miss. They start a clear gap after
-    -- the label's measured width, so a long message never runs into it.
+    -- Unsaved changes and errors go at the top right of the profit panel, next to
+    -- the rate box. They start after the label's measured width so they never overlap it.
     local stateX = TOP_INSET + math.ceil(Style.textWidth(profitLabel)) + 16
 
     local state = summary:AddText({
@@ -1144,8 +1138,7 @@ function MethodView.mount(view, method, calculator, guarded, options)
             travel:AddText(method.location.text)
         end
 
-        -- Shared itineraries remain above the individual locations. These are
-        -- reading-only directions, never live navigation or game actions.
+        -- Routes shared by every location go above the individual ones.
         for _, route in ipairs(method.location.routes or {}) do
             travel:AddText({ text = route, colour = Style.muted })
         end

@@ -50,8 +50,8 @@ end
 local difficultyEntries, difficultyValues = filterEntries(Browser.difficultyLevels)
 local intensityEntries, intensityValues = filterEntries(Browser.intensityLevels)
 
--- Keep readiness separate from profit: missing requirements do not erase an
--- estimate. Unknown checks stay in All; they are not treated as missing.
+-- The Requirements filter. It only hides rows; it never changes their profit.
+-- Unknown checks still show under All; they don't count as Missing.
 local readinessEntries = {
     { id = 0, label = "All" }, { id = 1, label = "Met" },
     { id = 2, label = "Missing" },
@@ -132,8 +132,7 @@ local FACT_LABEL_WIDTH = 130
 local FIND_EVENT = "profit-path-recommend"
 local FIND_TICKS = 25
 
--- A missing estimate is not zero GP/hour. Keep the reason next to the method so
--- nobody mistakes a partial source model for an unprofitable activity.
+-- A missing estimate isn't 0 GP/hour, so say why it's missing instead.
 local function estimateText(method, estimate)
     if method.income.coverage ~= "complete" then
         return "Income model incomplete"
@@ -869,8 +868,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
         results:SetScrollPosition(scrollState.scroll)
     end
 
-    -- These are interface units, not physical pixels. The right column stretches
-    -- with the window; the narrow sidebar and header stay separate from list scroll.
+    -- Draws the right-hand column: the list, a recommendation or My account. It
+    -- stretches with the window. (Sizes are interface units, not screen pixels.)
     local function drawResults()
         local generation = rowGeneration
 
@@ -885,7 +884,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             layout = { startY = 8, padding = 10, rowGap = 8 },
         })
 
-        -- Rebuilt results have their own lifetime even though the header survives.
+        -- Row clicks only count while these rows are current; a redraw makes new
+        -- ones (the header stays).
         local function rowAction(callback)
             return guarded(function(...)
                 if not closed and generation == rowGeneration then
@@ -919,9 +919,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             heading.content = listHeadings[browser.section] or listHeadings.browse
         end
 
-        -- Use the gold frame for the active page. Mark the selected activity
-        -- filter with its own colour and side bar so it stays distinct from page
-        -- navigation.
+        -- The current section gets the gold frame; the chosen activity filter
+        -- gets its own colour and side bar instead.
         for section, button in pairs(sectionButtons) do
             button:SetActive(browser.section == section)
         end
@@ -1011,8 +1010,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             })
 
             if method.variant then
-                -- A smaller, neutral suffix keeps the method name easy to scan.
-                -- Fit both labels once the card has its final scrollbar-aware width.
+                -- The version goes after the title in a smaller, plainer font. Both
+                -- are sized once the row's final width is known.
                 local variantText = " - " .. method.variant
                 local variant = row:AddText({
                     text = variantText, x = ROW_INSET + 32, y = 6,
@@ -1148,9 +1147,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
         results:AddText({ text = "RuneScape Wiki contributors / CC BY-NC-SA 3.0. GEPL trade estimates may use old trades.", colour = Style.muted })
         fitter:fit()
 
-        -- Title and variant share only the space before the profit column. Long
-        -- names clip independently; neither overlaps money. The method page has
-        -- the full title, so we don't need another tooltip for every list label.
+        -- Title and version share the space left of the profit column; long
+        -- ones are cut off. No tooltip: the activity page shows the full title.
         for _, entry in ipairs(headings) do
             local x, gap = ROW_INSET + 32, 8
             local room = math.max(0, entry.row.content.width - x - 196)
@@ -1166,8 +1164,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
         results:SetScrollPosition(scrollState.scroll)
     end
 
-    -- Search and sort can rebuild after the initial mount has finished. Clean up
-    -- a failed rebuild too; don't leave half a list with working stale controls.
+    -- Redraws the list (search, sort, filters). A redraw that fails is cleaned up
+    -- too, rather than leaving half a list with stale buttons.
     renderResults = function()
         clearResults()
 
@@ -1224,7 +1222,7 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
         if accountPage then
             view:AddTitle({ text = "My account", x = 52, y = 10, height = 32, colour = Style.gold })
         else
-            -- A continuous backdrop and divider tie navigation to the window edge.
+            -- The sidebar's background, and the divider line on its right.
             Style.rectangle(view, { x = 0, y = 0, width = 174, height = 0, heightAnchor = 1, colour = 0x24231FFF })
             Style.rectangle(view, { x = 172, y = 0, width = 2, height = 0, heightAnchor = 1, colour = 0x655638FF })
 
@@ -1400,8 +1398,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
                 return control
             end
 
-            -- Restoring a failed save can emit another native event. Compare against
-            -- the selected model first so that notification cannot save in a loop.
+            -- Putting the old choice back after a failed save fires this again, so
+            -- skip it when nothing changed (or it would try to save in a loop).
             sortControl = dropdown(sortEntries, sortIDs[browser.sort], 0, function(selectedID)
                 if selectedID == sortIDs[browser.sort] or not sortNames[selectedID] then
                     return

@@ -189,9 +189,9 @@ function Draft.usesTrips(draft)
     return false
 end
 
--- Convert per-trip rows to per-action quantities, preserving hourly totals by
--- dividing by actions per trip. If no trip size exists, keep the quantity; the
--- previous per-trip total was unavailable.
+-- Turns per-trip rows into per-action ones, dividing by actions per trip so the
+-- hourly total stays the same. Without a trip size the quantity is kept as it is
+-- (there was no hourly total to keep).
 function Draft.stopTrips(draft)
     local perTrip = draft.actions_per_trip
     local canConvert = type(perTrip) == "number" and perTrip > 0 and perTrip < math.huge
@@ -284,8 +284,8 @@ function Draft.decodeSource(kind, title)
                 row.pricing = "fixed"
             end
 
-            -- The three states (see the editor plan): restricted or unvalued drops
-            -- start off; unreadable rates wait for a number; the rest count.
+            -- The three states: restricted or unvalued drops start off;
+            -- unreadable rates wait for a number; the rest count.
             if Draft.isConditional(drop.notes) then
                 row.state = "off"
             elseif row.pricing == "fixed" and row.unit_value == nil then
@@ -476,9 +476,8 @@ end
 -- omitted outputs, supplies and requirements, plus unsupported recipe labels.
 -- Bundled recurring models cannot be copied into custom runs.
 function Draft.fromMethod(method, quotes)
-    -- Bundled recurring guides scale a share of the guide yield, not individual
-    -- custom runs. Refuse that conversion rather than changing the recipe's
-    -- meaning.
+    -- Bundled daily/weekly guides are scaled as a share of the guide's yield,
+    -- which doesn't map onto custom runs, so they can't be copied.
     if method.category ~= "pvm" and method.category ~= "skilling" and method.category ~= "production" then
         return nil, "Daily and weekly activities can't be copied as custom activities."
     end

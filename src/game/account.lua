@@ -1,7 +1,6 @@
--- Reads account evidence and owns the inventory, skill, quest and game-state
--- subscriptions. Tell the caller which evidence changed.
--- Bank reads require an open bank. Even complete supported container reads do not
--- cover every storage location or tool-belt category.
+-- Reads what the account has (items, skills, quests, unlocks) and owns the event
+-- subscriptions that say when those change. The bank can only be read while it's
+-- open, and even a full read doesn't cover every storage spot or tool-belt category.
 local Toolbelt = require("src/game/toolbelt")
 local Account = {}
 
@@ -20,12 +19,10 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         -- thrown away as soon as that container changes. Lives only in memory.
         ownershipCache = {},
 
-        -- Keep this login's last open-bank read for use while the bank is closed.
-        -- It may become stale through deposit boxes or other changes we cannot
-        -- read.
-        -- all holds every item seen on that visit, so newly watched custom
-        -- requirements can still be answered. After logout, saved evidence covers
-        -- only previously watched items.
+        -- This login's last open-bank read, used while the bank is closed. It can go
+        -- stale (deposit boxes, say). `all` holds every item seen on that visit, so a
+        -- newly watched custom requirement can still be answered; after logout only
+        -- the saved, already-watched items are known.
         sessionBank = nil,
         snapshot = snapshot,
         questVariables = {},
@@ -121,8 +118,8 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         return name
     end
 
-    -- Keep plain tool-belt evidence until one of its watched variables changes.
-    -- It is live state, never written into the bank/inventory snapshot records.
+    -- Tool-belt contents, cached until one of its game variables changes. Not
+    -- saved: the belt can always be read live.
     function self:readToolbelt()
         if not self.active or not Player.IsAvailable() then
             return { counts = {}, slots = {}, complete = false, message = "Tool belt is unavailable outside a game world." }
@@ -136,18 +133,17 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         return self.toolbeltCache
     end
 
-    -- Read counts for the wanted item-ID set across backpack, worn gear, bank and
-    -- mapped tool-belt families. Cache containers until inventory events
-    -- invalidate them.
-    -- complete covers only those supported sources. Live failures cannot prove
-    -- absence; saved counts and lastKnownAbsent are separate last-seen evidence.
+    -- Counts the wanted items across backpack, worn gear, bank and tool belt,
+    -- caching each container until an inventory event says it changed.
+    -- `complete` only means those places were all read. A failed read never proves
+    -- an item is missing; saved counts and lastKnownAbsent are last-seen hints.
     function self:readOwnership(wanted)
         local totals, savedCounts, sources = {}, {}, {}
         local lastKnownAbsent = {}
 
-        -- A red border can retain a last-checked absence after the bank closes.
-        -- Each container must explicitly record zero for this item; a missing key
-        -- is unknown, not zero. This display hint never qualifies access checks.
+        -- After the bank closes, an item can keep its red "not there last time"
+        -- border, but only if every container saved an explicit 0 for it (no entry
+        -- means unknown). It's just a display hint; it never fails a check.
         for itemId in pairs(wanted) do
             lastKnownAbsent[itemId] = true
         end
@@ -308,8 +304,8 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
                 local remembered = self.snapshot and self.snapshot.data[name]
                 sources[name] = remembered and "saved" or "unavailable"
 
-                -- Historical locations can contain the SAME moved item. Never sum
-                -- them or add them to live counts; they are only a last-seen hint.
+                -- Saved counts from different places might be the same item that
+                -- moved, so never add them up or add them to live counts.
                 for itemId in pairs(wanted) do
                     local recorded = remembered and remembered[itemId]
                     local quantity = recorded or 0
@@ -327,8 +323,8 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
 
         for itemId in pairs(wanted) do
             if toolbelt.counts[itemId] then
-                -- The belt proves a usable tool, not another tradeable copy.
-                -- Do not inflate named-item quantities by adding a virtual stack.
+                -- The belt shows you can use the tool, not that you own another
+                -- copy, so it counts as 1 at most.
                 totals[itemId] = math.max(totals[itemId] or 0, 1)
                 lastKnownAbsent[itemId] = false
             end
@@ -351,8 +347,8 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         end
     end
 
-    -- Read documented quest completion flags and watch only their progress variables.
-    -- Unknown native values stay unknown rather than becoming an incomplete quest.
+    -- Reads whether a quest is done and watches its progress variables. A value
+    -- we can't read stays unknown rather than counting as "not done".
     function self:readQuest(name)
         if not self.active then
             return { status = "stopped" }
@@ -377,8 +373,8 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
                 return { status = "unknown", message = "This quest config is deprecated; use its replacement." }
             end
 
-            -- Track only this quest's progress variables. Other variable traffic
-            -- must not trigger a catalogue-wide refresh.
+            -- Only watch this quest's own variables, so unrelated variable
+            -- changes don't refresh everything.
             for _, descriptor in pairs(quest.masterQuestVars or {}) do
                 if descriptor.varPlayer then
                     self.questVariables[descriptor.varPlayer.id] = true
@@ -503,8 +499,8 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         return { status = "available", level = level }
     end
 
-    -- Inventory events invalidate only the affected presence cache. Native item
-    -- totals are re-read on demand while a method is visible, never each frame.
+    -- An inventory event only clears that container's cached counts; they're
+    -- re-read when next needed.
     subscribe(Event.InventoryAdded, function(event)
         inventoryChanged("Added", event)
     end)
@@ -528,8 +524,7 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         end
     end)
 
-    -- Keep skill-event handling small: notify the UI to refresh the skills it
-    -- currently shows.
+    -- A skill changed: just tell the UI, which re-reads the skills it shows.
     subscribe(Event.SkillTransmit, function()
         notify("skills")
     end)

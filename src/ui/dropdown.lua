@@ -21,8 +21,8 @@ function Dropdown.new(parent, options)
     control:SetPos(options.x, options.y, options.xAnchor or 0, 0)
     control:SetSize(options.width, options.compact and 24 or 30)
 
-    -- A method version is secondary to its title. Soften only the native frame
-    -- and arrow; keep the control active and its selected text fully readable.
+    -- The version picker sits beside the title, so dim its frame and arrow
+    -- but keep the text fully readable.
     if options.compact then
         control.headerSprite.alpha = 0.45
         control.buttonSprite.alpha = 0.65
@@ -51,8 +51,8 @@ function Dropdown.new(parent, options)
             return
         end
 
-        -- Repeated clicks replace the same pending callback. This is not a
-        -- poller: it runs once, on the next logic tick, then unsubscribes.
+        -- Clicking again replaces the pending callback. It runs once, on
+        -- the next logic tick, then unsubscribes.
         Event.Logic.Unsubscribe(owner)
         Event.Logic.Subscribe(owner, function()
             Event.Logic.Unsubscribe(owner)

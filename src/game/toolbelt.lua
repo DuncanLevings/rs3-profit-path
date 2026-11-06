@@ -1,10 +1,10 @@
--- Resolves supported tool-belt families through the client's own item enums.
--- Account owns this reader's cache, login guard and variable subscriptions. This
--- file returns plain evidence and never retains native configs or assumes tiers.
+-- Reads which tools are on the tool belt (hatchets, pickaxes...) using the
+-- client's own item enums. account.lua owns the caching and subscriptions;
+-- this just returns plain counts.
 local Toolbelt = {}
 
--- Native variables can expose nil or invalid values. Zero is a real enum key for
--- some families, so do not use a truthy/nonzero test to detect a stored tool.
+-- Game variables can come back nil or junk. 0 is a real enum key for some
+-- tools, so it doesn't mean "no tool".
 local function integer(value)
     return type(value) == "number" and value >= 0 and value < math.huge and value % 1 == 0
 end
@@ -19,8 +19,8 @@ local function watch(setting, watched)
     end
 end
 
--- Called only after Account's login check. The definitions are validated bundled
--- data: variable/enum names and verified indexing offsets, not per-method cases.
+-- Called once Account knows we're logged in. `definitions` is bundled data:
+-- which variables and enums to read, and their key offsets.
 function Toolbelt.read(definitions)
     local result = { counts = {}, slots = {}, watched = {}, complete = true }
 
@@ -68,8 +68,8 @@ function Toolbelt.read(definitions)
 
             local mapping = config.Enum[definition.items_enum]
 
-            -- Official ValueType IDs: INTEGER=0, OBJ=33. A wrong/missing enum must
-            -- not accidentally count some unrelated native config as an owned item.
+            -- ValueType IDs: INTEGER=0, OBJ=33. If the enum isn't the one we
+            -- expect, skip it rather than count some unrelated item.
             if not mapping or mapping.configName ~= definition.items_enum
                 or mapping.inputValueType ~= 0 or mapping.outputValueType ~= 33 then
                 return { status = "unknown", message = "Tool-belt item mapping is unavailable or has changed." }
@@ -97,8 +97,7 @@ function Toolbelt.read(definitions)
         end
 
         if slot.itemId then
-            -- One tool is available for use, not a stack of tradeable supplies.
-            -- Never add two belt entries as two copies of the same item.
+            -- A belt tool counts as one, even if two entries map to the same item.
             result.counts[slot.itemId] = 1
         end
     end

@@ -50,9 +50,8 @@ local function validProfile(name)
         and name:match("^[%w _-]+$") ~= nil and name:find("%S") ~= nil
 end
 
--- Keep native display-name text, including non-breaking spaces. The client has no
--- utf8 library. These are database key components with byte-length prefixes, not
--- file paths.
+-- Display names are kept byte for byte, non-breaking spaces and all (the client has
+-- no utf8 library). They only go into length-prefixed storage keys.
 local function validCharacterText(value)
     return type(value) == "string" and value:find("%S") ~= nil
         and not value:find("%c")
@@ -146,7 +145,7 @@ function Preferences.new(db)
     end
 
     -- Re-reads before writing so a failed load can't accidentally replace the
-    -- player's saved list with an empty one. This touches no rates or sort keys.
+    -- player's saved list with an empty one.
     local function saveId(base, what, id, selected)
         local ids, warning, writable = loadIds(base, what)
 
@@ -326,8 +325,8 @@ function Preferences.new(db)
         return true
     end
 
-    -- Sorting is a device preference; favourites and rates are per profile.
-    -- Keep these separate from rate keys so existing saves need no migration.
+    -- Sorting is saved for this computer, not per profile (unlike favourites
+    -- and rates).
     function self:loadBrowser()
         local defaults = { sort = "profit", descending = true }
         local success, stored, exists = pcall(function()

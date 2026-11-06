@@ -911,12 +911,11 @@ def verify(source, output=OUTPUT, reader_module="src/data/monster_data", what="m
 
 
 # ---------------------------------------------------------------------------
-# Custom activity sources: GE item names and thieving loot (Phase 9)
+# Custom activity sources: GE item names and thieving loot
 # ---------------------------------------------------------------------------
 #
-# Both come from src/tools/wiki_drop_sources.py. Nothing in the plugin loads them
-# yet; the custom activity editor will (item search, and "start from a thieving
-# target"). They're built and verified now so the data is reviewed before the UI.
+# Both come from src/tools/wiki_drop_sources.py. The custom activity editor uses
+# them for its item search and for "start from a thieving target".
 
 THIEVING_SOURCE = ROOT / "catalogue-source" / "thieving.json"
 THIEVING_OUTPUT = ROOT / "data" / "thieving.lua"
@@ -1253,8 +1252,8 @@ def validate_methods(source, monsters, recipes=None):
 
         ids.add(method_id)
 
-        # Bundled methods are always "bundled". Players' copies will use the same
-        # record shape with their own origin, so the record says which one it is.
+        # Bundled methods are always "bundled" (custom activities say "custom"),
+        # so the record says which one it is.
         if method.get("schema") != METHOD_RECORD_SCHEMA or method.get("origin") != "bundled":
             raise ValueError(f"{method_id} needs record schema {METHOD_RECORD_SCHEMA} and origin bundled")
 
@@ -1569,7 +1568,7 @@ def validate_methods(source, monsters, recipes=None):
 #
 # catalogue-source/methods.json is written to be short (schema 2). The build
 # "expands" it into full method records, which is the one shape the plugin uses for
-# every method (and later for players' own copies), checks those, then packs them.
+# every method, checks those, then packs them.
 #
 # What the short source is allowed to leave out, and how the build fills it in:
 #
@@ -1586,8 +1585,7 @@ def validate_methods(source, monsters, recipes=None):
 
 METHOD_SOURCE_SCHEMA = 2
 
-# Version of a single full method record. Bundled methods carry it now so a
-# player's saved copy can be checked against the same shape later.
+# Version of a single full method record.
 METHOD_RECORD_SCHEMA = 1
 
 WIKI_PAGE = "https://runescape.wiki/w/"

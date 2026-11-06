@@ -226,8 +226,7 @@ function App.start()
             local method = CustomMethods.toMethod(saved)
             browser:putCustom(method)
 
-            -- Start reading whatever its requirements ask about (defined below,
-            -- next to the startup walk).
+            -- Start reading whatever its requirements check (defined further down).
             self:watchRequirements(method)
         end
 
@@ -249,7 +248,7 @@ function App.start()
         self:recalculate()
     end
 
-    -- Collect the bounded set needed by this catalogue. Extra tool candidates
+    -- Gather everything the requirements need us to read. Extra tool candidates
     -- are included so a basic hatchet can satisfy 'your highest-tier hatchet'.
     local wanted, skillNames, questNames = {}, {}, {}
 
@@ -384,8 +383,8 @@ function App.start()
         return nameChecks[itemId]
     end
 
-    -- Refresh only the evidence that changed. Inventory activity never re-reads
-    -- skills/quests, and no persistence or native scans run in the resize watcher.
+    -- Refresh only what `reason` could have changed: an inventory change doesn't
+    -- re-read skills or quests, for example.
     function calculator:refreshEvidence(reason)
         local evidence = self.evidence or { skills = {}, quests = {}, items = {}, equipment = equipment }
 
@@ -409,8 +408,9 @@ function App.start()
             evidence.achievements = account:readAchievements(achievementIds)
         end
 
-        -- A live total and a historical hint are separate fields all the way to
-        -- the UI. Aliases may add current quantities, but saved counts use a max.
+        -- Live counts and saved (last-seen) counts stay separate all the way to the UI.
+        -- Alias IDs add to the live count, but saved counts take the biggest, since
+        -- they might be the same item seen in two places.
         if reason == nil or reason == "inventory" then
             self.ownershipEvidence = account:readOwnership(wanted)
             evidence.items = {}
@@ -432,8 +432,8 @@ function App.start()
                         lastKnownAbsent = lastKnownAbsent and absent[alias] == true
                     end
 
-                    -- Native name verification prevents a wrong catalogue ID from
-                    -- qualifying an item or a supposedly higher-tier tool.
+                    -- Check the client's name for this ID, so a wrong catalogue ID can't
+                    -- count as owning an item (or a higher-tier tool).
                     local verified = nameMatches(itemId, item.name)
 
                     evidence.items[itemId] = {
@@ -459,9 +459,8 @@ function App.start()
         self.evidence = evidence
         self.accessChanged = false
 
-        -- Browse filters the listed requirements, using the same verdicts as
-        -- the method page. A source's research status isn't a failed player check;
-        -- individual checks with missing evidence still stay unknown on their own.
+        -- Work out each activity's Required verdict for Browse's Requirements
+        -- filter (the same verdicts the activity page shows).
         for _, method in ipairs(browser.methods) do
             local checked = Requirements.evaluateAccess(method.requirements, evidence)
 
@@ -471,9 +470,9 @@ function App.start()
         end
     end
 
-    -- The UI reads the same evidence used by Browse. (A closed bank counts as it
-    -- was last seen open; see readOwnership.) A saved backpack hint isn't added
-    -- to live counts and can never turn an unknown requirement into a pass.
+    -- Item evidence for the activity page, the same as Browse uses. A closed bank
+    -- counts as it was last seen open (see readOwnership). Saved backpack counts
+    -- are only a hint: they never turn an unknown check into a pass.
     function calculator:ownership()
         local result = self.ownershipEvidence or { counts = {}, complete = false }
         result.message = snapshot.message or (result.toolbelt and result.toolbelt.message)
@@ -485,7 +484,7 @@ function App.start()
             Requirements.evaluate(self.method.requirements.recommended, self.evidence or {})
     end
 
-    -- Save historical evidence at meaningful UI checkpoints, not per XP drop.
+    -- Save the last-seen item counts at natural stopping points, not on every change.
     function calculator:checkpoint()
         snapshot:flush()
     end

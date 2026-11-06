@@ -83,9 +83,8 @@ local RECURRENCES = {
 -- player banks between trips).
 local BASES = { "action", "trip", "hour" }
 
--- The draft's lists of lines (steps, income notes, getting there) as lists.
--- Older saves had one plain note; a blank draft has none of them. Either way
--- the editor works on lists.
+-- Draft fields that hold a list of lines (steps, income notes, directions).
+-- Older saves had a single note string, so normaliseNotes turns them all into lists.
 local LINE_LISTS = { "notes", "income_notes", "getting_there" }
 
 local function normaliseNotes(draft)
@@ -277,9 +276,9 @@ local function roughNumber(value)
     return text
 end
 
--- The grey line under a row's boxes always shows the hourly total, so changing
--- "Each ..." keeps the same unit for an easy comparison. Blank when it can't be worked out
--- yet (no quantity, no kills an hour, no kills per trip) or the row isn't counted.
+-- The grey "About N an hour" line under a row: always hourly, whatever the row is
+-- counted per. Blank when it can't be worked out yet (no quantity, no kills an
+-- hour, no kills per trip) or the row isn't counted.
 local function hourlyText(row, draft)
     local rate = draft.rate.default
 
@@ -1102,8 +1101,8 @@ function MethodEditor.income(page, state, tools)
 
         page:AddText({ text = "Default runs to count (usually 1)", colour = Style.muted })
     else
-        -- One plain question. Whether it's kills or actions follows the
-        -- category (a thieving target always counts actions: you pickpocket it).
+        -- Kills or actions, depending on the category (a thieving target
+        -- always counts actions: you pickpocket it).
         questionLabel = page:AddText({ text = questionText(), colour = Style.gold, marginTop = 6 })
         page:AddText({ text = "Players can change this to their own speed on the activity page.", colour = Style.muted })
     end
@@ -1119,8 +1118,7 @@ function MethodEditor.income(page, state, tools)
             updatePreview()
         end)
 
-    -- Trips. Asked up front, so the kills per trip box is right here instead of
-    -- only turning up after a row on another tab was set to "Each trip".
+    -- Trips, asked here so the kills-per-trip box is easy to find.
     -- Daily/weekly counts runs, so it has no trips.
     if draft.category ~= "recurring" then
         local trips = tripsOn(state)
@@ -1714,7 +1712,6 @@ function MethodEditor.requirements(page, state, tools)
 
         choose(state.skill)
 
-        -- Combat level.
         page:AddText({ text = "Combat level", colour = Style.gold, marginTop = 6 })
         local combatField = tools.numberField(page, {
             text = "", placeholder = "Combat level", maxLength = 3, width = 200, height = 28, most = 152,

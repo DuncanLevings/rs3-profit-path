@@ -180,8 +180,8 @@ function Requirements.evaluate(requirement, account)
             { { quest = requirement.quest, name = entry.name, completed = entry.completed } })
     end
 
-    -- Gear groups describe alternatives, not a mandatory top-end example. Pick
-    -- the highest owned tier that also meets its use levels and requested slot/style.
+    -- A gear group lists alternatives, not one must-have item. Find the best tier
+    -- the player owns and can actually use (levels, slot and style).
     if kind == "gear" and requirement.equipment_group then
         local group = account.equipment and account.equipment[requirement.equipment_group]
 
@@ -204,9 +204,9 @@ function Requirements.evaluate(requirement, account)
 
             local owned = account.items and account.items[candidate.item_id]
 
-            -- A name mismatch makes this item ID unverified. Ignore an unowned
-            -- stale ID so it does not spoil the whole tier check; an owned
-            -- possible match keeps the result unknown.
+            -- The client's name for this ID didn't match, so we can't trust
+            -- it. If they don't own it, just skip it; if they do, the result
+            -- has to stay unknown.
             if matches and owned and owned.verified == false then
                 matches = false
 
@@ -266,8 +266,8 @@ function Requirements.evaluate(requirement, account)
             checked = result(requirement, "unmet", "No usable matching equipment was found in checked storage.")
         end
 
-        -- A named minimum can retain its red display border after the bank closes,
-        -- but the historical hint must not become a confirmed failed access check.
+        -- A named minimum can keep its red border after the bank closes, but
+        -- that's only a last-seen hint, never a failed check.
         checked.lastKnownAbsent = candidateCount > 0 and lastKnownAbsent
         return checked
     end

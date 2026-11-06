@@ -332,10 +332,10 @@ return function(test, equal, client, pretty)
         equal(state.db["profit-path.hidden.v1/11:Character 2"].schema, 2)
     end)
 
-    -- "Don't recommend" will live on Recommend for me's cards, so for now the
-    -- test saves one directly. A Browse row that isn't recommended says so and its
-    -- eye puts it back; other rows have no eye. My account has no search or
-    -- filters, and lists what to recommend again.
+    -- The test hides one directly rather than going through a card's "Don't
+    -- recommend". A Browse row that isn't recommended says so and its eye puts it
+    -- back; other rows have no eye. My account has no search or filters, and lists
+    -- what to recommend again.
     test("a method that isn't recommended is marked in Browse and listed in My account", function()
         client()
         prettyui = pretty()
@@ -1215,8 +1215,8 @@ return function(test, equal, client, pretty)
         local income = detail.tabs[1].pages[1]
         equal(#income:allFields(), 1, "No manual character/profile field in the method")
 
-        -- The potion stays an icon; creation-cost explanations are no longer
-        -- printed in Notes. Pricing itself is covered by the calculation tests.
+        -- The potion stays an icon, and Notes has no creation-cost explanation.
+        -- Pricing itself is covered by the calculation tests.
         for _, label in ipairs(income:allTexts()) do
             assert(not label.content:find("ROI unavailable", 1, true))
             assert(label.content ~= "Perfect plus potion", "Potion should be an icon, not a text row")

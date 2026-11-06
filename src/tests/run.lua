@@ -394,8 +394,8 @@ local function pretty()
     -- nested columns. Tests find actions by label instead of layout coordinates.
     local library = { views = {}, allViews = {}, windows = {}, failTitle = false }
 
-    -- Rough native-part counts, for comparing how heavy pages are (Phase 9 size
-    -- limits). Every control counts 1 and every tooltip counts separately, since
+    -- Rough native-part counts, for comparing how heavy pages are (the custom
+    -- activity limits). Every control counts 1 and every tooltip counts separately, since
     -- PrettyUI builds tooltips up front at about 11 native IDs each. This is a
     -- relative measure between pages, not the client's real ID count.
     library.counted = { parts = 0, tooltips = 0 }

@@ -505,7 +505,7 @@ def load_access_research():
 # The PvM difficulty bands, easiest first, and the 1-10 ladder levels each one
 # covers. The plugin's Difficulty filter uses the same four labels
 # (Browser.difficultyLevels in src/methods/browser.lua) and the same ranges
-# (Recommendations.bandOf in src/methods/recommendations.lua).
+# (Recommendations.bands in src/methods/recommendations.lua).
 DIFFICULTY_SCALE = ["Easy", "Medium", "Hard", "Elite"]
 DIFFICULTY_BANDS = {"Easy": [1, 2], "Medium": [3, 4], "Hard": [5, 7], "Elite": [8, 10]}
 
@@ -1161,8 +1161,8 @@ def convert_requirement(entry, ctx):
             check = capability(name, ctx)
 
     elif entry.startswith("quest:"):
-        # Quests need their client quest ID to be checked, which is research for
-        # later. Until then they show the quest icon and stay unknown.
+        # A quest mapped to its client config is checked; any other shows the
+        # quest icon and stays unknown (see capability()).
         check = capability(entry[len("quest:"):], ctx, quest=True)
 
     else:
@@ -1491,8 +1491,8 @@ def convert_guide(guide, ctx, category):
     research = ctx.access_research.get(method["id"])
 
     if research:
-        # Refuse stale repairs when the guide snapshot changes. Requirements from
-        # another version of a method must never leak into this one's filter.
+        # Research made for an older snapshot of this guide is refused, so it
+        # can't end up on the wrong version.
         if (research["page"] != guide["page"] or research["revision"] != guide["revision"]
                 or research["version"].casefold() != guide.get("version", "").casefold()):
             raise ValueError("Access research does not match the pinned guide: " + method["id"])
@@ -1509,8 +1509,8 @@ def convert_guide(guide, ctx, category):
         requirements = method["requirements"]
         requirements["notes"] = list(dict.fromkeys(requirements["notes"] + research["notes"]))
 
-        # Only an explicitly reviewed requirement-free method can turn an empty
-        # source list into a pass. This is not a general "research is complete" flag.
+        # Only a method reviewed as needing no requirements can turn an empty
+        # source list into a pass.
         if research.get("requirement_free"):
             if requirements["access"]["children"] or requirements["notes"]:
                 raise ValueError("Requirement-free review conflicts with access checks")
@@ -1877,7 +1877,7 @@ def print_report(monsters, recipe_source):
     for name, count in unpriced.most_common(12):
         print(f"    {count:3} methods use unpriced {name}")
 
-    # Requirements: what the plugin will be able to check.
+    # Requirements: what the plugin can check.
     kinds, unknown_names, with_icon = collections.Counter(), collections.Counter(), 0
     capability_kinds = collections.Counter()
 

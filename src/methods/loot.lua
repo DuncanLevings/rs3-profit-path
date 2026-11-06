@@ -1,10 +1,10 @@
--- Turns selected shared monster drops into expected outputs per kill. This file
--- owns no native objects or prices. The build uses the same expansion function
--- to reject ambiguous rates/quantities before they can reach the game.
+-- Turns selected monster drops into expected outputs per kill (no prices or UI
+-- here). The catalogue build runs the same code to reject unreadable rates or
+-- quantities.
 local Loot = {}
 
--- Static models don't change while enabled. Cache their expanded rows so typing
--- a rate doesn't decode the monster table again; discarded models can be freed.
+-- Bundled models never change, so cache their expanded rows: typing a rate then
+-- doesn't decode the monster table again. Weak keys let unused models be freed.
 local expanded = setmetatable({}, { __mode = "k" })
 
 -- Use exact fractions, never the rounded percentage in the monster's "chance".
@@ -144,8 +144,8 @@ function Loot.expand(selection, monster)
     return outputs
 end
 
--- Ordinary production methods keep their existing output rows. Loot methods
--- add their shared-drop selections without copying drop tables into each method.
+-- An activity's output rows, plus its expanded monster drops if it has any
+-- (drop tables are shared, not copied into each activity).
 function Loot.outputs(model)
     if not model.loot then
         return model.outputs

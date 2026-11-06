@@ -1,14 +1,12 @@
--- Owns saved, profile-specific item evidence and its dirty flag. Store watched
--- counts separately for backpack, worn gear and bank; no native proxies.
--- Use the saved bank while closed. Saved backpack/worn counts are last-seen hints
--- because their live containers remain readable.
+-- Saves last-seen item counts per profile (backpack, worn gear and bank), so the
+-- next login knows what was in the bank. Saved backpack and worn counts are only
+-- hints, since those can always be read live.
 local Snapshot = {}
 local containers = { "INV", "WORN", "BANK" }
 
--- Application bounds, not claimed client/database limits. Reject oversized
--- records rather than walking arbitrary persisted data or overwriting it silently.
--- MAX_ITEMS caps items actually held; MAX_CHECKED caps everything checked, since
--- the tiered gear checks alone look for about 2,900 pieces.
+-- Our own size caps (not client limits), so a huge or damaged save is refused
+-- rather than walked or quietly overwritten. MAX_ITEMS caps items held;
+-- MAX_CHECKED caps everything checked (tiered gear alone checks ~2,900 pieces).
 local MAX_ITEMS = 4096
 local MAX_CHECKED = 20000
 
@@ -85,8 +83,8 @@ end
 function Snapshot.new(db)
     local self = { data = {}, dirty = false, writable = true }
 
-    -- Reusing the character's existing profile binding preserves rename/profile
-    -- behaviour. Length prefixes make this a flat, unambiguous database key.
+    -- Uses the same profile as the rest of the settings. The length prefix keeps
+    -- the key unambiguous whatever the name contains.
     function self:bind(profile)
         if self.profile == profile then
             return
@@ -129,7 +127,8 @@ function Snapshot.new(db)
         end
     end
 
-    -- Copy plain counts only. Identical reads do not create new persistence work.
+    -- Remembers one container's counts. A read identical to the last one changes
+    -- nothing, so there's nothing new to save.
     function self:observe(name, counts)
         if not self.profile then
             return
@@ -160,8 +159,8 @@ function Snapshot.new(db)
         end
     end
 
-    -- Checkpoints happen on close, bank removal, character change and shutdown;
-    -- never on each inventory event or logic tick. Keep failed writes retryable.
+    -- Writes any unsaved counts. Called when the window or bank closes, the
+    -- character changes or the plugin shuts down. A failed write stays pending.
     function self:flush()
         if not self.profile or not self.dirty or not self.writable then
             return
@@ -199,8 +198,8 @@ function Snapshot.new(db)
         end
     end
 
-    -- A world/character transition ends the live binding. The next explicit open
-    -- binds again, so late inventory events cannot save under the previous player.
+    -- Called on login, logout or world hop. Nothing is saved until the window binds
+    -- the next character, so a late event can't save under the old one.
     function self:unbind()
         self:flush()
         self.profile = nil

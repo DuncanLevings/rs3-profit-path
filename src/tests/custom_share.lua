@@ -1,4 +1,4 @@
--- Sharing custom activities (Phase 9, slice 7): the share line's writer and
+-- Sharing custom activities: the share line's writer and
 -- reader, what's left out, every way a paste gets refused, and the Export and
 -- Import screens end to end.
 return function(test, equal, client, pretty)
@@ -98,8 +98,8 @@ return function(test, equal, client, pretty)
         assert(line, problem)
         equal(length, #line)
 
-        -- One line of printable ASCII, so it survives the text box (the probe:
-        -- a line break cuts the text there).
+        -- One line of printable ASCII, so it survives the text box (a line
+        -- break cuts the text there).
         assert(not line:find("[^ -~]"), "only printable ASCII")
         assert(line:sub(1, 4) == "PP1:", line)
 

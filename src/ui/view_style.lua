@@ -18,7 +18,7 @@ local Style = {
     gold = 0xE3BF70FF,
     good = 0xB7D8A6FF,
     bad = 0xE4A099FF,
-    -- Secondary money figures keep their sign colour below the headline's weight.
+    -- Softer money colours for secondary figures, so the headline stands out.
     subtleGood = 0x8FA184FF,
     subtleBad = 0xAA8580FF,
     -- Activity colours for titles and sidebar buttons: PvM red, skilling green,
@@ -110,9 +110,9 @@ function Style.panelFitter(host, padding, gap)
     return fitter
 end
 
--- Look up only our configured UI icons, using the client's named sprite table.
--- Missing names can throw through the native proxy, so protect that read. Warn
--- once per name and let each caller keep its existing text/empty-icon fallback.
+-- Looks up one of our icon names in the client's sprite table. A missing name
+-- can throw, so the read is protected. Each missing name is warned about once;
+-- callers then fall back to text or no icon.
 local reportedSprites = {}
 
 local function resolveIcon(alias)
@@ -146,8 +146,8 @@ local function resolveIcon(alias)
     return nil
 end
 
--- PrettyUI draws the resolved sprite and owns its lifetime. A missing icon is
--- decoration only: the adjacent text still explains the requirement or action.
+-- PrettyUI draws the sprite and owns it. A missing icon is fine: the text
+-- beside it still says what it is.
 function Style.icon(parent, name, options)
     local sprite = resolveIcon(name)
 
@@ -224,12 +224,11 @@ local function coinStep(step, action)
     return ok
 end
 
--- Draw a Coins pile without its quantity label. Return the native sprite so
--- placeCoin can move it beside the total.
--- This client rejects the two-argument SetAssociatedObject call. Set the quantity
--- separately, before and after attaching the item, to get the pile graphic.
--- Try each native step separately. If the item picture fails, hide the partial
--- result and use the COINS sprite.
+-- Draws a Coins pile with no quantity number, and returns the native sprite so
+-- placeCoin can move it beside the total. Each native step is tried on its own;
+-- if the item picture fails we hide it and use the plain COINS sprite instead.
+-- (This client rejects the two-argument SetAssociatedObject call, so step 2
+-- sets the quantity separately.)
 function Style.coins(parent, options)
     local x = options.x or 0
     local y = options.y or 0
