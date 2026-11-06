@@ -201,7 +201,8 @@ class ThievingTests(unittest.TestCase):
         decoded = reader.open("data/thieving").find("Master Farmer")
 
         self.assertEqual(decoded.level, 38)
-        self.assertEqual(catalogue.decode_record(decoded, catalogue.MONSTER_FIELDS), source["monsters"][0])
+        self.assertEqual(catalogue.decode_record(decoded, catalogue.PACKED_MONSTER_FIELDS),
+                         catalogue.packed_view(source["monsters"][0]))
 
         # Provenance stays in the JSON, not the runtime file.
         self.assertNotIn("revision", source["monsters"][0])

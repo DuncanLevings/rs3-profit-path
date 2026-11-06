@@ -8,6 +8,26 @@ local Account = {}
 -- GetTotal call per item.
 local SLOT_SCAN_THRESHOLD = 200
 
+-- The containers we read item counts from (see readOwnership).
+local WATCHED_CONTAINERS = { "INV", "WORN", "BANK" }
+
+-- True when `inventoryConfig` is one of the containers above. Shops, loot
+-- windows, the GE and so on also fire inventory events, but can't change
+-- anything we show, so they shouldn't trigger a refresh.
+local function isWatched(inventoryConfig)
+    local id = inventoryConfig and inventoryConfig.id
+
+    for _, name in ipairs(WATCHED_CONTAINERS) do
+        local definition = config.Inv[name]
+
+        if definition and definition.id == id then
+            return true
+        end
+    end
+
+    return false
+end
+
 -- App supplies the optional snapshot owner and validated tool-belt bindings;
 -- tests can leave them out without importing the whole catalogue.
 function Account.new(onChanged, snapshot, toolbeltBindings)
@@ -55,6 +75,10 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         end
 
         local inventoryConfig = event.inv
+
+        if not isWatched(inventoryConfig) then
+            return
+        end
 
         -- A removed bank is a useful checkpoint for the last observed contents.
         if kind == "Removed" and self.snapshot then
@@ -158,7 +182,7 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
             return { counts = totals, complete = false }
         end
 
-        for _, name in ipairs({ "INV", "WORN", "BANK" }) do
+        for _, name in ipairs(WATCHED_CONTAINERS) do
             local snapshot = self.ownershipCache[name]
 
             -- Native reads can fail (e.g. the bank isn't sent until opened), so

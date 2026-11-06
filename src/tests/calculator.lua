@@ -1020,6 +1020,7 @@ return function(test, equal, client, pretty)
 
         level = 40
         Event.SkillTransmit.emit({ skill = SkillType.SMITHING })
+        settleAccount()
         equal(skillLabel.content, "20 Smithing")
         equal(skillLabel.rgba, require("src/ui/view_style").good)
         assert(not textContent(requirements):find("Your level:", 1, true))
@@ -1029,6 +1030,7 @@ return function(test, equal, client, pretty)
         equal(Event.SkillTransmit.count(), 0)
 
         Event.SkillTransmit.emit({ skill = SkillType.SMITHING })
+        settleAccount()
     end)
 
     -- Inventory events can fire on every action while skilling. They can't change
@@ -1053,9 +1055,11 @@ return function(test, equal, client, pretty)
         local afterOpen = reads
 
         Event.InventoryUpdated.emit({ inv = config.Inv.INV })
+        settleAccount()
         equal(reads, afterOpen)
 
         Event.SkillTransmit.emit({ skill = SkillType.SMITHING })
+        settleAccount()
         assert(reads > afterOpen, "Skill updates should still refresh method evidence")
 
         PluginShutdown()

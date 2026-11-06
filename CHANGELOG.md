@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.56-dev - 2026-11-05
+
+- Smaller install (about 3.3 MB, down from about 4.3 MB). The bundled data stores repeated requirement checks, drop rows and text once, and leaves out fields the plugin never reads, such as Wiki page URLs and NPC IDs. No activities, recipes, unlocks, drop tables or item names were removed.
+- Less lag with the window open: a burst of item, skill or quest changes in one game tick (a bank deposit, say) now causes one refresh on the next tick instead of one per event.
+- Inventory changes in shops, loot windows, the GE and other containers the plugin doesn't read no longer trigger a refresh.
+- Browse works out each repeated gear check once per refresh instead of once per activity, roughly halving the time to check every activity.
+
 ## 0.8.55-dev - 2026-11-05
 
 - Custom activity editor: row hints consistently show the hourly total. A supply of 4 counted Each hour now says "About 4 an hour", instead of converting it to a tiny per-action amount. Each action and Each trip rows still show their calculated hourly total.

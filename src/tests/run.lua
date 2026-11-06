@@ -73,6 +73,12 @@ function settleSearch()
     end
 end
 
+-- Account changes reach the screen on the next Logic tick (main.lua batches
+-- them), so tests that change the account call this before looking.
+function settleAccount()
+    Event.Logic.emit({})
+end
+
 -- A method screen draws what's on screen first and the rest a piece per Logic
 -- tick. Tests that look past the open tab (or at long Income tables) call this
 -- to let it finish.
@@ -948,6 +954,7 @@ test("account teardown is idempotent and removes subscriptions", function()
     end
 
     Event.InventoryAdded.emit({ inv = config.Inv.BANK })
+    settleAccount()
 
     equal(notifications, 0)
     equal(account:readCombatLevel().status, "unavailable")
@@ -1659,6 +1666,7 @@ test("item presence caches requested totals and invalidates the changed containe
 
     backpackCount = 0
     Event.InventoryUpdated.emit({ inv = config.Inv.INV })
+    settleAccount()
     equal(account:readOwnership(wanted).counts[42], 0)
     equal(calls, 8)
 
@@ -1698,6 +1706,7 @@ test("a closed bank counts as it was last seen open, this session or saved", fun
     -- Closing the bank: no new bank read, and the item is still proven absent.
     bankOpen = false
     Event.InventoryRemoved.emit({ inv = config.Inv.BANK })
+    settleAccount()
     local closed = account:readOwnership(wanted)
     equal(closed.complete, true)
     equal(closed.counts[43], 0)

@@ -266,12 +266,14 @@ return function(test, equal, client, pretty)
         equal(account:readOwnership({ [42] = true }).lastKnownAbsent[42], true)
         bankAvailable = false
         Event.InventoryRemoved.emit({ inv = config.Inv.BANK })
+        settleAccount()
         local result = account:readOwnership({ [42] = true, [43] = true })
         equal(result.lastKnownAbsent[42], true)
         equal(result.lastKnownAbsent[43], false)
         equal(result.complete, false)
         backpack = 1
         Event.InventoryUpdated.emit({ inv = config.Inv.INV })
+        settleAccount()
         equal(account:readOwnership({ [42] = true }).lastKnownAbsent[42], false)
         account:bindProfile("Second")
         backpack = 0
@@ -432,9 +434,11 @@ return function(test, equal, client, pretty)
         account:readOwnership(wanted)
         equal(calls(), baselineCalls)
         Event.VarTransmit.emit({ var = { id = 999999 } })
+        settleAccount()
         equal(updates, 0)
         settings.TOOLBELT_HATCHET_LEVEL.value = 6
         Event.VarTransmit.emit({ var = { id = 7903 } })
+        settleAccount()
         equal(updates, 1)
         local result = account:readOwnership(wanted)
         equal(result.counts[1359], 1)
@@ -533,6 +537,7 @@ return function(test, equal, client, pretty)
         assert(foundLabel)
         settings.TOOLBELT_HATCHET_LEVEL.value = 6
         Event.VarTransmit.emit({ var = { id = 7903 } })
+        settleAccount()
         assert(match(1359))
         assert(original.destroyed)
         assert(not detail.destroyed)
@@ -581,12 +586,15 @@ return function(test, equal, client, pretty)
         equal(border.rgba, Style.muted)
         bankAvailable = true
         Event.InventoryAdded.emit({ inv = config.Inv.BANK })
+        settleAccount()
         equal(border.rgba, Style.bad)
         bankAvailable = false
         Event.InventoryRemoved.emit({ inv = config.Inv.BANK })
+        settleAccount()
         equal(border.rgba, Style.bad)
         ownsUpgrade = true
         Event.InventoryUpdated.emit({ inv = config.Inv.INV })
+        settleAccount()
         local upgrade, ownedBorder = find(34772)
         assert(upgrade and minimum.destroyed)
         equal(upgrade.tooltip, "Spring cleaner 9000")
@@ -617,13 +625,16 @@ return function(test, equal, client, pretty)
         end)
         equal(account:readQuest("FIXTURE_QUEST").completed, true)
         Event.VarTransmit.emit({ var = { id = 999 } })
+        settleAccount()
         equal(updates, 0)
         Event.VarTransmit.emit({ var = { id = 321 } })
+        settleAccount()
         equal(updates, 1)
         config.Quest.FIXTURE_QUEST.hasFinishedQuest = false
         equal(account:readQuest("FIXTURE_QUEST").completed, false)
         account:bindProfile("Another")
         Event.VarTransmit.emit({ var = { id = 321 } })
+        settleAccount()
         equal(updates, 1)
         account:destroy()
         equal(Event.VarTransmit.count(), 0)
@@ -796,12 +807,15 @@ return function(test, equal, client, pretty)
         -- A genuinely low level, or unavailable live level, still cannot pass.
         level = 10
         Event.SkillTransmit.emit({})
+        settleAccount()
         assert(not prettyui:findMethod("Smelting steel bars"))
         level = nil
         Event.SkillTransmit.emit({})
+        settleAccount()
         assert(not prettyui:findMethod("Smelting steel bars"))
         level = 50
         Event.SkillTransmit.emit({})
+        settleAccount()
         assert(prettyui:findMethod("Smelting steel bars"))
 
         PluginShutdown()
@@ -854,6 +868,7 @@ return function(test, equal, client, pretty)
         hasHatchet = true
         Event.SkillTransmit.emit({})
         Event.InventoryUpdated.emit({ inv = config.Inv.INV })
+        settleAccount()
         assert(prettyui:findMethod("Cutting elder logs"))
         prettyui:findMethod("Cutting elder logs")()
         local detail = prettyui.views[#prettyui.views]
@@ -890,6 +905,7 @@ return function(test, equal, client, pretty)
         equal(hatchetSlots(), 1)
         hasHatchet = false
         Event.InventoryUpdated.emit({ inv = config.Inv.INV })
+        settleAccount()
         equal(hatchetSlots(), 0)
 
         -- No match: no coverage note next to the empty slot.
@@ -899,6 +915,7 @@ return function(test, equal, client, pretty)
         end
         hasHatchet = true
         Event.InventoryUpdated.emit({ inv = config.Inv.INV })
+        settleAccount()
         equal(hatchetSlots(), 1)
         PluginShutdown()
 
@@ -988,8 +1005,123 @@ return function(test, equal, client, pretty)
         equal(questLabel.rgba, Style.bad)
         config.Quest.TEMPLE_AT_SENNTISTEN.hasFinishedQuest = true
         Event.VarTransmit.emit({ var = { id = 333 } })
+        settleAccount()
         equal(questLabel.rgba, Style.good)
         PluginShutdown()
+    end)
+
+    -- Shops, loot windows and the GE fire inventory events too. Only the backpack,
+    -- worn gear and bank can change what we show, so the rest are ignored.
+    test("inventory events from containers we don't read are ignored", function()
+        client()
+        local reasons = {}
+        local account = Account.new(function(reason)
+            reasons[#reasons + 1] = reason
+        end)
+
+        Event.InventoryUpdated.emit({ inv = { id = 555 } })
+        Event.InventoryRemoved.emit({ inv = { id = 555 } })
+        equal(#reasons, 0)
+
+        Event.InventoryUpdated.emit({ inv = config.Inv.WORN })
+        equal(#reasons, 1)
+        equal(reasons[1], "inventory")
+        account:destroy()
+    end)
+
+    -- A bank deposit can fire lots of events in one tick. They should cost one
+    -- pass over the activities, on the next tick, not one pass each.
+    test("a burst of account events refreshes once, on the next tick", function()
+        client()
+        prettyui = pretty()
+        gepl = nil
+        dofile("main.lua")
+        Event.ContentLayerReady.emit({ component = { width = 1000, height = 740 } })
+        prettyui:findButton("Open Profit Path")()
+
+        -- Count how many activities get checked.
+        local original = Requirements.evaluateAccess
+        local checks = 0
+        Requirements.evaluateAccess = function(...)
+            checks = checks + 1
+            return original(...)
+        end
+
+        Event.InventoryUpdated.emit({ inv = config.Inv.INV })
+        settleAccount()
+        local onePass = checks
+        assert(onePass > 0, "One event should still refresh")
+
+        checks = 0
+
+        for _ = 1, 10 do
+            Event.InventoryUpdated.emit({ inv = config.Inv.INV })
+        end
+
+        Event.SkillTransmit.emit({})
+        Event.InventoryAdded.emit({ inv = config.Inv.BANK })
+        equal(checks, 0)
+        settleAccount()
+        equal(checks, onePass)
+
+        -- Shutting down with a refresh still waiting cancels it.
+        Event.SkillTransmit.emit({})
+        PluginShutdown()
+        settleAccount()
+        equal(checks, onePass)
+        Requirements.evaluateAccess = original
+    end)
+
+    -- Browse shares gear answers across all activities (the memo). That must be
+    -- a pure speed-up: every activity's verdict tree comes out exactly the same.
+    test("sharing gear answers across activities gives identical verdicts", function()
+        client()
+        local catalogue = require("src/data/method_data")
+
+        -- Own every third piece of each gear group, with middling levels, so the
+        -- checks land on a mix of met, unmet and unknown.
+        local items, skills = {}, {}
+
+        for _, group in pairs(catalogue.equipment) do
+            for index, candidate in ipairs(group.candidates) do
+                if index % 3 == 0 then
+                    items[candidate.item_id] = { status = "available", verified = true, quantity = 1, complete = true }
+                end
+
+                for skill in pairs(candidate.skills) do
+                    skills[skill] = { status = "available", level = 70 }
+                end
+            end
+        end
+
+        local evidence = { skills = skills, quests = {}, items = items, equipment = catalogue.equipment }
+
+        local function same(left, right, path)
+            if type(left) ~= "table" or type(right) ~= "table" then
+                assert(left == right, "Verdicts differ at " .. path)
+                return
+            end
+
+            assert(left ~= right, "Two activities share a table at " .. path)
+
+            for key, value in pairs(left) do
+                same(value, right[key], path .. "." .. tostring(key))
+            end
+
+            for key in pairs(right) do
+                assert(left[key] ~= nil, "Verdicts differ at " .. path .. "." .. tostring(key))
+            end
+        end
+
+        local memo = {}
+
+        for _, method in ipairs(catalogue.methods) do
+            local alone = Requirements.evaluateAccess(method.requirements, evidence)
+            local shared = Requirements.evaluateAccess(method.requirements, evidence, memo)
+            same(alone, shared, method.id)
+        end
+
+        assert(next(memo), "The gear checks should have used the memo")
     end)
 
 end

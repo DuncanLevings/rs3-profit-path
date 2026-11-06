@@ -26,11 +26,100 @@ local function nonNegativeInteger(value)
     return type(value) == "number" and value >= 0 and value < math.huge and value % 1 == 0
 end
 
+-- The best usable item in a gear group for one check. Returns status, reason,
+-- the evidence entry (or nil) and the last-seen-absent hint.
+local function gearVerdict(requirement, account, group)
+    local best, saved, uncertain = nil, nil, false
+    local lastKnownAbsent, candidateCount = true, 0
+
+    -- The combat equipment group has thousands of pieces; bySlot (built by
+    -- main.lua) lets a "T90+ weapon" check look at weapons only.
+    local candidates = requirement.slot and group.bySlot and group.bySlot[requirement.slot] or group.candidates
+
+    for _, candidate in ipairs(candidates) do
+        local matches = candidate.tier >= (requirement.minimum_tier or 0)
+            and (not requirement.style or candidate.style == requirement.style)
+            and (not requirement.slot or candidate.slot == requirement.slot)
+            and (not requirement.armour_type or candidate.armour_type == requirement.armour_type)
+
+        local owned = account.items and account.items[candidate.item_id]
+
+        -- The client's name for this ID didn't match, so we can't trust
+        -- it. If they don't own it, just skip it; if they do, the result
+        -- has to stay unknown.
+        if matches and owned and owned.verified == false then
+            matches = false
+
+            if nonNegativeInteger(owned.quantity) and owned.quantity > 0 then
+                uncertain = true
+            end
+        end
+
+        if matches then
+            local usable = true
+            candidateCount = candidateCount + 1
+            lastKnownAbsent = lastKnownAbsent and owned ~= nil and owned.lastKnownAbsent == true
+
+            for skill, level in pairs(candidate.skills) do
+                local evidence = account.skills and account.skills[skill]
+
+                if not available(evidence) or not nonNegativeInteger(evidence.level) then
+                    usable = false
+                    uncertain = true
+                elseif evidence.level < level then
+                    usable = false
+                end
+            end
+
+            if available(owned) and nonNegativeInteger(owned.quantity) and owned.quantity > 0 and usable then
+                if not best or candidate.tier > best.tier then
+                    best = { itemId = candidate.item_id, tier = candidate.tier, toolbelt = owned.toolbelt == true }
+                end
+            elseif not available(owned) or not owned.complete or not nonNegativeInteger(owned.quantity) then
+                uncertain = true
+            end
+
+            if owned and nonNegativeInteger(owned.savedQuantity) and owned.savedQuantity > 0 and usable then
+                if not saved or candidate.tier > saved.tier then
+                    saved = { itemId = candidate.item_id, tier = candidate.tier, saved = true }
+                end
+            end
+        end
+    end
+
+    if best then
+        return "met", "Owned equipment meets the listed tier and use levels.", best
+    end
+
+    if saved then
+        return "unknown", "A suitable item was seen in saved data; verify it in game.", saved
+    end
+
+    -- Every place was read and none of the listed items is there: Missing.
+    -- (The lists cover the items players really use; a rare variant we
+    -- don't list would show as Missing, which is the safe way round.)
+    --
+    -- A named minimum can keep its red border after the bank closes, but
+    -- that's only a last-seen hint, never a failed check.
+    local absent = candidateCount > 0 and lastKnownAbsent
+
+    if uncertain then
+        return "unknown", "Some of your items haven't been read yet; open your bank once.", nil, absent
+    end
+
+    return "unmet", "No usable matching equipment was found in checked storage.", nil, absent
+
+    -- A named minimum can keep its red border after the bank closes, but
+    -- that's only a last-seen hint, never a failed check.
+end
+
 -- `requirement` is one node from the method data: a group ("all"/"any" with children)
 -- or a single check ("skill", "quest", "item", ...). `account` holds plain evidence
 -- tables: skills, quests, items, flags, achievements, combat and equipment (see
--- refreshEvidence in src/main.lua).
-function Requirements.evaluate(requirement, account)
+-- refreshEvidence in src/main.lua). `memo` is optional: pass the same empty table
+-- when checking many activities against the same evidence, and repeated gear checks
+-- are only worked out once.
+function Requirements.evaluate(requirement, account, memo)
     local kind = requirement.kind
 
     -- Groups: check every child first, then combine their answers.
@@ -39,7 +128,7 @@ function Requirements.evaluate(requirement, account)
         local met, unmet, unknown, ignored = 0, 0, 0, 0
 
         for index, child in ipairs(requirement.children) do
-            local checked = Requirements.evaluate(child, account)
+            local checked = Requirements.evaluate(child, account, memo)
             children[index] = checked
 
             -- Left out of the count (see the top of this file).
@@ -189,86 +278,31 @@ function Requirements.evaluate(requirement, account)
             return result(requirement, "unknown", "Equipment alternatives are not mapped yet.")
         end
 
-        local best, saved, uncertain = nil, nil, false
-        local lastKnownAbsent, candidateCount = true, 0
+        -- Lots of activities ask for the same gear (say, a T80+ melee weapon), and
+        -- the combat group has thousands of pieces. Within one pass over all
+        -- activities, `memo` keeps each answer so the scan runs once per check.
+        local key = table.concat({ requirement.equipment_group, requirement.slot or "", requirement.style or "",
+            requirement.minimum_tier or 0, requirement.armour_type or "" }, "|")
+        local verdict = memo and memo[key]
 
-        -- The combat equipment group has thousands of pieces; bySlot (built by
-        -- main.lua) lets a "T90+ weapon" check look at weapons only.
-        local candidates = requirement.slot and group.bySlot and group.bySlot[requirement.slot] or group.candidates
+        if not verdict then
+            verdict = { gearVerdict(requirement, account, group) }
 
-        for _, candidate in ipairs(candidates) do
-            local matches = candidate.tier >= (requirement.minimum_tier or 0)
-                and (not requirement.style or candidate.style == requirement.style)
-                and (not requirement.slot or candidate.slot == requirement.slot)
-                and (not requirement.armour_type or candidate.armour_type == requirement.armour_type)
-
-            local owned = account.items and account.items[candidate.item_id]
-
-            -- The client's name for this ID didn't match, so we can't trust
-            -- it. If they don't own it, just skip it; if they do, the result
-            -- has to stay unknown.
-            if matches and owned and owned.verified == false then
-                matches = false
-
-                if nonNegativeInteger(owned.quantity) and owned.quantity > 0 then
-                    uncertain = true
-                end
-            end
-
-            if matches then
-                local usable = true
-                candidateCount = candidateCount + 1
-                lastKnownAbsent = lastKnownAbsent and owned ~= nil and owned.lastKnownAbsent == true
-
-                for skill, level in pairs(candidate.skills) do
-                    local evidence = account.skills and account.skills[skill]
-
-                    if not available(evidence) or not nonNegativeInteger(evidence.level) then
-                        usable = false
-                        uncertain = true
-                    elseif evidence.level < level then
-                        usable = false
-                    end
-                end
-
-                if available(owned) and nonNegativeInteger(owned.quantity) and owned.quantity > 0 and usable then
-                    if not best or candidate.tier > best.tier then
-                        best = { itemId = candidate.item_id, tier = candidate.tier, toolbelt = owned.toolbelt == true }
-                    end
-                elseif not available(owned) or not owned.complete or not nonNegativeInteger(owned.quantity) then
-                    uncertain = true
-                end
-
-                if owned and nonNegativeInteger(owned.savedQuantity) and owned.savedQuantity > 0 and usable then
-                    if not saved or candidate.tier > saved.tier then
-                        saved = { itemId = candidate.item_id, tier = candidate.tier, saved = true }
-                    end
-                end
+            if memo then
+                memo[key] = verdict
             end
         end
 
-        if best then
-            return result(requirement, "met", "Owned equipment meets the listed tier and use levels.", { best })
+        -- Copy the evidence entry, so two activities never share one table.
+        local entry = verdict[3]
+        local evidence = nil
+
+        if entry then
+            evidence = { { itemId = entry.itemId, tier = entry.tier, toolbelt = entry.toolbelt, saved = entry.saved } }
         end
 
-        if saved then
-            return result(requirement, "unknown", "A suitable item was seen in saved data; verify it in game.", { saved })
-        end
-
-        local checked
-
-        -- Every place was read and none of the listed items is there: Missing.
-        -- (The lists cover the items players really use; a rare variant we
-        -- don't list would show as Missing, which is the safe way round.)
-        if uncertain then
-            checked = result(requirement, "unknown", "Some of your items haven't been read yet; open your bank once.")
-        else
-            checked = result(requirement, "unmet", "No usable matching equipment was found in checked storage.")
-        end
-
-        -- A named minimum can keep its red border after the bank closes, but
-        -- that's only a last-seen hint, never a failed check.
-        checked.lastKnownAbsent = candidateCount > 0 and lastKnownAbsent
+        local checked = result(requirement, verdict[1], verdict[2], evidence)
+        checked.lastKnownAbsent = verdict[4]
         return checked
     end
 
@@ -309,8 +343,8 @@ end
 -- Evaluate Required checks for the overall verdict. An empty list, or one
 -- containing only ignored checks, counts as met; those ignored checks remain
 -- visible on the activity page.
-function Requirements.evaluateAccess(requirements, account)
-    local checked = Requirements.evaluate(requirements.access, account)
+function Requirements.evaluateAccess(requirements, account, memo)
+    local checked = Requirements.evaluate(requirements.access, account, memo)
 
     if checked.ignored then
         checked.status = "met"

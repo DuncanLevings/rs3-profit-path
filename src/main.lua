@@ -23,21 +23,63 @@ function App.start()
     local view, calculator
     local snapshot = Snapshot.new(PersistentDB)
 
-    -- When the account changes, refresh whatever's on screen. A game-state change
-    -- (login, logout, world hop) is different: the game area our window hangs off may
-    -- have been replaced, so we throw the window away instead of trusting it.
+    -- Account changes waiting for the next Logic tick, as a set like
+    -- { inventory = true }. A bank deposit can fire dozens of inventory events in
+    -- one tick, and each refresh re-checks every activity, so we collect them and
+    -- refresh once per tick instead of once per event.
+    local REFRESH_EVENT = "profit-path-account-refresh"
+    local pendingReasons = nil
+
+    local function cancelRefresh()
+        if pendingReasons then
+            pendingReasons = nil
+            Event.Logic.Unsubscribe(REFRESH_EVENT)
+        end
+    end
+
+    local function runRefresh()
+        local reasons = pendingReasons
+        cancelRefresh()
+
+        if not active or not reasons or not view or not view.interactive then
+            return
+        end
+
+        calculator:refreshEvidence(reasons)
+
+        -- The activity page only skips redrawing for inventory-only changes.
+        local screenReason = "inventory"
+
+        for reason in pairs(reasons) do
+            if reason ~= "inventory" then
+                screenReason = reason
+            end
+        end
+
+        view:refresh(screenReason)
+    end
+
+    -- When the account changes, refresh whatever's on screen (on the next tick,
+    -- see above). A game-state change (login, logout, world hop) is different: the
+    -- game area our window hangs off may have been replaced, so we throw the window
+    -- away straight away instead of trusting it.
     local account = Account.new(function(reason)
         if not view then
             return
         end
 
         if reason == "game_state" then
+            cancelRefresh()
             calculator.evidence = nil
             calculator.ownershipEvidence = nil
             view:destroyWindow()
         elseif view.interactive then
-            calculator:refreshEvidence(reason)
-            view:refresh(reason)
+            if not pendingReasons then
+                pendingReasons = {}
+                Event.Logic.Subscribe(REFRESH_EVENT, runRefresh)
+            end
+
+            pendingReasons[reason] = true
         end
     end, snapshot, catalogue.toolbelt)
 
@@ -383,12 +425,17 @@ function App.start()
         return nameChecks[itemId]
     end
 
-    -- Refresh only what `reason` could have changed: an inventory change doesn't
-    -- re-read skills or quests, for example.
-    function calculator:refreshEvidence(reason)
+    -- Refresh only what changed: an inventory change doesn't re-read skills or
+    -- quests, for example. `reasons` is a set like { skills = true, inventory = true },
+    -- or nil to re-read everything.
+    function calculator:refreshEvidence(reasons)
         local evidence = self.evidence or { skills = {}, quests = {}, items = {}, equipment = equipment }
 
-        if reason == nil or reason == "skills" then
+        local function changed(reason)
+            return reasons == nil or reasons[reason]
+        end
+
+        if changed("skills") then
             evidence.skills = account:readSkills(skillNames)
 
             -- Combat level only changes when a combat skill levels up.
@@ -397,7 +444,7 @@ function App.start()
             end
         end
 
-        if reason == nil or reason == "quests" then
+        if changed("quests") then
             for name in pairs(questNames) do
                 evidence.quests[name] = account:readQuest(name)
             end
@@ -411,7 +458,7 @@ function App.start()
         -- Live counts and saved (last-seen) counts stay separate all the way to the UI.
         -- Alias IDs add to the live count, but saved counts take the biggest, since
         -- they might be the same item seen in two places.
-        if reason == nil or reason == "inventory" then
+        if changed("inventory") then
             self.ownershipEvidence = account:readOwnership(wanted)
             evidence.items = {}
 
@@ -460,9 +507,12 @@ function App.start()
         self.accessChanged = false
 
         -- Work out each activity's Required verdict for Browse's Requirements
-        -- filter (the same verdicts the activity page shows).
+        -- filter (the same verdicts the activity page shows). The memo shares
+        -- repeated gear checks across activities for this pass only.
+        local memo = {}
+
         for _, method in ipairs(browser.methods) do
-            local checked = Requirements.evaluateAccess(method.requirements, evidence)
+            local checked = Requirements.evaluateAccess(method.requirements, evidence, memo)
 
             local previous = browser.readiness[method.id]
             self.accessChanged = self.accessChanged or not previous or previous.status ~= checked.status
@@ -509,6 +559,7 @@ function App.start()
         active = false
 
         Event.ContentLayerReady.Unsubscribe("profit-path-content")
+        cancelRefresh()
         account:destroy()
         view:destroy()
     end

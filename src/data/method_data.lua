@@ -2,11 +2,12 @@
 -- with find(id) for activity lookup.
 -- The packer shares strings and key sets (shapes). Records store a shape number
 -- followed by values in key order; a $ key marks a string reference. Lists start
--- with 0, or -1 for string references.
+-- with 0, or -1 for string references. {-2, n} points at records[n], a record
+-- that several activities share in the file.
 -- Keep this format in sync with catalogue.py: catalogue verify round-trips every
 -- activity against its source.
 local data = require("data/methods")
-assert(data.schema == 1 and data.packing == 1, "Unsupported Profit Path method data")
+assert(data.schema == 1 and data.packing == 2, "Unsupported Profit Path method data")
 
 local strings = data.strings
 
@@ -41,6 +42,13 @@ local function decode(value)
     end
 
     local shape = value[1]
+
+    -- A shared record. Decode it fresh every time: the calculator writes results
+    -- onto requirement nodes, so two activities must never share one table.
+    if shape == -2 then
+        return decode(assert(data.records[value[2]], "Broken record reference in method data"))
+    end
+
     local result = {}
 
     -- Lists: 0 holds numbers/records, -1 holds text.

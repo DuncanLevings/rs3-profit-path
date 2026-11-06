@@ -10,6 +10,7 @@ drop rows and sections. Only import needs an existing Monster Lookup checkout.
 from __future__ import annotations
 
 import argparse
+import collections
 import copy
 import hashlib
 import json
@@ -287,7 +288,7 @@ def unlocks_text():
         "schema=1,",
         "quest_configs=" + lua_literal([config for config, _ in quests]) + ",",
         "quest_names=" + lua_literal([name for _, name in quests]) + ",",
-        "unlocks=" + readable_lua(unlock_entries()) + ",",
+        "unlocks=" + lua_lines(unlock_entries()) + ",",
         "}",
     ]) + "\n"
 
@@ -321,9 +322,8 @@ def verify_unlocks():
     print(f"Verified {len(quests)} quests and {len(entries)} unlocks for custom activities; "
           f"{len(expected.encode('utf-8')):,} runtime bytes.")
 
-# Field order inside the packed Lua rows. monster_data.lua reads these by position
-# (row[1], row[2]...), so if you reorder or add a field here you MUST update that
-# reader too. `verify` will catch it if you forget.
+# Every field a monster record can have in catalogue-source/monsters.json (and the
+# thieving snapshot). The source keeps all of them for provenance and review.
 DROP_FIELDS = (
     "name", "quantity", "rate", "notes", "note_marker", "item_id", "chance",
     "rolls", "quantity_low", "quantity_high", "untradeable",
@@ -336,11 +336,22 @@ SECTION_FIELDS = (
 # out, and trailing empty fields aren't packed, so data/monsters.lua is unchanged.
 MONSTER_FIELDS = ("title", "npc_ids", "sections", "no_drops", "level")
 
+# Only the fields the plugin reads go into data/monsters.lua and data/thieving.lua:
+# loot.lua and the custom activity editor use a drop's name, quantity, rate, notes,
+# item ID and untradeable flag, and a section's title. Section notes and
+# descriptions, NPC IDs, note markers and the rounded "chance" stay in the source.
+# This is also the field order inside the packed rows. monster_data.lua reads them
+# by position (row[1], row[2]...), so if you reorder or add a field here you MUST
+# update that reader too. `verify` will catch it if you forget.
+PACKED_DROP_FIELDS = (
+    "name", "quantity", "rate", "notes", "item_id", "rolls", "quantity_low",
+    "quantity_high", "untradeable",
+)
+PACKED_SECTION_FIELDS = ("title", "drops")
+PACKED_MONSTER_FIELDS = ("title", "sections", "no_drops", "level")
+
 # Text fields get swapped for a number pointing into one shared string list.
-STRING_FIELDS = {
-    "name", "quantity", "rate", "notes", "note_marker", "chance", "title",
-    "description", "afterword", "drop_mode", "no_drops",
-}
+STRING_FIELDS = {"name", "quantity", "rate", "notes", "title", "no_drops"}
 
 
 # Small checkers used by the validators below. Each raises ValueError with a
@@ -567,10 +578,25 @@ def lua_literal(value):
         return "{" + ",".join(lua_literal(item) for item in value) + "}"
 
     if isinstance(value, dict):
-        return "{" + ",".join("[" + lua_literal(key) + "]=" + lua_literal(item)
+        return "{" + ",".join(lua_key(key) + "=" + lua_literal(item)
                                for key, item in sorted(value.items())) + "}"
 
     raise TypeError(f"Cannot write Lua value: {type(value).__name__}")
+
+
+# Words Lua won't accept as a bare table key (`end = 1` is a syntax error).
+LUA_KEYWORDS = {
+    "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if",
+    "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while",
+}
+
+
+def lua_key(key):
+    # `name=` instead of `["name"]=` where Lua allows it: same table, fewer bytes.
+    if isinstance(key, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key) and key not in LUA_KEYWORDS:
+        return key
+
+    return "[" + lua_literal(key) + "]"
 
 
 def array(value):
@@ -578,23 +604,15 @@ def array(value):
     return [value[index] for index in range(1, len(value) + 1)] if value is not None else []
 
 
-def readable_lua(value, depth=0):
-    """Keep the small method catalogue reviewable; packed monster rows use lua_literal."""
-    if not isinstance(value, (dict, list)) or not value:
-        return lua_literal(value)
-
-    indent = "    " * depth
-    entries = []
-
+def lua_lines(value):
+    """A table with one top-level entry per line (no indentation), so the file stays
+    compact but a change to one recipe or unlock is still a one-line diff."""
     if isinstance(value, dict):
-        for key, item in sorted(value.items()):
-            entries.append(f"[{lua_literal(key)}] = {readable_lua(item, depth + 1)}")
+        entries = [lua_key(key) + "=" + lua_literal(item) for key, item in sorted(value.items())]
     else:
-        entries = [readable_lua(item, depth + 1) for item in value]
+        entries = [lua_literal(item) for item in value]
 
-    body = "\n".join(indent + "    " + entry + "," for entry in entries)
-
-    return "{\n" + body + "\n" + indent + "}"
+    return "{\n" + "".join(entry + ",\n" for entry in entries) + "}"
 
 
 def import_monsters(checkout):
@@ -815,13 +833,9 @@ def build_text(source):
             value = record.get(field)
 
             if field == "drops":
-                value = [intern_row(pack(drop, DROP_FIELDS), drops, drop_ids) for drop in value]
+                value = [intern_row(pack(drop, PACKED_DROP_FIELDS), drops, drop_ids) for drop in value]
             elif field == "sections":
-                value = [intern_row(pack(section, SECTION_FIELDS), sections, section_ids) for section in value]
-            elif field == "notes" and isinstance(value, list):
-                value = [intern_string(note) for note in value]
-            elif field == "note_ids":
-                value = [[intern_string(key), number] for key, number in sorted(value.items())]
+                value = [intern_row(pack(section, PACKED_SECTION_FIELDS), sections, section_ids) for section in value]
             elif field in STRING_FIELDS and value is not None:
                 value = intern_string(value)
 
@@ -833,12 +847,48 @@ def build_text(source):
 
         return row
 
-    monsters = [pack(monster, MONSTER_FIELDS) for monster in source["monsters"]]
+    monsters = [pack(monster, PACKED_MONSTER_FIELDS) for monster in source["monsters"]]
+
+    # Renumber so the most-used strings, drops and sections get the smallest
+    # numbers. A reference to "1/128" used 3,000 times then costs 2 digits, not 5.
+    def remap(rows, fields, field, lists, values):
+        position = fields.index(field)
+
+        for row in rows:
+            if position < len(row) and row[position] is not None:
+                row[position] = [values[item] for item in row[position]] if lists else values[row[position]]
+
+    def by_use(table, uses):
+        order = sorted(range(len(table)), key=lambda index: -uses[index + 1])
+        table[:] = [table[index] for index in order]
+
+        return {old + 1: new + 1 for new, old in enumerate(order)}
+
+    # Sections and drops first, then strings (a string's uses include those rows).
+    section_uses = collections.Counter(item for row in monsters for item in row[1])
+    remap(monsters, PACKED_MONSTER_FIELDS, "sections", True, by_use(sections, section_uses))
+
+    drop_uses = collections.Counter(item for row in sections for item in row[1])
+    remap(sections, PACKED_SECTION_FIELDS, "drops", True, by_use(drops, drop_uses))
+
+    string_uses = collections.Counter()
+
+    for rows, fields in ((drops, PACKED_DROP_FIELDS), (sections, PACKED_SECTION_FIELDS), (monsters, PACKED_MONSTER_FIELDS)):
+        for row in rows:
+            string_uses.update(row[index] for index, field in enumerate(fields)
+                               if field in STRING_FIELDS and index < len(row) and row[index] is not None)
+
+    string_ids = by_use(strings, string_uses)
+
+    for rows, fields in ((drops, PACKED_DROP_FIELDS), (sections, PACKED_SECTION_FIELDS), (monsters, PACKED_MONSTER_FIELDS)):
+        for field in fields:
+            if field in STRING_FIELDS:
+                remap(rows, fields, field, False, string_ids)
 
     lines = [
         "-- Generated by src/tools/catalogue.py; do not edit.",
         "-- RuneScape Wiki contributors, CC BY-NC-SA 3.0. See THIRD_PARTY_NOTICES.txt.",
-        "return {", "schema=1,", "built=" + lua_literal(source["source"]["built"]) + ",",
+        "return {", "schema=2,", "built=" + lua_literal(source["source"]["built"]) + ",",
     ]
 
     for name, values in (("strings", strings), ("drops", drops), ("sections", sections), ("monsters", monsters)):
@@ -864,15 +914,24 @@ def decode_record(value, fields):
             continue
 
         if field == "sections":
-            item = [decode_record(section, SECTION_FIELDS) for section in array(item)]
+            item = [decode_record(section, PACKED_SECTION_FIELDS) for section in array(item)]
         elif field == "drops":
-            item = [decode_record(drop, DROP_FIELDS) for drop in array(item)]
-        elif field in {"notes", "npc_ids"} and not isinstance(item, str):
-            item = array(item)
-        elif field == "note_ids":
-            item = dict(item.items())
+            item = [decode_record(drop, PACKED_DROP_FIELDS) for drop in array(item)]
 
         result[field] = item
+
+    return result
+
+
+def packed_view(monster):
+    """The part of a source monster record that goes into the runtime file, in
+    the same shape decode_record gives back. verify() compares the two."""
+    result = {key: monster[key] for key in PACKED_MONSTER_FIELDS if key in monster and key != "sections"}
+    result["sections"] = [
+        {"title": section["title"],
+         "drops": [{key: drop[key] for key in PACKED_DROP_FIELDS if key in drop} for drop in section["drops"]]}
+        for section in monster["sections"]
+    ]
 
     return result
 
@@ -881,6 +940,7 @@ def verify(source, output=OUTPUT, reader_module="src/data/monster_data", what="m
     # Two checks:
     #   1. the generated file on disk is exactly what we'd build now (no stale data)
     #   2. every record read through the real Lua reader matches the JSON exactly
+    #      (the fields that are packed; see PACKED_DROP_FIELDS)
     # The second one is what proves the packing and the reader agree. Thieving
     # targets use the same format and reader, so they're checked the same way.
     expected = build_text(source)
@@ -900,13 +960,13 @@ def verify(source, output=OUTPUT, reader_module="src/data/monster_data", what="m
         if isinstance(decoded, tuple):
             decoded = decoded[0]
 
-        if decoded is None or decode_record(decoded, MONSTER_FIELDS) != original:
+        if decoded is None or decode_record(decoded, PACKED_MONSTER_FIELDS) != packed_view(original):
             raise ValueError(f"Round-trip mismatch: {original['title']}")
 
     compact_bytes = len(expected.encode("utf-8"))
     compact_json_bytes = len(json_text(source["monsters"]).encode("utf-8"))
 
-    print(f"Verified {len(source['monsters'])} complete {what} record round trips; "
+    print(f"Verified {len(source['monsters'])} {what} record round trips; "
           f"{compact_bytes:,} runtime bytes ({compact_bytes / compact_json_bytes:.1%} of equivalent compact JSON).")
 
 
@@ -1088,14 +1148,14 @@ def choose_recipes(source):
 
 def recipes_text(source):
     """The runtime copy: just the chosen recipe per page, with the fields the
-    calculator uses. Wiki bookkeeping (cost markers, other recipes) stays in the
-    JSON source."""
+    calculator uses. Wiki bookkeeping (cost markers, other recipes, page URLs) stays
+    in the JSON source."""
     chosen = choose_recipes(source)
     runtime = {}
 
     for page, recipe in sorted(chosen.items()):
         output = recipe["output"]
-        entry = {"name": output["name"], "quantity": output["quantity"], "url": recipe["url"], "materials": []}
+        entry = {"name": output["name"], "quantity": output["quantity"], "materials": []}
 
         for key in ("portion", "item_id"):
             if key in output:
@@ -1120,7 +1180,7 @@ def recipes_text(source):
     return ("-- Generated by src/tools/catalogue.py from catalogue-source/recipes.json; do not edit.\n"
             "-- " + source.get("licence", "RuneScape Wiki contributors, CC BY-NC-SA 3.0.")
             + " See THIRD_PARTY_NOTICES.txt.\n"
-            "return " + readable_lua(runtime) + "\n")
+            "return " + lua_lines(runtime) + "\n")
 
 
 def verify_recipes(source):
@@ -1803,13 +1863,58 @@ def source_text(value, indent=0, lead=0, width=110):
 #   - every distinct set of record keys (a "shape") is stored once in `shapes`
 #   - a record is then {shape number, value, value, ...} in the shape's key order
 #   - a list is {0, value, value, ...}, or {-1, text number, ...} for a list of text
+#   - a record that appears in several methods (the same requirement check, the
+#     same drop row) is stored once in `records` and used as {-2, record number}
 #
 # A key starting with "$" in a shape means "this value is a text number". That's
 # how the reader (src/data/method_data.lua) tells text apart from real numbers.
 
+# A repeated record is only shared when it's at least this long as JSON. Below
+# that, the {-2,1234} reference saves too little to be worth the indirection.
+SHARED_RECORD_MIN = 40
+
+def runtime_method(method):
+    """A full method record minus the fields the plugin never reads. The Wiki URL
+    and revision (the title stays), the research-status summary and the members
+    flag are kept in the source and the merge report, not in data/methods.lua."""
+    result = {key: value for key, value in method.items() if key not in ("research", "members")}
+
+    if "source" in method:
+        result["source"] = {key: value for key, value in method["source"].items() if key not in ("url", "revision")}
+
+    return result
+
+
 def pack_methods(catalogue):
     strings, string_ids = [], {}
     shapes, shape_ids = [], {}
+    records, record_ids = [], {}
+    runtime = [runtime_method(method) for method in catalogue["methods"]]
+
+    # Count every record and string across all methods first, so we know which
+    # records repeat and which strings are used most.
+    seen = collections.Counter()
+    words = collections.Counter()
+
+    def count(value):
+        if isinstance(value, dict):
+            seen[json_text(value)] += 1
+        elif isinstance(value, str):
+            words[value] += 1
+
+        for item in value.values() if isinstance(value, dict) else value if isinstance(value, list) else ():
+            count(item)
+
+    for method in runtime:
+        for item in method.values():
+            count(item)
+
+    shared = {key for key, times in seen.items() if times > 1 and len(key) >= SHARED_RECORD_MIN}
+
+    # The most-used strings get the smallest numbers, so references are shorter.
+    for word, _ in words.most_common():
+        string_ids[word] = len(strings) + 1
+        strings.append(word)
 
     def text(value):
         if value not in string_ids:
@@ -1818,7 +1923,17 @@ def pack_methods(catalogue):
 
         return string_ids[value]
 
-    def pack(value):
+    def pack(value, share=True):
+        if isinstance(value, dict) and share and json_text(value) in shared:
+            key = json_text(value)
+
+            if key not in record_ids:
+                record_ids[key] = len(records) + 1
+                records.append(None)
+                records[record_ids[key] - 1] = pack(value, share=False)
+
+            return [-2, record_ids[key]]
+
         if isinstance(value, dict):
             # nil fields simply don't exist in Lua, so leave them out of the shape.
             fields = [(key, value[key]) for key in sorted(value) if value[key] is not None]
@@ -1853,13 +1968,14 @@ def pack_methods(catalogue):
     equipment = pack(catalogue.get("equipment", {}))
     toolbelt = pack(catalogue.get("toolbelt", {}))
     icons = pack(catalogue.get("icons", {}))
-    methods = [pack(method) for method in catalogue["methods"]]
+    # A whole method is never shared (each has its own ID), only records inside one.
+    methods = [pack(method, share=False) for method in runtime]
 
     lines = [
         "-- Generated by src/tools/catalogue.py from catalogue-source/methods.json; do not edit.",
         "-- RuneScape Wiki contributors, CC BY-NC-SA 3.0. See THIRD_PARTY_NOTICES.txt.",
         "-- Packed: read it through src/data/method_data.lua, never directly.",
-        "return {", "schema=1,", "packing=1,",
+        "return {", "schema=1,", "packing=2,",
         "items=" + lua_literal(items) + ",",
         "equipment=" + lua_literal(equipment) + ",",
         "toolbelt=" + lua_literal(toolbelt) + ",",
@@ -1867,7 +1983,7 @@ def pack_methods(catalogue):
     ]
 
     # One line per string, shape and method keeps diffs readable.
-    for name, values in (("strings", strings), ("shapes", shapes), ("methods", methods)):
+    for name, values in (("strings", strings), ("shapes", shapes), ("records", records), ("methods", methods)):
         lines.append(name + "={")
         lines.extend(lua_literal(value) + "," for value in values)
         lines.append("},")
@@ -1948,7 +2064,7 @@ def build_catalogue(recipe_source, monsters=None):
 
 def verify_methods(monsters, recipe_source):
     # Same idea as verify(): the file on disk must match a fresh build, and every
-    # method read back through the plugin's own reader must equal its full record.
+    # method read back through the plugin's own reader must equal its runtime record.
     catalogue = build_catalogue(recipe_source, monsters)
     recipes = choose_recipes(recipe_source) if recipe_source else None
     expected = methods_text(catalogue, monsters, recipes)
@@ -1966,7 +2082,7 @@ def verify_methods(monsters, recipe_source):
             raise ValueError(f"Method data round-trip mismatch: {key}")
 
     for method in catalogue["methods"]:
-        if from_lua(decoded.find(method["id"])) != plain(method):
+        if from_lua(decoded.find(method["id"])) != plain(runtime_method(method)):
             raise ValueError(f"Method data round-trip mismatch: {method['id']}")
 
     if len(decoded.methods) != len(catalogue["methods"]):

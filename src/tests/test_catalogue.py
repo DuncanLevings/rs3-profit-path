@@ -58,7 +58,9 @@ class CatalogueTests(unittest.TestCase):
         source = fixture()
         decoded = reader(source).find(source["monsters"][0]["title"])
 
-        self.assertEqual(catalogue.decode_record(decoded, catalogue.MONSTER_FIELDS), source["monsters"][0])
+        # Only the fields the plugin reads are packed (npc_ids stay in the source).
+        self.assertEqual(catalogue.decode_record(decoded, catalogue.PACKED_MONSTER_FIELDS),
+                         catalogue.packed_view(source["monsters"][0]))
 
     def test_shares_rows_without_sharing_mutable_results(self):
         # Two monsters with identical drops should share one stored section and one
@@ -78,12 +80,12 @@ class CatalogueTests(unittest.TestCase):
         lookup = reader(source)
         first = lookup.find(source["monsters"][0]["title"])
         first.sections[1].drops[1].name = "Mutated"
-        first.npc_ids[1] = 999
+        first.sections[1].title = "Mutated"
 
         second = lookup.find("Another boss")
 
         self.assertEqual(second.sections[1].drops[1].name, "Fixture item")
-        self.assertEqual(second.npc_ids[1], 10)
+        self.assertEqual(second.sections[1].title, "Hard mode")
 
     def test_unknown_and_known_empty_tables_are_distinct(self):
         # "We don't have this monster" and "this monster drops nothing" are different.
@@ -712,9 +714,10 @@ class ShortSourceTests(unittest.TestCase):
         reader = loaded[0] if isinstance(loaded, tuple) else loaded
 
         method = catalogue_data["methods"][0]
-        self.assertEqual(catalogue.from_lua(reader.find("fixture-method")), catalogue.plain(method))
+        self.assertEqual(catalogue.from_lua(reader.find("fixture-method")), catalogue.plain(catalogue.runtime_method(method)))
         self.assertEqual(catalogue.from_lua(reader["items"]), catalogue.plain(catalogue_data["items"]))
-        self.assertIs(reader.find("fixture-method")["members"], True)
+        # The members flag stays in the source; nothing in the plugin reads it.
+        self.assertIsNone(reader.find("fixture-method")["members"])
         self.assertIsNone(reader.find("missing"))
 
         # Repeated text is stored once.

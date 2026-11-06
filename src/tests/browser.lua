@@ -1468,6 +1468,7 @@ return function(test, equal, client, pretty)
         bankAvailable = true
         owned = false
         Event.InventoryUpdated.emit({ inv = config.Inv.INV })
+        settleAccount()
 
         for _, border in ipairs(items.rectangles) do
             equal(border.rgba, Style.bad)
@@ -1477,6 +1478,7 @@ return function(test, equal, client, pretty)
         -- absence. It must not erase a red border or invent live coverage.
         bankAvailable = false
         Event.InventoryRemoved.emit({ inv = config.Inv.BANK })
+        settleAccount()
 
         for _, border in ipairs(items.rectangles) do
             equal(border.rgba, Style.bad)

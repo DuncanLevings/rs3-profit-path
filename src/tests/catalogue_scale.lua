@@ -157,11 +157,11 @@ return function(test, equal, client, pretty)
         Event.ContentLayerReady.emit({ component = { width = 1200, height = 900 } })
         prettyui:findButton("Open Profit Path")()
 
-        -- A per-hour Wiki guide: steel bars' neighbour on the Wiki, from the snapshot.
+        -- A per-hour Wiki guide from the snapshot (only those count "% of guide pace").
         local imported
 
         for _, method in ipairs(catalogue.methods) do
-            if method.research and method.research.income == "wiki" and method.income.rate.unit == "% of guide pace" then
+            if method.income.rate.unit == "% of guide pace" then
                 imported = method
                 break
             end
