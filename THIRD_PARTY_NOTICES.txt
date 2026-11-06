@@ -1,4 +1,12 @@
-Profit Path: monster and drop reference snapshot
+Profit Path: third-party notices
+
+Profit Path's code is written independently. The bundled reference data in data/
+is derived from the sources below. The editable sources, with their page revisions,
+retrieval dates and hashes, are kept in catalogue-source/ (not shipped).
+
+-------------------------------------------------------------------------------
+RuneScape Wiki
+-------------------------------------------------------------------------------
 
 RuneScape Wiki contributors
 https://runescape.wiki/
@@ -6,129 +14,69 @@ https://runescape.wiki/w/RuneScape:Copyrights
 Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported
 https://creativecommons.org/licenses/by-nc-sa/3.0/
 
-Derived from the local static snapshot bundled in DuncanLevings/rs3-monster-lookup:
+Derived from the Wiki (Bucket and MediaWiki APIs, retrieved 2026-10-28 to
+2026-11-04 with the User-Agent "ProfitPath-development (Discord: Tatsuya)"):
+
+- Money making guides: every current guide's income, requirements and
+  {{MMGWarning}} warnings, pinned to each page's revision. Guides the Wiki marks
+  as obsolete are left out.
+  https://runescape.wiki/w/Bucket:Money_making_guide
+- Guide summaries and travel directions for the How to do it and Getting there
+  tabs, from the same revisions and from area pages. Complete sentences were
+  selected, shortened and reworded; no full strategy guides or images are copied.
+- Item, outfit and equipment data: item IDs, outfit pieces, gear tiers and use
+  levels (e.g. https://runescape.wiki/w/Hatchets?oldid=37191363).
+  https://runescape.wiki/w/Bucket:Infobox_item
+- Creation-cost recipes for untradeable Herblore and Summoning supplies.
+  https://runescape.wiki/w/Bucket:Recipe
+- Grand Exchange item names and thieving loot (pickpocket NPCs and stalls), for
+  the custom activity editor.
+  https://runescape.wiki/w/Bucket:Dropsline
+- Spell, prayer and achievement requirements used by unlock checks.
+
+Monster drop tables come from the Wiki-derived snapshot bundled in the author's
+Monster Lookup plugin (built 2026-10-22), which doesn't record per-page revisions:
 https://github.com/DuncanLevings/rs3-monster-lookup
-Its embedded data was built 2026-10-22. The inherited bundle does not provide
-individual article revision IDs; this snapshot is not a claim of current Wiki data.
+Profit Path keeps each monster's drop sections, rates, quantities, roll counts and
+notes, and leaves out stats, locations and prices. It is not a claim of current
+Wiki data.
 
-Profit Path retains monster identity, drop sections, rates, quantities, roll counts,
-conditions and notes. It omits monster stats, maps, locations, search indexes and
-historical prices, and records rows labelled Not sold as untradeable reference data.
-Repeated strings, drop rows and sections are shared in generated Lua tables.
-
-Editable source, exact input hashes and full inherited source notices are recorded
-in catalogue-source/monsters.json and catalogue-source/monster-source-notices.txt.
-These are maintainer inputs; runtime uses data/monsters.lua and monster_data.lua.
-No Monster Data Core runtime dependency or implementation code is bundled.
-
-Representative method records (summarised and normalised by Profit Path):
-https://runescape.wiki/w/Money_making_guide/Smelting_steel_bars?oldid=36866574
-https://runescape.wiki/w/Money_making_guide/Cutting_elder_logs?oldid=37041274
-https://runescape.wiki/w/Money_making_guide/Killing_abyssal_demons?oldid=37017140
-
-Equipment alternatives and use-level reference data were normalised from Wiki
-item pages on 2026-10-29. Per-item revision URLs are retained in
-catalogue-source/methods.json and data/methods.lua. Hatchet tiers here mean cutting
-performance, not combat weapon tiers. Cutting-power comparison and use levels:
-https://runescape.wiki/w/Hatchets?oldid=37191363
-The Wiki attribution and content license above apply.
-
-Tool-belt variable names, enum names and indexing offsets come from native beta
-client metadata and developer display verification on 2026-10-29. The reader uses
-the native item enums rather than bundling copied item mappings. Other tool-belt
-categories and unlisted equipment variants remain unverified.
-
-Additional item identifiers:
-https://runescape.wiki/w/Steel_bar?oldid=37134793
-https://runescape.wiki/w/Elder_logs?oldid=37166250
-https://runescape.wiki/w/Spring?oldid=37186141
-https://runescape.wiki/w/Elder_wood_spirit?oldid=36950369
-
-Retrieved 2026-10-28 using MediaWiki API. Wiki contributor attribution and the
-CC BY-NC-SA 3.0 content license above also apply to this derived reference data.
-
-Calculator reference reviewed 2026-10-28:
-https://runescape.wiki/w/Template:Mmgtable/doc?oldid=36863324
+Changes made by Profit Path: data is normalised and packed into Lua tables; Wiki
+markup is reduced to plain text; and some guide figures are recalculated, for
+example supplies priced from live GE prices or their recipe, and Abyssal demon
+salvage valued at its high-alchemy return. Profit uses GE Prices Library quotes,
+not the Wiki's prices. The calculator follows the Wiki's Mmgtable conventions
+(per-hour and per-kill inputs, output tax rounded per item, ROI on cost) but is
+independently written:
 https://runescape.wiki/w/Module:Mmgtable?oldid=37167449
-The source establishes per-hour/per-kill input distinctions, per-item output tax
-rounding and cost-based ROI. Profit Path's calculator is independently written.
-It uses GEPL instant-buy input and instant-sell output trade quotes instead of
-the Wiki's guide prices. Zero-cost ROI is shown as not applicable, not infinity.
 
-Creation-cost recipes (untradeable Herblore and Summoning supplies)
-Derived from the RuneScape Wiki's recipe and infobox_item structured data (Bucket API),
-retrieved 2026-10-29 with User-Agent "ProfitPath-development (Discord: Tatsuya)".
-https://runescape.wiki/w/Bucket:Recipe
-https://runescape.wiki/w/Bucket:Infobox_item
-Each recipe keeps its source page URL in catalogue-source/recipes.json. Wiki contributor
-attribution and the CC BY-NC-SA 3.0 licence above apply. Runtime uses data/recipes.lua.
+-------------------------------------------------------------------------------
+PvM Encyclopedia (PvME)
+-------------------------------------------------------------------------------
 
-Money making guide snapshot (the shipped activity catalogue)
-Derived from the RuneScape Wiki's money_making_guide and infobox_item structured data (Bucket API)
-and page revision IDs, retrieved 2026-10-29 with User-Agent "ProfitPath-development (Discord: Tatsuya)".
-https://runescape.wiki/w/Bucket:Money_making_guide
-https://runescape.wiki/w/Bucket:Infobox_item
-Each guide in catalogue-source/wiki/guides.jsonl records its page title and revision. Outfit pieces in
-catalogue-source/research/outfits.json come from each outfit page's set infobox, with its revision. Guides the Wiki
-marks as obsolete are not included. Wiki contributor attribution and the CC BY-NC-SA 3.0 licence above apply.
-Guide warnings ({{MMGWarning}} reasons) in catalogue-source/wiki/warnings.json are read from each guide page at its
-snapshot revision; the same attribution and licence apply.
-
-GE item names and thieving loot (custom activities, 2026-11-04)
-Derived from the RuneScape Wiki's infobox_item and dropsline structured data (Bucket API),
-category listings (Category:Thievable entities, Category:Stalls) and page revision IDs,
-retrieved 2026-11-04 with User-Agent "ProfitPath-development (Discord: Tatsuya)".
-https://runescape.wiki/w/Bucket:Infobox_item
-https://runescape.wiki/w/Bucket:Dropsline
-Item names are kept only for items with a Grand Exchange page; items the Wiki gives two
-names or an unversioned second ID are left out (listed in catalogue-source/ge-items.json).
-Thieving loot keeps only rows of drop type "thieving", grouped into one target per page or
-page version; each target records its page revision in catalogue-source/thieving.json.
-Note markup is reduced to plain text. Wiki contributor attribution and the CC BY-NC-SA 3.0
-licence above apply. Runtime uses data/ge_items.lua and data/thieving.lua.
-
-rsprite development reference
-Sprite names were identified during development using rsprite 0.1.2 by sereselene.
-Profit Path resolves these names through the client directly and does not require rsprite at runtime.
-Project: https://github.com/sereselene/rsprite
-Licence: PolyForm Strict 1.0.0, as supplied with rsprite. Its source code is not copied or bundled here.
-The small native sprite-name registry (data/icons.lua and catalogue-source/research/capabilities.json, whose names were matched against rsprite's reference list) references RuneScape game assets, copyright Jagex Ltd.; Profit Path does not distribute these images or rsprite's list.
-Quest config names in catalogue-source/research/quests.json are client identifiers (Jagex Ltd.) read in game by the author's own Skill Tips probe; only the names Profit Path uses are kept.
-catalogue-source/research/quest-list.json keeps every current quest config name and display name from the same probe, for the custom activity editor's quest search (runtime: data/unlocks.lua). The unlocks in data/unlocks.lua (catalogue-source/research/custom-unlocks.json) reuse the requirement research above: unlock flag names read in the client, and achievement IDs and spell/prayer requirements from the RuneScape Wiki, whose contributor attribution and CC BY-NC-SA 3.0 licence apply.
-
-Abyssal demon output reconciliation, 2026-10-29
-Expected quantities checked against Money making guide/Killing abyssal demons revision 37017140. The method keeps references to the shared drop snapshot. Item source revisions are recorded in catalogue-source/methods.json. Salvage valuation is modified to actual high-alchemy proceeds rather than the source table's GE values (6,000 / 8,000 / 8,000 / 32,000 GP); spring inputs are retained.
-https://runescape.wiki/w/Abyssal_demon
-
-Guide summaries and area travel text (2026-10-30):
-RuneScape Wiki contributors, CC BY-NC-SA 3.0 (licence and URL above).
-Collected via api.php using ProfitPath-development (Discord: Tatsuya).
-Guide prose is pinned to the income snapshot's per-page revisions; area travel
-and access sections retain separate article revision IDs. Complete sentences
-were selected, shortened and normalised; targeted candle/area descriptions were
-summarised separately. No full boss strategy guides or article images copied.
-Source records and transformations are in catalogue-source/research/guide-content.json
-and guide-content-overrides.json. Repeated route strings are shared by the runtime
-packer. Raw cached article responses remain in the external maintainer workspace.
-
-Access/setup requirement audit (2026-10-30):
-RuneScape Wiki contributors, CC BY-NC-SA 3.0. Restored displayed item requirement
-labels for 15 pinned guide variants. Supporting article revisions and review
-reasons are retained in catalogue-source/research/access-requirements.json.
-Tier 1-59 weapon, shield and body-armour records were added from the Wiki
-infobox_bonuses and infobox_item buckets using the identified, paced API client.
-Unresolved Mindspike/Tower mindspike IDs do not establish negative ownership.
-
-PvM difficulty ratings (2026-10-30):
-PvM Encyclopedia (PvME) guide contributors, https://pvme.io/
-https://github.com/pvme/pvme-guides at commit aa2f5ccf0ed92f926b45420ae352d9ff0ffc5876
+PvME guide contributors, https://pvme.io/
+https://github.com/pvme/pvme-guides (commit aa2f5ccf0ed92f926b45420ae352d9ff0ffc5876)
 Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
 https://creativecommons.org/licenses/by-nc-sa/4.0/
-Profit Path's 1-10 difficulty level (and its Easy/Medium/Hard/Elite band) for each PvM method draws on PvME's
-Bossing Path stages, its Slayer guides (whether they offer AFK methods or warn of
-dangerous mechanics) and which bosses have AFK or low-effort guides. No PvME guide
-text is bundled. The 1-10 levels come from the author's RS3 PvM difficulty ladder research
-(30 October 2026; RuneScape Wiki, PvME and community discussion; an analytical scale,
-not an official one). Each rating's short evidence note is in
-catalogue-source/research/difficulty.json. Ratings marked for review are
-Profit Path's own judgement calls.
+
+Profit Path's 1-10 PvM difficulty ratings draw on PvME's Bossing Path stages,
+Slayer guides and AFK guides, together with the Wiki and community discussion.
+The ratings are the author's own judgement; no PvME guide text is bundled.
+
+-------------------------------------------------------------------------------
+rsprite
+-------------------------------------------------------------------------------
+
+rsprite 0.1.2 by sereselene, https://github.com/sereselene/rsprite
+Licence: PolyForm Strict 1.0.0.
+Used during development only, to find the client sprite names in data/icons.lua.
+Profit Path looks those names up in the client itself; no rsprite code or data is
+bundled.
+
+-------------------------------------------------------------------------------
+Jagex
+-------------------------------------------------------------------------------
+
+Quest config names, unlock variable names, tool-belt variables and sprite names
+are RuneScape client identifiers (Jagex Ltd.), read in game by the author. Only
+the names Profit Path uses are kept, and no game images are distributed.
