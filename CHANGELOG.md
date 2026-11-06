@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0 - 2026-11-05
+
+- First release, with everything from the 0.8 development builds below.
+
 ## 0.8 dev - 2026-10-29 to 2026-11-05
 
 - Full catalogue: every current RuneScape Wiki money making guide (674 activities), including daily and weekly runs counted per run.
