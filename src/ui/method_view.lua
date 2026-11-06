@@ -1,13 +1,7 @@
--- Draws one method's screen: a header row plus four tabs (Income, Requirements,
--- How to do it, Getting there).
---
--- This file only draws. The maths, requirement checks and saving all happen in
--- the `calculator` from src/main.lua; we call it and show what it returns. Every
--- control is a child of the `view` passed in, so it all goes away on navigation.
---
--- One rule worth knowing: a refresh only changes label text and colours. It never
--- rebuilds controls, because rebuilding the rate box would kick the player's
--- cursor out of it mid-typing.
+-- Draws an activity header and its Income, Requirements, How to do it and Getting
+-- there tabs. The calculator handles maths, checks and saving.
+-- Controls belong to the parent view. Refresh labels in place where possible so
+-- typing a rate keeps its focus.
 local Style = require("src/ui/view_style")
 local ItemIcon = require("src/ui/item_icon")
 local Loot = require("src/methods/loot")
@@ -35,12 +29,9 @@ local SECOND_LINE_Y = 46
 
 local itemDefinitions = require("src/data/method_data").items
 
--- The client stops any single callback that runs past one second, and native
--- components are slow to make (PrettyUI builds every tooltip up front, about a
--- dozen parts each). A boss with 60 drops plus a long requirements list is too
--- much for one click. So opening a method draws only what's on screen, then
--- the rest a piece per game tick (50 a second): Income rows a batch at a time,
--- then each other tab. Clicking a tab that isn't drawn yet draws it straight away.
+-- Build rows in batches, then the remaining tabs, to stay below the client's
+-- one-second callback limit. Tooltips create several native parts each. Opening
+-- an unfinished tab draws it immediately.
 local ROWS_PER_STEP = 6
 local BUILD_EVENT = "profit-path-method-build"
 
@@ -109,10 +100,8 @@ local function requirementIcons(definition)
     return icons
 end
 
--- A group of tiered gear checks, drawn as one slot per piece instead of one long
--- line of link text: "any one" of several styles (magic, melee, ranged or
--- necromancy armour), or "all" the pieces of one line ("Tier 90+ magic weapon and
--- armour" needs both the weapon and the armour).
+-- Show tiered gear as one slot per check. "Any" groups offer alternatives; "all"
+-- groups require every listed piece.
 local function gearOptions(definition)
     if definition.kind ~= "any" and definition.kind ~= "all" then
         return false
@@ -156,10 +145,8 @@ local function requirementText(text)
     return cleaned
 end
 
--- The hover for an "any"/"all" line that isn't met: what each part reads as,
--- e.g. "Either one will do. Mobile: can't be checked in game. Shadow's Grace:
--- not unlocked yet." Without it, a neutral line doesn't say why it's neutral.
--- A met line needs no explaining, so it gets nil.
+-- Explain each part of an unmet or unknown group on hover. Met groups need no
+-- extra explanation.
 local function partsTooltip(checked)
     if checked.status == "met" or not checked.children then
         return nil
@@ -253,9 +240,7 @@ local function mountRequirements(parent, method, calculator, fitter)
                         y = y + math.ceil(usedSlots / 5) * 44
                         usedSlots = 0
                         entry.y = y
-                        -- A single text line needs 26 units, not the old 42.
-                        -- Keep the existing two-line allowance for longer wording
-                        -- so compact rows don't squeeze wrapped text out of view.
+                        -- Keep a plain text requirement to one line of height.
                         local iconNames = entry.icons or requirementIcons(requirement)
                         local textInset = requirement.equipment_group and 62 or (12 + #iconNames * 26)
                         local textWidth = math.max(1, panelWidth - textInset - 16)
@@ -337,11 +322,9 @@ local function mountRequirements(parent, method, calculator, fitter)
             local y = entry.y
 
             if gearOptions(requirement) then
-                -- One slot per option: an owned match shows its icon, otherwise
-                -- the empty slot's border gives the verdict. The short label sits
-                -- beside it, coloured the same way.
-                -- "Any one" says the slots are alternatives. Without it ("all"),
-                -- every slot is needed, like any other list of items.
+                -- Show the owned item when known; otherwise use an empty slot
+                -- with the verdict colour. "Any one" marks alternatives; other
+                -- groups need every slot.
                 local heading = 0
 
                 if requirement.kind == "any" then
@@ -557,11 +540,9 @@ local function mountRequirements(parent, method, calculator, fitter)
         end
     end
 
-    -- Recolour from the same cached evidence as the checks:
-    -- Green = live, gold = saved presence, red = absent when last checked in all
-    -- three stores, grey = never fully checked. Saved matches keep their own labels;
-    -- retained red borders don't turn historical evidence into a live access check.
-    -- Unverified icons (name mismatch) always stay grey.
+    -- Colour cached ownership: green for live presence, gold for saved presence,
+    -- red for last-checked absence, grey for unknown. Unverified item IDs stay
+    -- grey; saved evidence is not a live access check.
     local function refreshOwnership()
         local ownership = calculator:ownership()
 
@@ -595,28 +576,13 @@ local function mountRequirements(parent, method, calculator, fitter)
     return refreshRequirements, refreshOwnership
 end
 
--- One Inputs or Outputs table: a heading row with the hourly total, then a row per
--- item with its icon, hourly quantity and hourly value. Columns are laid out with
--- right-anchored offsets so values line up as the window is resized.
---
--- Only the heading total gets a coin. A coin on every row was noisy, and the coin
--- is moved next to the total's number each time it changes (see Style.placeCoin).
--- `moneyColour` tints the GP values (rows and total): subtle red for money going
--- out (Inputs), subtle green for money coming in (Outputs).
---
--- Returns an update function that fills in the numbers, and addRows(limit),
--- which draws up to `limit` more item rows and says how many it drew (0 once
--- they're all there). The panel's height is set for every row up front, so rows
--- drawn later don't move anything else on the page.
---
--- An "Unavailable" value says why when hovered. PrettyUI can't change a label's
--- tooltip after it's made, so the value label is made again when its reason
--- changes. That only happens when prices are fetched again, never while typing.
---
--- `quiet` (custom activities): no per-row "why is this unavailable" tooltips. A
--- custom page can have 55 rows, and a tooltip on every row as well as its icon
--- would come close to what ran Mega Shop Run out of native IDs. The status line
--- still says when prices are missing.
+-- Draw an Inputs or Outputs table with right-aligned quantities and GP values.
+-- The heading total gets a coin; moneyColour distinguishes costs from earnings.
+-- Returns update() for values and addRows(limit) for staged drawing. Reserve the
+-- full height up front so later rows do not shift the layout.
+-- Recreate unavailable-value labels only when their tooltip reason changes. quiet
+-- skips those row tooltips on custom pages to keep within the native ID budget;
+-- missing prices still appear in the status line.
 local function itemTable(panel, definitions, moneyColour, period, quiet)
     -- Recurring (daily/weekly) methods count per run instead of per hour.
     local perRun = period == "run"
@@ -729,16 +695,10 @@ local function itemTable(panel, definitions, moneyColour, period, quiet)
     return update, addRows
 end
 
--- The header's title, plus a version dropdown when the method has several
--- versions (e.g. elder logs with or without wood spirits). The title and dropdown
--- are centred together as one unit, the dropdown right after the title. Picking
--- another version calls onVersion(method). Returns a release() for the dropdown's
--- pending callback (a no-op when there's no dropdown), and the title label when
--- there's just the one title (so Delete can put its warning there).
---
--- `inset` is how much room to keep clear at each side, so the title stays
--- centred but never runs under the header's icons (default 44: Back on the
--- left, the favourite star on the right).
+-- Centre the title and optional version dropdown between the header icons. inset
+-- reserves space on each side.
+-- Returns the dropdown release callback and, for a single version, its title
+-- label so Delete can show a warning there.
 local VERSION_GAP = 10
 
 local function mountTitle(view, method, guarded, versions, onVersion, inset)
@@ -803,11 +763,8 @@ local function mountTitle(view, method, guarded, versions, onVersion, inset)
     return release
 end
 
--- ---- Edit, Delete and Export in the header (Duplicate for bundled ones) ------
--- Right to left: the favourite star (the workbench draws it, FAVOURITE_RIGHT
--- in from the right edge), Edit, Delete, then Export, all the same boxed buttons.
--- There's a wide gap between each, so a click meant for one can't land on its
--- neighbour.
+-- Header actions sit left of the favourite star: Edit (Duplicate for bundled
+-- activities), Delete and Export. Keep a clear gap between buttons.
 MethodView.FAVOURITE_RIGHT = 12
 MethodView.HEADER_ICON_Y = 8
 
@@ -842,12 +799,9 @@ local function headerIconPlaces(withDelete, withExport)
     return places
 end
 
--- Draws Edit and (if allowed) Delete. Delete can't be undone, so the first
--- click only arms it: the page title turns red and says to click again. The
--- title is in the header, so the warning shows whichever tab is open.
---
--- A bundled activity gets the same pencil in the same place, but it's
--- Duplicate as custom (a bundled one can't be edited in place), and no Delete.
+-- Custom activities get Edit and a two-click Delete. The first delete click puts
+-- a confirmation warning in the title, visible on every tab. Bundled activities
+-- get Duplicate as custom instead.
 local function mountHeaderIcons(view, places, titleLabel, guarded, options, custom)
     if custom then
         Style.iconButton(view, "edit", "Edit", "Edit this custom activity", guarded(options.onEdit),
@@ -897,22 +851,12 @@ local function mountHeaderIcons(view, places, titleLabel, guarded, options, cust
     end), { right = places.delete, y = HEADER_ICON_Y, absolute = true })
 end
 
--- Builds the whole method screen inside `view`. `guarded` comes from the workbench:
--- wrap every callback with it, so clicks on a screen we've left are ignored.
---
--- options (all optional):
---   activeTab   reopen this tab, e.g. when the screen is rebuilt after a resize
---   versions    every version of this method, in catalogue order
---   onVersion   called with the chosen method when the player picks a version
---   onEdit      custom activities: open the editor on this one
---   onDelete    custom activities: delete it; returns a message if that failed
---   onExport    custom activities: open the Export screen
---   onDuplicate bundled activities: open the editor on a copy
---
--- Returns three functions: refresh(reason), which the workbench calls when the
--- account changes; activeTab(), which says which tab is open right now; and
--- release(), which stops the staged drawing and the version dropdown's pending
--- callback when the screen goes away.
+-- Build the activity screen. guarded ignores callbacks after navigation.
+-- options can restore activeTab, supply versions/onVersion, and provide onEdit,
+-- onDelete, onExport and onDuplicate actions. onDelete returns an error message
+-- if deletion fails.
+-- Returns refresh(reason), activeTab() and release(). release stops staged
+-- drawing and any pending version-selection callback.
 function MethodView.mount(view, method, calculator, guarded, options)
     options = options or {}
 
@@ -1095,10 +1039,8 @@ function MethodView.mount(view, method, calculator, guarded, options)
     local rowCount = math.max(#method.income.inputs, #outputDefinitions, 1)
     local tableHeight = 74 + rowCount * 46
 
-    -- Each table takes half the page. The page keeps PAGE_PADDING clear on both
-    -- outer edges (like the full-width summary above), with TABLE_GAP between the
-    -- two tables: Inputs ends TABLE_GAP/2 left of the middle, Outputs starts
-    -- TABLE_GAP/2 right of it.
+    -- Give Inputs and Outputs half the page each, with PAGE_PADDING outside and
+    -- TABLE_GAP between them.
     local halfWidth = -(PAGE_PADDING + TABLE_GAP / 2)
 
     local inputs = incomeFitter:add(income:AddPanel({
@@ -1116,9 +1058,8 @@ function MethodView.mount(view, method, calculator, guarded, options)
     inputs:AddText({ text = "Inputs", x = 12, y = 6, width = 88, colour = Style.gold, height = 26, tooltip = "Supply costs use the last hour's average instant-buy price (the latest trade if there were none). Actual purchase prices may differ." })
     outputs:AddText({ text = "Outputs", x = 12, y = 6, width = 88, colour = Style.gold, height = 26, tooltip = "GE outputs use the last hour's average instant-sell price (the latest trade if there were none), after tax. Coin drops and alchemy proceeds are untaxed. Your pace and luck affect profit." })
 
-    -- Costs read red and earnings green, so it's obvious at a glance which way
-    -- the money goes. The "Inputs"/"Outputs" headings still say it in words.
-    -- Each table's update function, plus addRows to draw its item rows later.
+    -- Use red for costs and green for earnings. Keep each table's updater and
+    -- staged row builder for later refreshes.
     local inputTable, outputTable = {}, {}
     local quiet = method.origin == "custom"
     inputTable.update, inputTable.addRows = itemTable(inputs, method.income.inputs, Style.bad, method.income.period, quiet)

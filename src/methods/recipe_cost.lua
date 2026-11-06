@@ -1,22 +1,9 @@
--- Prices untradeable supplies by what they cost to MAKE.
---
--- Some supplies (Perfect plus potion, Overload, Dungeoneering pouches) can't be
--- traded, so the GE has no price for them. Instead we add up their ingredients:
---
---   ge      an ingredient with a GE price: we use its instant-buy price ("high"),
---           same as any other supply you'd buy
---   recipe  an ingredient that's untradeable too: we price ITS recipe, and so on
---           down the chain (Perfect plus -> Overload -> extreme potions)
---   free    an ingredient with no price at all (e.g. Crystal tree blossom, which
---           you gather yourself): counted as 0 GP, and freeNames() lists these so
---           the screen can say so
---
--- Doses: recipes say how many doses they make and use. A Perfect plus recipe uses an
--- Overload (4), but the Overload recipe makes Overload (3), so one 4-dose overload
--- costs 4/3 of an overload recipe.
---
--- The data comes from data/recipes.lua, generated and checked (no loops, every GE
--- ingredient has an item ID) by src/tools/catalogue.py.
+-- Prices untradeable supplies from their ingredients, using the validated
+-- data/recipes.lua bundle. GE ingredients use instant-buy prices; nested recipes
+-- are priced recursively. Free ingredients count as 0 and are listed by
+-- freeNames().
+-- Convert doses explicitly: an Overload (4) uses 4/3 of a recipe that produces
+-- Overload (3).
 local recipes = require("data/recipes")
 
 local RecipeCost = {}

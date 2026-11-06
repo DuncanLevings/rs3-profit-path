@@ -1,22 +1,10 @@
--- Money maths for a method, plus the one place we talk to GE Prices Library (GEPL).
---
--- Quick primer on GE prices: we use two numbers per item.
---   high = the instant-buy price  -> what you'd pay for supplies
---   low  = the instant-sell price -> what you'd get for your outputs
---
--- Each side is the average over the last hour of trades when there were any.
--- The latest single trade is too easy to throw off: one player dumping steel bars
--- at 15 GP made the "latest sell" 15 while the hour's average was over 1,000.
--- Only a side with no trades in the hour falls back to its latest trade, and even
--- then it's dropped if it's wildly out of line with the other side's average.
--- (Monster Lookup's live drop prices solved the same problem the same way.)
---
--- Opening/reopening reads GEPL's cached getter. That getter owns cache expiry
--- and the in-flight fetch guard; we never force updateDatabase or run HTTP here.
--- Typing a new rate reuses those same prices, so we never hit GEPL per keystroke.
---
--- Untradeable supplies (rows with pricing = "recipe") have no GE price of their own;
--- recipe_cost.lua prices them from their ingredients instead.
+-- Calculates activity income and owns GEPL price reads. Supplies use instant-buy
+-- (high); outputs use instant-sell (low). Recipe-priced untradeables use their
+-- ingredients.
+-- Prefer hourly trade averages. Use a latest trade only when that side has no
+-- hourly trades, rejecting it when it is far from the other side's average.
+-- Opening captures GEPL's cached quotes; GEPL owns fetches and expiry. Rate edits
+-- reuse the capture without new price reads.
 local RecipeCost = require("src/methods/recipe_cost")
 local Loot = require("src/methods/loot")
 
@@ -60,18 +48,10 @@ local function averageSide(average, price, volume)
     end
 end
 
--- Asks GEPL for one item's prices and turns the answer into a plain table with a
--- status: "available", "partial" (only one side usable), "loading", "unavailable",
--- "invalid" or "error". Nothing here ever invents a price.
---
--- Each usable side has a price and a source ("hour" for the hourly average,
--- "latest" for a single trade). A latest side always has its trade's timestamp;
--- an hour side has one only when the item has a latest trade too, because GEPL's
--- hourly data carries no times of its own. A side we refused or couldn't find
--- says why in its message (highMessage / lowMessage).
---
--- GEPL keeps its latest and hourly data apart, and an item can be in one but not
--- the other. So we ask for both, and either one is enough for a price.
+-- Read one item's latest and hourly data; either dataset may be missing. Return a
+-- plain quote with status and per-side price, source and failure message.
+-- Latest trades carry timestamps. Hourly averages have no timestamp of their own,
+-- so use the latest trade time only when available.
 function Income.inspectQuote(library, itemId)
     -- GEPL is a required dependency, but guard anyway: a missing or disabled
     -- library must show "unavailable", never crash or invent a price.
@@ -195,15 +175,9 @@ function Income.parseRate(text)
     return rate
 end
 
--- Fetches one quote per distinct item in the method. If an item is both an input
--- and an output we only ask once, so both sides use the exact same snapshot.
---
--- `shared` is optional: a table of quotes already fetched for other methods in the
--- same refresh (Browse prices every method at once). Items found there are reused
--- instead of asking GEPL again, and new ones are added for the next method.
---
--- A recipe-priced row doesn't need its own item's price (it can't be traded);
--- instead we fetch every GE ingredient in its recipe, all the way down.
+-- Capture one quote per item so inputs and outputs use the same snapshot.
+-- Optional shared quotes avoid repeat reads across Browse activities. For
+-- recipe-priced supplies, capture their GE ingredients recursively.
 function Income.captureQuotes(library, model, shared)
     local quotes = {}
 
@@ -255,13 +229,9 @@ function Income.usesTrips(model)
     return false
 end
 
--- How many times a row's quantity happens in an hour, for a row counted per
--- `basis` (see the list above Income.calculate). `rate` is kills/actions an
--- hour; `actionsPerTrip` is only needed for per-trip rows. Returns nil when a
--- per-trip row has no sensible kills/actions per trip to divide by.
---
--- The editor uses this too (each row's "About 2.4 an hour" line), so what the
--- editor shows can't drift from what the activity page works out.
+-- Return the hourly multiplier for a row basis. rate is actions/hour; per-trip
+-- rows also need actionsPerTrip. Return nil for an invalid trip size. The editor
+-- uses this same conversion for its hourly hints.
 function Income.timesPerHour(basis, rate, actionsPerTrip)
     if basis == "action" then
         return rate
@@ -280,26 +250,14 @@ function Income.timesPerHour(basis, rate, actionsPerTrip)
     return 1
 end
 
--- Works out the hourly numbers for a method at a given rate (e.g. smelts/hour).
---
--- `model` is the method's income data, already checked when the catalogue was built,
--- so we don't re-validate it here. `quotes` is the snapshot from captureQuotes.
---
--- Every row has a basis that says what its quantity is "per":
---   "action" - per kill/smelt/item, so it scales with the rate
---   "trip"   - per trip (food eaten on one trip, say). Trips/hour comes from
---              rate / model.actions_per_trip, so the rate is still the one
---              throughput number. It already includes banking and travel, so
---              we never take downtime off a second time.
---   "hour"   - a fixed amount per hour, whatever the rate
---
--- If the source recipe itself is incomplete, there's no total profit. A missing
--- price is different: one thinly traded potion or rare drop shouldn't hide a
--- whole method. When most of a side's priced rows (supplies, or outputs) have
--- prices, the missing ones count as 0 GP and the result names them. When most
--- don't (or the only one doesn't), that side has no total, so neither does the
--- profit. A missing output counted as 0 can only make the profit look worse; a
--- missing supply can make it look a little better, and its row says so.
+-- Calculate from a validated income model and captured quotes.
+-- Row bases: action scales with rate; trip scales with rate/actions_per_trip;
+-- hour stays fixed. The rate already includes travel and banking, so do not
+-- subtract downtime again.
+-- Incomplete recipes have no total. For missing market prices, a side with a
+-- majority of priced rows counts the missing rows as 0 and names them. Otherwise
+-- that side and net profit stay unavailable. Missing supply prices can overstate
+-- profit; their messages explain that.
 function Income.calculate(model, rate, quotes)
     if not nonNegativeFinite(rate) then
         return { status = "invalid", message = "Rate must be finite and zero or greater." }
@@ -469,17 +427,7 @@ function Income.calculate(model, rate, quotes)
         return total, tax
     end
 
-    -- Some guides make choices from GE prices: which items a shop run buys, which
-    -- dose of a potion to sell. Those are made again here, from live prices. Each
-    -- option's rows are priced on their own, and the one that comes out furthest
-    -- ahead wins (a tie keeps the guide's own pick). The other options' rows stay
-    -- in the tables but count as 0, and every row says why when hovered.
-    --
-    -- If any option can't be priced, there's nothing fair to compare, so the
-    -- guide's own pick (from the day we imported it) stands.
-    --
-    -- Returns the input and output lines to price, with the losers set to 0.
-    -- What a shop run spends on these output lines, at this rate.
+    -- Calculate spending for a shop option at the current rate.
     local function shopSpend(lines)
         local spent = 0
 
@@ -492,6 +440,9 @@ function Income.calculate(model, rate, quotes)
         return spent
     end
 
+    -- Re-evaluate guide options using current prices, keeping the guide choice
+    -- if any option cannot be priced. Losing rows stay visible but count as
+    -- zero; ties keep the guide choice.
     local function choose(inputs, outputs)
         if not model.choices then
             return inputs, outputs

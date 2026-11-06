@@ -1,18 +1,7 @@
--- Owns the launcher, window frame and navigation. browse_view.lua draws the
--- browser columns; method_view.lua draws the method tabs.
---
--- There are two separate pieces, each with its own lifetime:
---   * the launcher: a small page in the Plugins ribbon with an "Open" button
---   * the workbench: our own resizable window floating over the game
---
--- Inside the window, moving between screens (Browse, a method) swaps
--- just the content view and keeps the window itself, so it doesn't jump back to its
--- starting position or size every time you click something.
---
--- The one tricky idea here is the "generation" counter. Every time we tear down a
--- view we bump it, and every button callback remembers the generation it was made
--- in. A click that arrives late (say, after we've moved to another screen) sees the
--- number has changed and does nothing, instead of poking UI that no longer exists.
+-- Owns the ribbon launcher, floating window and screen navigation. Changing
+-- screens replaces the content, keeping the window in place.
+-- Callbacks remember the screen generation so late clicks cannot reach destroyed
+-- controls.
 local MethodView = require("src/ui/method_view")
 local BrowseView = require("src/ui/browse_view")
 local MethodEditor = require("src/ui/method_editor")
@@ -21,15 +10,9 @@ local Draft = require("src/methods/custom_draft")
 local Style = require("src/ui/view_style")
 local UI = {}
 
--- Window resizing. PrettyUI views size their inner content once, when they're
--- built (its docs say to call SetSize again "if the available space changes").
--- Rather than chase every nested panel, we wait until the player stops dragging
--- the window edge, then rebuild the current screen once at the new size.
---
--- How we notice: while the window is open and visible, each logic tick reads its
--- content size and compares two numbers. That's all it costs; the check stops
--- whenever the window is hidden or closed. (We first tried the native ONRESIZE
--- hook, but it never fired for PrettyUI's window resizes in game.)
+-- Watch the content size while the window is visible and rebuild after resizing
+-- settles. The native ONRESIZE hook does not fire for PrettyUI window resizes in
+-- this client.
 local RESIZE_EVENT = "profit-path-resize"
 
 -- How long the size must stay put before we rebuild: 15 logic ticks is 0.3 s
@@ -41,10 +24,9 @@ local RESIZE_SETTLE_TICKS = 15
 function UI.new(library, account, calculator, browser)
     local self = { active = true, generation = 0, screen = "browse" }
 
-    -- Re-reads whatever the current screen shows. `reason` says what changed:
-    -- "skills", "inventory", "quests", or nil for everything (e.g. on reopen).
-    -- Account evidence has already been refreshed. Details reuse their controls;
-    -- Browse only needs new rows when an active requirements filter changes.
+    -- Refresh the visible screen after account evidence changes. Activity pages
+    -- update their controls in place; lists redraw when a requirement filter or
+    -- recommendation may have changed.
     function self:refresh(reason)
         if not self.view or not self.interactive then
             return
@@ -149,9 +131,8 @@ function UI.new(library, account, calculator, browser)
         -- The size we built for, so the resize check knows when it's out of date.
         self.mountedWidth, self.mountedHeight = parent.width, parent.height
 
-        -- The anchors make the view stretch with the window when it's resized.
-        -- Scrolling is off here because the screens' child views scroll themselves;
-        -- two nested scroll areas would fight each other.
+        -- Stretch with the window. Child views handle scrolling, so keep
+        -- scrolling off here to avoid competing scroll areas.
         local view = library.SimpleView.new(parent, {
             width = 0, height = 0, widthAnchor = 1, heightAnchor = 1,
             scrollable = false,
@@ -160,9 +141,8 @@ function UI.new(library, account, calculator, browser)
         self.view = view
         self.interactive = true
 
-        -- Wrap every button/input callback with this. The wrapped callback only runs
-        -- if we're still alive, the window is open and this exact view is still the
-        -- current one (see the generation note at the top of the file).
+        -- Ignore input from an old screen, a hidden window or a plugin that has
+        -- shut down.
         local function guarded(callback)
             return function(...)
                 if self.active and self.interactive and self.view == view and self.generation == generation then
@@ -248,11 +228,9 @@ function UI.new(library, account, calculator, browser)
                         return browser.favourites[self.method.id] and "Remove favourite" or "Add favourite"
                     end
 
-                    -- A boxed button, like a custom activity's Edit and Delete beside
-                    -- it: a gold star once it's a favourite, a silver one when not.
-                    -- The icon can't be swapped on a drawn button, so a click draws
-                    -- a fresh button in the same place (the old one is destroyed
-                    -- first, like any redraw from inside a click).
+                    -- The star changes from silver to gold when favourited.
+                    -- PrettyUI cannot swap a drawn button's icon, so replace the
+                    -- button in the same position.
                     local drawFavourite
 
                     -- Reload favourites first in case the character changed while this
@@ -278,10 +256,9 @@ function UI.new(library, account, calculator, browser)
 
                     drawFavourite()
 
-                    -- Every catalogue entry with the same title is a version of
-                    -- this method; the page lets the player switch between them.
-                    -- Switching loads that version's prices and saved rate and
-                    -- rebuilds the page on the same tab (clearView remembers it).
+                    -- Bundled activities with the same title are versions of one
+                    -- activity. Switching versions reloads its prices and rate
+                    -- while keeping the current tab.
                     local versions = {}
 
                     for _, candidate in ipairs(browser.methods) do
@@ -416,10 +393,8 @@ function UI.new(library, account, calculator, browser)
         end
     end
 
-    -- Runs once per logic tick while the window is visible. Usually the window is
-    -- the size we built for, so this returns after a couple of comparisons. After a
-    -- resize it waits until the size has held for RESIZE_SETTLE_TICKS (so we don't
-    -- rebuild on every step of a drag), then rebuilds the current screen once.
+    -- Check the visible window once per logic tick. Rebuild only after its size
+    -- has stayed unchanged for RESIZE_SETTLE_TICKS.
     function self:checkSize()
         local window = self.window
 
@@ -525,8 +500,8 @@ function UI.new(library, account, calculator, browser)
 
         local ok, failure = pcall(function()
             self.window = library.Window.new(gameArea, {
-                -- Just the plugin name. Settings still follow the character behind
-                -- the scenes; a future account page will show whose they are.
+                -- Keep the title short; My account shows the character/profile
+                -- binding.
                 title = "Profit Path",
                 width = width,
                 height = height,

@@ -1,23 +1,9 @@
--- The custom activity editor screen (Phase 9).
---
--- This file only draws and forwards clicks. The decisions (how drops are loaded,
--- which are left out, what the preview says, whether Save is allowed) live in
--- src/methods/custom_draft.lua, and saving lives in main.lua.
---
--- How it redraws: anything that changes the layout (adding a row, switching a
--- tab, changing a row's basis) changes `state` and then calls actions.rebuild(),
--- which mounts the whole screen again from `state`. Typing in a box only updates
--- the draft and the profit band's text, so the box keeps its focus.
---
--- Searches (items, monsters, thieving targets) wait for a short pause in typing,
--- then redraw only their own list of matches, again so the search box keeps
--- its focus.
---
--- Native parts: the client shares 4,096 between every plugin, so this screen
--- draws only the open tab and at most ROWS_PER_PAGE rows of it. Tooltips cost
--- the most: Outputs/Supplies have one per row's item icon, remove button and
--- (drops with a note) On/Off button; Requirements has one per skill icon and
--- per remove button. Tests measure both (see README "Native dynamic IDs").
+-- Draws the custom activity editor and owns its nested views and search timers.
+-- custom_draft.lua handles the draft; main.lua saves it.
+-- Layout changes rebuild from state. Typing updates text in place, and searches
+-- replace only their results, so fields keep focus.
+-- Only the open tab and one page of rows are drawn. Native UI IDs are shared
+-- across plugins, and tooltips use several IDs each.
 local CustomMethods = require("src/methods/custom_methods")
 local CustomShare = require("src/methods/custom_share")
 local Draft = require("src/methods/custom_draft")
@@ -41,11 +27,8 @@ local HEADER_HEIGHT = 44
 local BAND_HEIGHT = 104
 local RESULT_HEIGHT = 30
 
--- The item table, drawn like the activity page's: a shaded heading band, then
--- rows of alternating shades, ROW_GAP apart.
--- Rows are tall enough for a grey "About 2.4 an hour" line under the item's
--- name. Daily/weekly rows have no such line, so they keep the shorter height.
--- Every box and button is centred in its row either way, so they line up.
+-- Table rows match the activity page. Hourly rows leave room for the quantity
+-- hint; daily/weekly rows use the shorter height.
 local TABLE_TOP = 36
 local ROW_HEIGHT = 58
 local SHORT_ROW_HEIGHT = 44
@@ -261,10 +244,8 @@ local function perWhat(draft)
     return "per " .. actionWord(draft)
 end
 
--- Whether the player banks between trips ("Do you bank between trips?"). It
--- lives on the editor state, not the draft, because it's only a question: the
--- saved activity just has (or hasn't) a kills per trip number and per-trip
--- rows. Worked out from those the first time it's asked.
+-- Keep the banking choice in editor state. Saved records store the trip size and
+-- per-trip rows; use those to initialise the choice.
 local function tripsOn(state)
     if state.trips == nil then
         state.trips = Draft.usesTrips(state.draft)
@@ -370,19 +351,11 @@ local SKILL_BUTTON = 40
 
 -- ---- The screen -----------------------------------------------------------------
 
--- Returns an unmount() that destroys the screen's nested views and stops its
--- Logic tickers. Call it before destroying `view`: PrettyUI keeps a nested view's
--- scrollbar overlay registered with the window until that view itself is
--- destroyed, and a leftover overlay crashed the next rebuild in game (4 Nov,
--- "attempt to index a nil value (local 'target')"). browse_view.lua destroys its
--- nested views the same way.
---
--- `library` is PrettyUI. `actions`:
---   rebuild()            mount the screen again from `state`
---   quote(itemId)        one GE quote (Income.inspectQuote's shape)
---   save(draft)          returns the saved record, or nil plus a message/problems
---   delete(id)           returns true, or false plus a message
---   done(saved)          leave the editor (saved is the record, or nil)
+-- Returns unmount(), which stops Logic timers and destroys nested views before
+-- the parent. Destroying those views removes PrettyUI scrollbar overlays; leaving
+-- one registered can crash the next rebuild.
+-- actions supplies rebuild(), quote(itemId), save(draft), delete(id) and
+-- done(saved). Saves return a record or an error; done leaves the editor.
 function MethodEditor.mount(library, view, state, guarded, actions)
     -- Every nested view made below, so unmount() can destroy them.
     local nested = {}
@@ -475,10 +448,8 @@ function MethodEditor.mount(library, view, state, guarded, actions)
         return typed, now
     end
 
-    -- A text box that only takes numbers. `kind` is "whole", "decimal" or
-    -- "rate" (see ALLOWED); anything else typed is taken straight back out.
-    -- options.most caps it (typing 150 in a level box shows 120). onText(text)
-    -- gets the cleaned text.
+    -- Accept whole numbers, decimals or rates (see ALLOWED). Strip invalid input,
+    -- apply options.most, then pass the cleaned text to onText.
     local function numberField(parent, options, kind, onText)
         local field
         local most = options.most
@@ -885,10 +856,8 @@ function MethodEditor.mount(library, view, state, guarded, actions)
     return unmount
 end
 
--- A box of result buttons under a search field, `rows` lines of `columns`
--- buttons each `width` wide. show() swaps its contents in place, so the search
--- field above keeps its focus. box:show(entries, note) takes { label, pick,
--- active } entries and an optional muted note (e.g. "5 of 143 matches").
+-- Replace result buttons without rebuilding the search field. show(entries, note)
+-- takes { label, pick, active } entries and an optional status line.
 resultsBox = function(page, fitter, layout)
     layout = layout or {}
 
@@ -932,13 +901,10 @@ resultsBox = function(page, fitter, layout)
     return box
 end
 
--- A Grand Exchange item search: a field, its results box, and `pick(item)` for
--- a clicked match. `key` is where state.search keeps the typed text across
--- redraws. Returns the field.
---
--- The quest and unlock search uses it too: options.search swaps in another
--- list's search (same results shape: { label, ... } plus a total), and
--- options.none says what was searched when nothing matches.
+-- Build a search field and results box; pick(item) handles a selection.
+-- state.search[key] keeps the query across redraws.
+-- options.search supplies a different lookup for quests/unlocks, and options.none
+-- names it in the empty state.
 itemSearch = function(page, state, tools, key, options)
     local box
     local field
@@ -1013,10 +979,8 @@ function MethodEditor.income(page, state, tools)
         end),
     })
 
-    -- Category. Switching between PvM, Skilling and Production only changes
-    -- which buttons are lit and a few words (kills or actions), so it happens
-    -- in place (no redraw, no flicker). Daily/weekly has different boxes below,
-    -- so going to or from it redraws.
+    -- Update hourly categories in place. Switching to or from daily/weekly
+    -- changes the fields, so rebuild that layout.
     page:AddText({ text = "Category", colour = Style.gold, marginTop = 6 })
 
     local categoryButtons = {}
@@ -1524,10 +1488,8 @@ function MethodEditor.table(page, state, side, tools, first, last)
             end
         end
 
-        -- The small grey line under the item's name: what this row comes to an
-        -- hour (see hourlyText). It's in the smaller font so it reads as a note,
-        -- not a second name. Typing a quantity updates it in place. Daily/weekly
-        -- rows are just "each run", so they don't get one.
+        -- Update the hourly hint below the item name as the quantity changes.
+        -- Daily/weekly rows already count per run and have no hourly hint.
         local hourly
 
         if hasHourly then
@@ -1564,10 +1526,9 @@ function MethodEditor.table(page, state, side, tools, first, last)
             updatePreview()
         end)
 
-        -- Price each, always editable. A GE item's box starts at the live GE
-        -- price; typing another price uses yours instead, and clearing the box
-        -- (or typing the live price) goes back to the live one. Anything else
-        -- (coins, a charm, a custom item) is its own GP value.
+        -- GE prices start live. A typed price overrides that; clearing it or
+        -- entering the live price removes the override. Other rows store a fixed
+        -- GP value.
         if row.pricing == "ge" then
             local live = gePrice(state.quotes[row.item_id], side)
 

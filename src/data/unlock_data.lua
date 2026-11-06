@@ -1,12 +1,8 @@
--- Quests and unlocks a custom activity can ask for, for the editor's "Quest or
--- unlock" search and for turning a saved pick back into a real check.
---
--- The list (data/unlocks.lua) is built by src/tools/catalogue.py:
---   * every current quest from an in-game quest dump (catalogue-source/research/
---     quest-list.json), as two parallel lists sorted by name;
---   * a reviewed list of unlocks (custom-unlocks.json): prayers, spellbooks,
---     relics, abilities, diaries... Each one carries the exact check bundled
---     activities use for it, so the game answers it the same way.
+-- Searches quests/unlocks for the editor and resolves saved choices into
+-- requirement checks.
+-- catalogue.py builds data/unlocks.lua from quest-list.json (client quest names)
+-- and custom-unlocks.json (reviewed prayers, abilities, relics and other
+-- unlocks). Unlocks reuse the bundled activity checks.
 local ItemNames = require("src/data/item_names")
 
 local UnlockData = {}
@@ -133,10 +129,8 @@ function UnlockData.check(key)
     return unlock and copy(unlock.check) or nil
 end
 
--- Quests and unlocks whose name contains `query`, best matches first (the same
--- ranking as the item search), at most `limit`. Returns a list of entries
--- ({ kind = "quest", quest, name, label } or { kind = "unlock", key, name,
--- label }) and the total number of matches. A blank query matches nothing.
+-- Return up to limit matching quest/unlock entries plus the total count. Use the
+-- item search ranking; a blank query returns nothing.
 function UnlockData.search(query, limit)
     load()
 

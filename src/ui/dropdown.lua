@@ -1,32 +1,14 @@
--- Native dropdown lists (ui.List), with the workarounds this client needs. Used by
--- the Browse sort/filter row and the method page's version picker.
---
--- Two things worth knowing, both found in game:
---
---   1. Entry IDs must count from 0 in list order (0, 1, 2...). Selecting ID 1
---      highlighted the SECOND entry, so the client seems to count from 0 whatever
---      ID we pass to Add. Numbering from 0 makes both readings agree.
---
---   2. Reading the selection inside the change hook can still see the OLD
---      selection, and the documented `selectedEntries` hands back numbers that
---      aren't always our IDs. So we wait one logic tick, then ask the list about
---      each of our own IDs with GetEntrySelected(id).
+-- Owns native dropdowns and their delayed selection callbacks.
+-- This client expects entry IDs in zero-based list order. Read selection one
+-- Logic tick after a change using GetEntrySelected(id): the change hook can still
+-- see the old value, and selectedEntries is unreliable here.
 local Dropdown = {}
 
--- Builds a dropdown on the native component `parent` and returns it, plus a
--- release() function that cancels any pending change callback (call it when the
--- screen goes away).
---
--- options:
---   x, y, xAnchor      position (xAnchor 0.5 measures x from the parent's centre)
---   width              in interface units
---   compact            smaller, quieter header for a secondary selector
---   entries            { { id = 0, label = "..." }, { id = 1, ... }, ... }
---   selected           the ID to show selected at first
---   owner              a unique name for this dropdown's logic-tick callback
---   guarded            the screen's callback wrapper (drops stale callbacks)
---   onChange(id)       called once per change, with the newly selected ID
---   isClosed()         optional: true once the screen is gone
+-- Build a dropdown and return it with release(), which cancels pending callbacks
+-- when the screen closes.
+-- options gives its position/width, entries ({ id, label }), selected ID, unique
+-- callback owner, guarded wrapper and onChange(id). compact changes the header
+-- style; isClosed() optionally checks its owner's lifetime.
 function Dropdown.new(parent, options)
     local entries = options.entries
 

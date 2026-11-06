@@ -1,24 +1,12 @@
--- Recommend for me: which methods suit this player, and which one to show next.
--- No native UI objects in here, and no invented scores: every rule below is one
--- the card can explain in plain words.
---
--- How a suggestion is picked:
---   1. Start from the chosen activity (PvM, Skilling, Production or Recurring).
---   2. Drop methods the player said not to recommend, ones whose Required checks
---      are definitely missing, ones a priced estimate says lose money, and group
---      methods when the player wants solo only. For PvM, also drop anything
---      above their comfort level, 1-10 (the next level up stays, labelled, if
---      they want to learn).
---      Recommended gear never drops anything; it's guidance on the method page.
---      Custom activities join in too, but only once every Required check is
---      confirmed met (not just "not missing"). A custom PvM activity's own
---      1-10 rating is checked against comfort like a bundled boss's.
---   3. Order what's left: within comfort before learning, solo before group when
---      solo is preferred, fully met requirements before "needs checking", then
---      most profitable first (unpriced methods last).
---   4. Rotate: the first method not yet shown this cycle. Once every match has
---      been shown, start a new cycle, skipping the one just shown if there's
---      another. The history is saved per profile, so it survives a reload.
+-- Filters, orders and rotates suggestions; owns no native UI controls.
+-- Use Required access, chosen activity, exclusions, profit and solo/group
+-- preferences. Recommended gear is guidance only. Custom activities need every
+-- Required check confirmed.
+-- PvM must fit comfort, or be one level higher when learning is enabled. Order by
+-- comfort, solo preference, confirmed checks and profit, then choose the first
+-- unseen activity.
+-- Save history per profile. Start a new cycle after every match has appeared,
+-- avoiding an immediate repeat when alternatives exist.
 local Recommendations = {}
 
 -- PvM comfort is a level on the same 1-10 ladder as the researched difficulty
@@ -139,10 +127,8 @@ function Recommendations.pool(methods, activity, settings, context)
             local estimate = context.estimates[method.id]
             local priced = estimate and estimate.status == "available"
 
-            -- A custom PvM activity is rated by the player (1-10) and checked
-            -- against comfort like a bundled boss. One saved before ratings
-            -- existed has none, and counts as within comfort (they made it
-            -- for something they do) until it's edited and rated.
+            -- Use the player's difficulty rating for custom PvM. Older unrated
+            -- records count as within comfort until edited and rated.
             local custom = method.origin == "custom"
             local unrated = custom and Recommendations.levelOf(method) == nil
             local fit = (activity ~= "pvm" or unrated) and "within" or difficultyFit(method, settings)
@@ -154,10 +140,8 @@ function Recommendations.pool(methods, activity, settings, context)
             elseif status == "unmet" then
                 skipped.missing = skipped.missing + 1
             elseif custom and status ~= "met" then
-                -- Stricter than bundled ones (agreed in the Phase 9 plan): a
-                -- custom activity is only suggested once the game confirms
-                -- every Required check. Notes are left out of that (as for
-                -- bundled ones), so notes alone don't hold it back.
+                -- Custom activities need every tracked Required check confirmed.
+                -- Ignored notes do not count towards that verdict.
                 skipped.unconfirmed = skipped.unconfirmed + 1
             elseif not fit then
                 skipped.comfort = skipped.comfort + 1
@@ -270,10 +254,9 @@ end
 function Recommendations.new(methods, browser, preferences)
     local self = { activity = nil, current = {}, notice = nil }
 
-    -- Every method ID's activity, to keep the saved history bounded by the
-    -- catalogue rather than growing forever. Worked out when it's needed, not
-    -- once: `methods` is the shared list, and custom activities are added to
-    -- and removed from it while the window is open.
+    -- Rebuild the known-ID map when needed: custom activities can change while
+    -- open. Use it to keep saved rotation history bounded to the current
+    -- catalogue.
     local function known()
         local categories = {}
 
@@ -402,10 +385,9 @@ function Recommendations.new(methods, browser, preferences)
         return chosen
     end
 
-    -- The suggestion to show now: the current one while it still matches (so a
-    -- price refresh or a trip to the method page never swaps it), otherwise the
-    -- next in rotation. Returns entry, pool, skipped and, if the current one
-    -- stopped matching, that method (the screen says why it changed).
+    -- Keep the current suggestion while it still qualifies; otherwise take the
+    -- next in rotation. Return entry, pool, skipped counts and the previous
+    -- method if it stopped matching, so the UI can explain the change.
     function self:suggestion()
         followProfile()
 

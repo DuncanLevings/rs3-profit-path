@@ -1,41 +1,15 @@
 """Merge the Wiki guide snapshot with our hand research into full method records,
 and report what still needs research."""
-# Developer tool, never shipped with the plugin. Step 3 of
-# outputs/profit-path-catalogue-scoping.md.
-#
-# Inputs:
-#   catalogue-source/wiki/guides.jsonl + meta.json   every current Wiki guide
-#                                                    (src/tools/wiki_methods.py)
-#   catalogue-source/methods.json                    our curated methods (step 1)
-#   catalogue-source/research/capabilities.json      what non-item requirements are,
-#                                                    and the sprite for each
-#   catalogue-source/recipes.json                    creation costs for untradeables
-#
-# Output: one catalogue in the same full-record shape the plugin already uses, so
-# `catalogue.validate_methods` checks every imported method exactly like a curated
-# one. Nothing here writes plugin data yet: step 4 switches data/methods.lua over.
-#
-# The rules, in order:
-#   1. A curated method replaces the Wiki guide it was made from (same page, same
-#      version label). Our research always wins over the raw import.
-#   2. Recurring guides (daily/weekly runs) count per run, not per hour: their rate
-#      is a "% of guide yield", and they keep how often they can be done.
-#   3. Every other guide becomes a method:
-#        - per-kill guides keep their kills per hour as the rate
-#        - per-hour guides get a "% of guide pace" rate: 100 is the guide's own pace,
-#          and every amount scales with it
-#        - GE rows need an item ID; a row without one leaves the income "partial"
-#        - the Wiki's fixed values (coins, clues) stay fixed values
-#        - the Wiki's calculated values use our creation-cost recipe when we have
-#          one, otherwise the Wiki's figure as a fixed value with a note
-#        - requirements become skill/item checks where the plugin can check them,
-#          and quest checks for quests mapped to their client config (research/
-#          quests.json). Wiki advice pages ("Armoury", "Recommended equipment") become
-#          "see also" notes, not checks. Everything else is a "capability" check,
-#          shown as unknown: outfits, abilities, perks... A capability records its
-#          kind and gets its sprite when the research file has them; unmapped quests
-#          get the quest icon. An outfit whose pieces we know (research/outfits.json)
-#          becomes "all of these pieces", checked like any other items.
+# Offline merge of Wiki guides, curated activities and requirement research.
+# Curated entries replace matching Wiki page/version records; catalogue.py
+# validates the combined result.
+# Recurring guides keep recurrence and scale guide yield per run. Per-kill
+# guides scale kills/hour; other hourly guides scale a percentage of guide pace.
+# GE rows need item IDs. Calculated costs use known ingredient recipes,
+# otherwise a labelled Wiki value. Preserve incomplete coverage when a row
+# cannot be modelled.
+# Map requirements to researched client checks where supported; keep advice and
+# unsupported requirements as text. Known outfits become item groups.
 from __future__ import annotations
 
 import collections

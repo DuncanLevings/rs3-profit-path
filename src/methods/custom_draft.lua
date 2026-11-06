@@ -1,14 +1,6 @@
--- The custom activity editor's working copy, with no UI (Phase 9, slice 4).
---
--- The editor screen (src/ui/method_editor.lua) only draws and forwards clicks.
--- Everything it decides lives here, where tests can reach it:
---   * starting a draft: blank, from a monster, or from a thieving target;
---   * which state each loaded drop comes in (counted, off, or needs a number);
---   * which source drops don't fit under the output limit ("left out");
---   * what the preview strip says, and whether Save is allowed.
---
--- A draft is just a custom record without an ID (see custom_methods.lua), so
--- saving it is CustomMethods.store(db):create(draft) and nothing else.
+-- Builds and edits custom activity drafts without UI controls: source drops, row
+-- states, omitted drops and profit previews. A draft uses the custom record
+-- format before a new activity gets its ID.
 local CustomMethods = require("src/methods/custom_methods")
 local Income = require("src/methods/income")
 local Loot = require("src/methods/loot")
@@ -26,17 +18,9 @@ local SOURCES = {
 -- (no GE price, no GE tax) rather than a GE item.
 local COINS = 995
 
--- ---- Which state a loaded drop comes in ------------------------------------------
---
--- Drop notes are free text from the Wiki. A note that RESTRICTS when the drop
--- happens (a Slayer task, an event month, "only if not already owned", a quest
--- stage) means the drop shouldn't count by default. A note that only adds
--- information (a better rate with luck, "this rate is approximate", a citation)
--- doesn't. Anything we don't recognise is treated as a restriction: guessing
--- "counted" could only make an activity look better than it is.
---
--- A note counts as information only if EVERY sentence in it matches one of these.
--- They're matched against lower-case text, as plain substrings.
+-- Only recognise a drop note as informational when every sentence matches this
+-- list (lower-case substrings). Conditions and unrecognised notes switch the drop
+-- off by default so an uncertain drop cannot inflate the estimate.
 local INFORMATIONAL = {
     -- Luck changes the rate; the base rate (what we use) still holds.
     "with tier", "tier 1 luck", "tier 2 luck", "tier 3 luck", "tier 4 luck", "luck or higher",
@@ -142,12 +126,9 @@ function Draft.blank(category)
     return draft
 end
 
--- Changes a draft's category and keeps the rest consistent with it:
---   * daily/weekly counts runs (default 1), every row per run, and has a how-often;
---   * the others count kills (PvM) or actions (everything else) per hour. The
---     editor has no separate kills/actions choice, so the category decides. A
---     saved activity keeps whatever it was saved with until its category changes;
---   * "No requirements needed" only exists for production and daily/weekly.
+-- Update units and category-specific fields. PvM counts kills/hour; other hourly
+-- categories count actions/hour. Daily/weekly counts per run with a recurrence.
+-- Only production and daily/weekly allow "No requirements needed".
 function Draft.setCategory(draft, category)
     local was = draft.category
     draft.category = category
@@ -208,13 +189,9 @@ function Draft.usesTrips(draft)
     return false
 end
 
--- Switches trips off ("No"). Per-trip rows become per kill/action, with their
--- quantity divided by kills per trip so every row's hourly amount stays the
--- same: 8 food a trip at 10 kills a trip is 0.8 food a kill.
---
--- Without a kills per trip number there's nothing to divide by. Those rows
--- couldn't be priced anyway (the editor said so), so they just keep their
--- number and become per kill; the hourly line shows what that now means.
+-- Convert per-trip rows to per-action quantities, preserving hourly totals by
+-- dividing by actions per trip. If no trip size exists, keep the quantity; the
+-- previous per-trip total was unavailable.
 function Draft.stopTrips(draft)
     local perTrip = draft.actions_per_trip
     local canConvert = type(perTrip) == "number" and perTrip > 0 and perTrip < math.huge
@@ -234,10 +211,8 @@ function Draft.stopTrips(draft)
     draft.actions_per_trip = nil
 end
 
--- What a newly added row is counted per. Drops and other outputs usually come
--- each kill/action; supplies are usually used up each trip (food, potions) when
--- the player banks, otherwise over an hour. Daily/weekly rows are always per run
--- (stored as "action", one action being one run).
+-- Default outputs to each action; supplies to each trip when banking, otherwise
+-- each hour. Daily/weekly always uses action, where one action means one run.
 function Draft.newRowBasis(draft, side, trips)
     if draft.category == "recurring" or side == "outputs" then
         return "action"
@@ -394,10 +369,9 @@ local function fit(rows, quotes)
     return kept, leftOut
 end
 
--- A draft seeded from a monster or thieving target: all its drops (up to the
--- limit), a suggested name, the category and throughput unit, and for thieving
--- the Thieving level as a Required check. `quotes` (optional) ranks drops when
--- there are too many. Returns the draft, or nil plus a message.
+-- Seed a draft from a monster or thieving target. Include drops up to the limit
+-- and the Thieving level when applicable. Optional quotes rank excess drops.
+-- Returns a draft or nil plus an error.
 function Draft.fromSource(kind, title, quotes)
     local rows, source = Draft.sourceRows(kind, title)
 
@@ -424,10 +398,7 @@ function Draft.fromSource(kind, title, quotes)
     return draft
 end
 
--- A bundled requirement tree flattened into custom checks. Levels, combat level and
--- quests stay checks; anything else (items, gear, unlocks, "any of" choices)
--- becomes a note with the source's own wording, for the player to check.
--- An item node as a custom item check, or nil if it isn't a plain item.
+-- Convert a plain item requirement to a custom item check, or return nil.
 local function itemCheck(node)
     if node.kind == "item" and math.type(node.itemId) == "integer" and type(node.text) == "string" then
         local quantity = math.type(node.quantity) == "integer" and node.quantity >= 1 and node.quantity or 1
@@ -435,6 +406,9 @@ local function itemCheck(node)
     end
 end
 
+-- Keep supported levels, items/groups, quests and known unlocks as checks when
+-- copying. Preserve unsupported requirements as notes and count anything over
+-- the limit.
 local function flattenRequirements(node, into, skipped, depth)
     if type(node) ~= "table" then
         return
@@ -498,14 +472,13 @@ local function flattenRequirements(node, into, skipped, depth)
     end
 end
 
--- A draft copied from a bundled activity ("Duplicate as custom"). Its outputs,
--- supplies, rate and requirements come across as far as custom records can hold
--- them. Returns the draft plus what didn't fit:
---   { outputs = n, supplies = n, requirements = n, recipes = { labels } }
--- Recurring activities can't be custom (no per-run model), so they return nil.
+-- Copy a bundled activity into an editable draft. Return the draft and counts of
+-- omitted outputs, supplies and requirements, plus unsupported recipe labels.
+-- Bundled recurring models cannot be copied into custom runs.
 function Draft.fromMethod(method, quotes)
-    -- Bundled daily/weekly guides count a percentage of the guide's yield, which
-    -- doesn't map onto custom runs one for one, so those aren't copied (yet).
+    -- Bundled recurring guides scale a share of the guide yield, not individual
+    -- custom runs. Refuse that conversion rather than changing the recipe's
+    -- meaning.
     if method.category ~= "pvm" and method.category ~= "skilling" and method.category ~= "production" then
         return nil, "Daily and weekly activities can't be copied as custom activities."
     end
@@ -645,11 +618,8 @@ end
 
 -- ---- What the preview strip says -------------------------------------------------
 
--- Everything the profit band shows, from the draft as it stands. It runs on
--- every keystroke, so it only does what the band needs:
---   result      Income.calculate's result (nil if the draft can't be priced yet)
---   coverage    "complete", or "partial" while a drop still needs a quantity
---   problems    validation problems; Save explains them while there are any
+-- Build the profit preview, coverage and validation problems from the current
+-- draft. This runs while typing, so leave work unrelated to the profit band out.
 function Draft.preview(draft, quotes)
     local record = Draft.withPlaceholderId(draft)
 

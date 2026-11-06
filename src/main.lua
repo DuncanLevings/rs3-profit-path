@@ -81,13 +81,13 @@ function App.start()
         methods[#methods + 1] = CustomMethods.toMethod(record)
     end
 
-    -- Kept for the custom activities screen (slice 3), which will show the warning.
+    -- Keep the store for editor actions and surface load warnings in Browse.
     calculator.customs = customs
     calculator.customWarning = customWarning
 
     local browser = Browser.new(methods, preferences, estimateMethod)
 
-    -- For the Custom activities list: its empty state and load warning.
+    -- Browse uses these for the Custom only empty state and load warning.
     browser.customCount = #records
     browser.customWarning = customWarning
 
@@ -362,10 +362,8 @@ function App.start()
         end
     end
 
-    -- Whether each catalogue item's ID really is that item in this client, by name.
-    -- Names never change, so a successful check is kept for the session: with the
-    -- full catalogue there are hundreds of items, and inventory changes are frequent.
-    -- A failed read (e.g. config not loaded yet) isn't kept, so it's tried again.
+    -- Verify item IDs against the client's names. Cache successful checks for
+    -- this session; retry failed native reads in case configs were not ready.
     local nameChecks = {}
 
     local function nameMatches(itemId, expected)

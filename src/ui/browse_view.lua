@@ -1,6 +1,6 @@
--- Draws the browser columns and the full-width My account screen. It owns its
--- child views; cleanup runs before workbench.lua destroys the parent screen.
--- Browser state and money calculations live elsewhere, so repainting is cheap.
+-- Draws the browser columns and full-width My account page. Owns the child
+-- views, which are released before workbench.lua destroys the parent. Browser
+-- state and calculations live elsewhere.
 local Browser = require("src/methods/browser")
 local Recommendations = require("src/methods/recommendations")
 local Dropdown = require("src/ui/dropdown")
@@ -24,8 +24,7 @@ local sortEntries = { { id = 0, label = "Profit" }, { id = 1, label = "ROI" } }
 local sortNames = { [0] = "profit", [1] = "roi" }
 local sortIDs = { profit = 0, roi = 1 }
 
--- Show: every activity, or only your own custom ones. Lists are always sorted
--- highest first, so this took the old direction slot.
+-- Filter between all activities and custom activities.
 local originEntries = {
     { id = 0, label = "All" },
     { id = 1, label = "Custom only" },
@@ -91,10 +90,8 @@ local CHIP_GAP = 8
 local CHIP_FILL = 0x3D3A32FF
 local ROW_INSET = 16
 
--- Browse shows results a page at a time. Each row is a panel with several native
--- parts (and PrettyUI builds every tooltip up front), and the full catalogue has
--- hundreds of methods. 25 rows could take the client past its one-second limit
--- for a single callback; 10 stays well inside it.
+-- Limit each page to 10 rows. Larger pages can exceed the client's one-second
+-- callback limit because native controls and tooltips are costly to build.
 local PAGE_SIZE = 10
 
 -- Recommend for me has no search, sort or filters. My account opens separately
@@ -162,13 +159,10 @@ local function estimateText(method, estimate)
     return text
 end
 
--- `guarded` checks the screen's lifetime. Row callbacks also check a local
--- generation because searching replaces rows without replacing the whole screen.
--- `extra` (optional): { onNewCustom = function() end }, which opens the custom
--- activity editor (the sidebar's Create activity button), and onImport, which
--- opens the screen for pasting in an activity someone shared (Import activity).
--- onAccount opens My account; accountState draws that page without the browser
--- columns and holds its scroll position through redraws and window resizes.
+-- Mount the browser, or My account when extra.accountState is supplied. guarded
+-- checks screen lifetime; row callbacks also reject replaced search results.
+-- extra provides onNewCustom, onImport and onAccount navigation actions.
+-- accountState keeps the account page's scroll position separate from the list.
 function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
     -- My account uses these controls in a full-width screen. Its own scroll
     -- state lets Back keep the previous list or recommendation where it was.
@@ -925,11 +919,9 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
             heading.content = listHeadings[browser.section] or listHeadings.browse
         end
 
-        -- Only the page you're on (Browse, Favourites...) gets the gold native
-        -- toggle frame. The activity is a filter on that page, so it's marked
-        -- differently: the chosen one in its own colour with a matching bar on
-        -- its left edge, the rest muted. Two gold frames looked like two pages
-        -- open at once.
+        -- Use the gold frame for the active page. Mark the selected activity
+        -- filter with its own colour and side bar so it stays distinct from page
+        -- navigation.
         for section, button in pairs(sectionButtons) do
             button:SetActive(browser.section == section)
         end
@@ -1010,10 +1002,9 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
                 colour = titleColour,
             })
 
-            -- Reserve the right column for profit. Anchored offsets let the title
-            -- shrink with the window without running underneath the figure. Keep
-            -- these labels tooltip-free: PrettyUI eagerly builds 11 components
-            -- per tooltip, which exhausted the native IDs on a full Browse page.
+            -- Reserve the right column for profit and let the title shrink on
+            -- resize. Keep these labels tooltip-free to stay within the native ID
+            -- budget.
             local title = row:AddTitle({
                 text = method.title, x = ROW_INSET + 32, y = 6,
                 width = -238, widthAnchor = 1, height = 28, colour = titleColour,
@@ -1282,10 +1273,8 @@ function BrowseView.mount(library, view, browser, guarded, openMethod, extra)
                 showSection("favourites")
             end), { width = 158, height = 32 })
 
-            -- Create activity is an action, not a list: it opens the custom activity
-            -- editor, so it never lights up as the page you're on. Your own
-            -- activities show in Browse with everything else (Show: Custom only
-            -- narrows to them).
+            -- Create activity opens the editor. Custom activities stay in Browse,
+            -- with Show: Custom only to narrow the list.
             if extra and extra.onNewCustom then
                 sidebar:AddSimpleButton("Create activity", guarded(function()
                     stopFinding()

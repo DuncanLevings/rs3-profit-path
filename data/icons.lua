@@ -1,35 +1,24 @@
--- The small set of native sprite names Profit Path draws, keyed by the short alias
--- the views use. This isn't a copy of rsprite's catalogue: names were picked from
--- its client 950-1 reference list. view_style.lua resolves them against the
--- running client and keeps the known unsafe-sprite exclusion.
---
--- Skill icons use the HITMARK_ICON_SKILL_* set: the small flat icons from XP drops,
--- which match the skills tab. The SKILL_* set is the round level-up medallion art,
--- which looked wrong next to the in-game stats. Necromancy has no hitmark icon in
--- that client build, so it keeps the mission-board icon.
---
--- `coins` is only a fallback. The views prefer the real Coins item icon; see
--- Style.coins in src/ui/view_style.lua.
+-- UI aliases for native client sprites. Names were selected from rsprite's
+-- client 950-1 reference list; view_style.lua resolves them and excludes the
+-- known unsafe sprite.
+-- Use flat XP-drop skill icons rather than level-up medallions. Necromancy uses
+-- mission-board art because that build has no hitmark icon. coins is a fallback
+-- for the item picture.
 return {
     coins = "COINS",
     save = "WARDROBE_ICON_PRESET_SAVE_24PX_0",
 
-    -- rsprite's curated "edit" icon (client 950-1 reference list), for Edit and
-    -- Duplicate as custom. Not yet seen in game; the buttons fall back to text.
+    -- Edit and Duplicate as custom; missing icons fall back to text.
     edit = "RS3_ICON_EDIT_23PX_0",
 
-    -- A rubbish bin, for removing rows and deleting custom activities. Not yet
-    -- seen in game; the buttons fall back to text.
+    -- Remove a row or delete a custom activity.
     trash = "AIF_COMBAR_TRASHCAN_0",
 
-    -- The client's own menu "share" button art, for Export on a custom
-    -- activity. Not yet seen in game; the button falls back to text.
+    -- Export a custom activity.
     share = "RS3_MENU_BTN_SHARE_NORMAL",
 
-    -- The activity page's boxed favourite button: gold once it's a favourite,
-    -- silver when it isn't. These are the stars PrettyUI's own STAR sprite
-    -- button draws (seen in game before the button was boxed). rsprite's
-    -- ICON_STAR_EMPTY drew as a black star in game, so it isn't used.
+    -- Gold for favourited, silver otherwise. Avoid ICON_STAR_EMPTY: it renders
+    -- black in this client.
     star_filled = "RAND_SPEEDRUN_STAR_GOLD_0",
     star_empty = "RAND_SPEEDRUN_STAR_SILVER_0",
 
@@ -53,8 +42,7 @@ return {
     skill_magic = "HITMARK_ICON_SKILL_MAGIC",
     skill_necromancy = "BP3_MISSION_ICON_SKILL_NECROMANCY",
 
-    -- The rest of the skills, from the same reference list (added for the Wiki
-    -- catalogue import; not yet seen in game). Hunter's sprite is named HUNTING.
+    -- Remaining skill icons. Hunter uses the native name HUNTING.
     skill_agility = "HITMARK_ICON_SKILL_AGILITY",
     skill_archaeology = "HITMARK_ICON_SKILL_ARCHAEOLOGY",
     skill_constitution = "HITMARK_ICON_SKILL_CONSTITUTION",

@@ -1,8 +1,7 @@
--- Saves only catalogue-relevant item counts, separately for backpack, worn gear
--- and bank. The saved bank stands in for the bank whenever it's closed (the game
--- only sends it while open; see readOwnership in account.lua). The saved backpack
--- and worn gear are only last-seen hints: those are always readable live.
--- This object owns the loaded profile record and a dirty flag, not native proxies.
+-- Owns saved, profile-specific item evidence and its dirty flag. Store watched
+-- counts separately for backpack, worn gear and bank; no native proxies.
+-- Use the saved bank while closed. Saved backpack/worn counts are last-seen hints
+-- because their live containers remain readable.
 local Snapshot = {}
 local containers = { "INV", "WORN", "BANK" }
 
@@ -13,10 +12,8 @@ local containers = { "INV", "WORN", "BANK" }
 local MAX_ITEMS = 4096
 local MAX_CHECKED = 20000
 
--- Record layout. Schema 1 saved every checked item as its own key, zeros too:
--- thousands of entries per container once tiered gear arrived. Schema 2 keeps
--- held items as keys and folds every zero into one "absent" string of IDs
--- ("1351,1359,..."), so a record stays small. Schema 1 records still load.
+-- Schema 2 stores held counts by item ID and packs checked zeros into one
+-- comma-separated absent string. Schema 1's individual zero entries still load.
 local SCHEMA = 2
 
 local function validCount(value)

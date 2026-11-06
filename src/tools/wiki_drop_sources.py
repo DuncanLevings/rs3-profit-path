@@ -4,30 +4,14 @@ Writes catalogue-source/ge-items.json and catalogue-source/thieving.json. Run by
 hand when they need refreshing; the plugin never talks to the Wiki.
 `catalogue.py build` then packs them into data/ge_items.lua and data/thieving.lua.
 """
-# Developer tool, never shipped with the plugin.
-#
-# Why this exists: custom activities (Phase 9) let a player pick items by name and
-# start from a thieving target's loot. Two things we didn't have yet:
-#   1. every Grand Exchange item's name and ID, so the editor's item search covers
-#      anything GE Prices Library can actually price;
-#   2. pickpocket and stall loot tables. The monster snapshot only has them for
-#      the few NPCs that are monsters too (no Master Farmer, H.A.M., elves...).
-#
-# Where the data comes from (all through api.php, one request per second):
-#   infobox_item bucket   item names and IDs. "On the GE" means the item has an
-#                         exchange page; the bucket's `tradeable` field is blank
-#                         even for things like Rune bar, so we don't use it.
-#   categorymembers       the thieving targets: Category:Thievable entities
-#                         (pickpocket NPCs) plus Category:Stalls.
-#   dropsline bucket      every drop row on those pages. Each row's drop_json says
-#                         its Drop type; we keep only "thieving" rows.
-#   prop=revisions        each target page's current revision, for provenance.
-#
-# Left out on purpose: Category:Thievable quest entities (quest-only pickpockets),
-# and thieving chests and safes, which have no category to list them by.
-#
-# Everything fetched is treated as untrusted data: it's parsed as JSON, checked
-# for the shapes we expect, and nothing in it is ever run.
+# Maintainer-only Wiki collection through api.php, at most one request per
+# second. infobox_item gives GE IDs/names; use exchange pages because tradeable
+# is blank for some GE items.
+# List Thievable entities and Stalls with categorymembers, retain thieving
+# dropsline rows, and record page revisions. Quest-only pickpockets, chests and
+# safes are excluded.
+# Validate response shapes before using them; collected content is data, never
+# executable code.
 from __future__ import annotations
 
 import argparse

@@ -1,19 +1,7 @@
--- Checks a method's requirements against what we know about the player. It's pure
--- logic over plain tables and never touches the game client, which makes it easy to
--- test. Callers check "access" (can you do it at all) and "recommended" (should you)
--- separately.
---
--- Every check answers one of three things:
---   "met"     - we have evidence the player meets it
---   "unmet"   - we have evidence they don't
---   "unknown" - we can't tell (logged out, data missing, check not built yet...)
--- The golden rule: missing data is "unknown", never quietly "unmet" or "met".
---
--- Some checks the game can never answer for a plugin: perks, unlocks with no
--- readable game value, "be skulled", "a light source". Those are marked
--- `ignored`: the method page still lists them (neutral, for the player to check
--- themselves), but they're left out of a method's overall Met/Missing, so they
--- can't keep a method out of Browse's Met filter or out of recommendations.
+-- Evaluates requirement trees against plain account evidence; no client calls.
+-- Required access and recommended checks are evaluated separately.
+-- met/unmet need evidence. Missing data stays unknown. Unsupported checks are
+-- ignored in the overall verdict but still shown for the player to check.
 local Requirements = {}
 
 -- Builds the result table every check returns, keeping the original wording so the
@@ -216,11 +204,9 @@ function Requirements.evaluate(requirement, account)
 
             local owned = account.items and account.items[candidate.item_id]
 
-            -- A candidate whose ID the client names differently (a retired or
-            -- renamed version on the Wiki) can't be trusted either way. If you
-            -- don't hold it, skip it: one stale ID among thousands must not make
-            -- every tier check "unknown". If you do hold it, it might be a real
-            -- match, so the answer stays unknown.
+            -- A name mismatch makes this item ID unverified. Ignore an unowned
+            -- stale ID so it does not spoil the whole tier check; an owned
+            -- possible match keeps the result unknown.
             if matches and owned and owned.verified == false then
                 matches = false
 
@@ -286,9 +272,8 @@ function Requirements.evaluate(requirement, account)
         return checked
     end
 
-    -- Item check: the tricky one. Seeing enough items proves the player has them. But
-    -- NOT seeing them only proves they don't if we know we've seen everything (bank
-    -- included). Otherwise the rest might be somewhere we haven't looked.
+    -- Enough observed items prove ownership. Missing items only prove absence
+    -- when every supported source, including the bank, has been checked.
     if kind == "item" then
         local entry = account.items and account.items[requirement.itemId]
 
@@ -321,10 +306,9 @@ function Requirements.evaluate(requirement, account)
     return checked
 end
 
--- A method's overall verdict from its Required list. A guide that lists nothing
--- required is Met. Checks only the player can judge (plain notes like "Combat
--- equipment", and anything ignored above) are left out, so a method whose only
--- requirements are those is Met too: the method page still lists them.
+-- Evaluate Required checks for the overall verdict. An empty list, or one
+-- containing only ignored checks, counts as met; those ignored checks remain
+-- visible on the activity page.
 function Requirements.evaluateAccess(requirements, account)
     local checked = Requirements.evaluate(requirements.access, account)
 

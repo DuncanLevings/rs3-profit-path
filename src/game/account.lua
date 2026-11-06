@@ -1,9 +1,7 @@
--- Player-account reads live here. This file owns the client event subscriptions
--- (inventory, skills, quests, game state) and tells its owner which evidence
--- changed. It never does money maths or decides recommendations.
---
--- Bank data may be unavailable while closed. Readable backpack/worn/bank contents
--- and mapped tool-belt families still don't establish full account ownership.
+-- Reads account evidence and owns the inventory, skill, quest and game-state
+-- subscriptions. Tell the caller which evidence changed.
+-- Bank reads require an open bank. Even complete supported container reads do not
+-- cover every storage location or tool-belt category.
 local Toolbelt = require("src/game/toolbelt")
 local Account = {}
 
@@ -22,14 +20,12 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         -- thrown away as soon as that container changes. Lives only in memory.
         ownershipCache = {},
 
-        -- The last bank read made while the bank was open, this login session.
-        -- The game only lets us read the bank while it's open, but a bank doesn't
-        -- change while it's closed (bar deposit boxes, familiars and playing on
-        -- another device), so the last read keeps counting after it closes. After
-        -- a logout the saved bank (account_snapshot.lua) takes over the same way.
-        -- Besides the watched items' counts it keeps `all`: every item that was in
-        -- the bank, so an item a custom activity starts asking about after the
-        -- bank closed can still be answered (in it or not) from that same visit.
+        -- Keep this login's last open-bank read for use while the bank is closed.
+        -- It may become stale through deposit boxes or other changes we cannot
+        -- read.
+        -- all holds every item seen on that visit, so newly watched custom
+        -- requirements can still be answered. After logout, saved evidence covers
+        -- only previously watched items.
         sessionBank = nil,
         snapshot = snapshot,
         questVariables = {},
@@ -140,18 +136,11 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         return self.toolbeltCache
     end
 
-    -- How many of each item in `wanted` (a set like { [2353] = true }) the player
-    -- can use across backpack (INV), worn gear (WORN), bank (BANK) and mapped
-    -- tool-belt families. The three inventory config names are verified.
-    --
-    -- Returns { counts = { [itemId] = total }, complete = true/false }. `complete`
-    -- means the three containers and mapped belt families were readable. It does
-    -- NOT cover Diango, the house or other belt categories. Unreadable live state
-    -- can't establish absence; lastKnownAbsent separately preserves saved zeros.
-    --
-    -- Counts are cached per container until an inventory event says it changed, so
-    -- refreshing the borders doesn't hit the client for every item every time.
-    -- Saved counts are returned separately and never count towards live ownership.
+    -- Read counts for the wanted item-ID set across backpack, worn gear, bank and
+    -- mapped tool-belt families. Cache containers until inventory events
+    -- invalidate them.
+    -- complete covers only those supported sources. Live failures cannot prove
+    -- absence; saved counts and lastKnownAbsent are separate last-seen evidence.
     function self:readOwnership(wanted)
         local totals, savedCounts, sources = {}, {}, {}
         local lastKnownAbsent = {}
@@ -196,12 +185,9 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
                     end
                 end
 
-                -- With many items to ask about (the combat equipment group has
-                -- thousands), one pass over the container's slots is far cheaper
-                -- than one GetTotal call per item. Items not in any slot are 0.
-                --
-                -- The bank is always scanned once per change, so we know
-                -- everything in it (see sessionBank's `all`), not just what's watched.
+                -- Scan large watched sets once instead of asking for every item
+                -- separately. Always scan the whole bank after a change so new
+                -- watched items can use this visit's evidence.
                 local needAll = name == "BANK" and not (snapshot and snapshot.all)
                 local slots = (missing > SLOT_SCAN_THRESHOLD or needAll) and inventory.GetSlots and inventory:GetSlots()
                 local all = snapshot and snapshot.all
@@ -245,12 +231,10 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
                 return { configId = definition.id, counts = counts, all = all }
             end)
 
-            -- The bank is closed: use the last time it was open, from this session
-            -- or saved from an earlier one. It must cover every wanted item (zeros
-            -- included), or it can't say what's missing.
-            --
-            -- Checking coverage walks every wanted item (thousands, with the gear
-            -- checks), so the answer is kept until the bank or the wanted set changes.
+            -- Use the latest session or saved bank read while closed. It must
+            -- cover every wanted item, including zeros, to establish last-seen
+            -- absence. Cache this coverage check until the bank or wanted set
+            -- changes.
             local lastBank
 
             if not (ok and read) and name == "BANK" then
@@ -261,10 +245,9 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
                 if counts and not (known and known.counts == counts and known.wanted == wanted) then
                     local covered = true
 
-                    -- An item we started watching after the bank closed: this
-                    -- session's visit saw everything in the bank, so it's that
-                    -- count, or 0 if it wasn't there. A saved bank from an earlier
-                    -- login only has the watched items, so there it stays unknown.
+                    -- The session snapshot includes the whole bank, so a newly
+                    -- watched item is present or known absent. Older saved
+                    -- snapshots cover only their watched set.
                     local all = self.sessionBank and self.sessionBank.counts == counts and self.sessionBank.all
 
                     local filled = false
@@ -545,8 +528,8 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
         end
     end)
 
-    -- This may well fire on every XP drop while skilling (not checked in game yet),
-    -- so keep the reaction cheap: the UI just re-reads the few skills on screen.
+    -- Keep skill-event handling small: notify the UI to refresh the skills it
+    -- currently shows.
     subscribe(Event.SkillTransmit, function()
         notify("skills")
     end)

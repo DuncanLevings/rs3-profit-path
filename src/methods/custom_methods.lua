@@ -1,23 +1,11 @@
--- Custom activities: the player's own money-making recipes (Phase 9).
---
--- This file owns three things, and no UI:
---   1. the saved record format, and checking a record before we trust it
---      (records come from storage, and later from pasted imports, so they're
---      untrusted: anything could be in them);
---   2. turning a valid record into the same method shape the bundled catalogue
---      uses, so the shared calculator, Browse and favourites need no special cases;
---   3. saving, loading and deleting records in PersistentDB.
---
--- On screen these are "Custom activities". In code they're methods, like the
--- bundled ones, with `origin = "custom"`.
---
--- Storage contract (shared by every profile on this computer; favourites, rates and
--- hiding stay per profile as before):
---   profit-path.custom.v1/index        { schema = 1, next = n, ids = { "custom.1", ... } }
---   profit-path.custom.v1/custom.<n>   one record per activity
--- One key per activity means a failed or oversized write can only affect that one
--- activity. IDs are never reused, so a leftover favourite, rate or history entry for
--- a deleted activity can never point at a different one later.
+-- Owns custom record validation, conversion to the shared activity model, and
+-- PersistentDB storage. Records from storage or import are untrusted.
+-- Activities are shared across profiles; rates, favourites and hiding stay per
+-- profile. Storage keys:
+-- profit-path.custom.v1/index: { schema, next, ids }
+-- profit-path.custom.v1/custom.<n>: one record per activity
+-- Keep records separate so a failed write affects one activity. Never reuse
+-- deleted IDs: old favourites and history must not point at a different activity.
 local CustomMethods = {}
 
 -- The quests and unlocks a requirement can name (loaded on first use).
@@ -26,9 +14,9 @@ local UnlockData = require("src/data/unlock_data")
 local INDEX_KEY = "profit-path.custom.v1/index"
 local RECORD_PREFIX = "profit-path.custom.v1/"
 
--- Size limits. They exist so nobody can build an activity big enough to run the
--- client out of native UI IDs (Mega Shop Run's page did, at ~112 tooltips). They're
--- provisional until the editor's pages are measured (Phase 9 plan, slice 4).
+-- Cap records to keep activity pages within the shared native UI ID budget.
+-- Editor and page tests cover records at these limits; see the README for the
+-- tooltip budget.
 CustomMethods.LIMITS = {
     outputs = 40,
     supplies = 15,
@@ -67,8 +55,7 @@ local BASES = { action = true, trip = true, hour = true }
 -- (an unreadable Wiki rate). Supply rows are always counted.
 local OUTPUT_STATES = { included = true, off = true, needs = true }
 
--- The client's SkillType names (developer.runescape.com/rs/game/player.html,
--- checked 4 Nov 2026). Constitution is HITPOINTS there.
+-- Use the client SkillType names; Constitution is HITPOINTS.
 local SKILLS = {}
 
 -- The same names as a list, in the client's order (the editor's skill search).
@@ -358,12 +345,9 @@ local function checkRequirement(check, where, problems)
     return false
 end
 
--- Checks a whole record. Returns true, or false plus a list of every problem
--- found (not just the first), so the editor and import review can show them all.
---
--- options.saving: the rules for a save (the editor's Save and its preview), on
--- top of the ones every stored record must pass. A PvM activity needs a
--- difficulty to be saved, but one saved before difficulty existed still loads.
+-- Return true, or false and all validation problems for the editor/import review.
+-- options.saving adds current save rules: PvM needs a difficulty, while older
+-- unrated records may still load.
 function CustomMethods.validate(record, options)
     local problems = {}
     local saving = options and options.saving
@@ -404,8 +388,8 @@ function CustomMethods.validate(record, options)
         end
     end
 
-    -- Notes are numbered steps (shown on How to do it). Builds before 0.8.36
-    -- saved one plain note; that still loads, as a single step.
+    -- Notes are numbered steps on How to do it. Load a legacy string note as
+    -- one step.
     if type(record.notes) == "string" then
         if #record.notes > CustomMethods.LIMITS.notes then
             problems[#problems + 1] = "Notes can be at most " .. CustomMethods.LIMITS.notes .. " characters."
@@ -463,10 +447,8 @@ function CustomMethods.validate(record, options)
         end
     end
 
-    -- Kills/actions per trip: needed when a row is per trip. It may also be
-    -- saved without any per-trip rows yet (the editor's "Do you bank between
-    -- trips? Yes" keeps it); the income maths simply doesn't use it then. It
-    -- still has to be a sensible number, and daily/weekly has no trips at all.
+    -- Allow a trip size before any row uses it, but validate it whenever present.
+    -- Daily/weekly activities cannot have trips.
     local perTrip = record.actions_per_trip
     local perTripOk = nonNegativeFinite(perTrip) and perTrip > 0
 
@@ -503,8 +485,8 @@ function CustomMethods.validate(record, options)
         problems[#problems + 1] = "At most " .. CustomMethods.LIMITS.requirements .. " requirements."
     end
 
-    -- The minimum-requirement rule (agreed 4 Nov). A note can't count: the game
-    -- can't check it, so it would let anything through.
+    -- Notes cannot satisfy the minimum Required-check rule: the game cannot
+    -- verify them.
     if record.no_requirements ~= nil and record.no_requirements ~= true then
         problems[#problems + 1] = "Invalid 'no requirements needed' choice."
     end
@@ -600,10 +582,9 @@ local function requirementNode(check)
 
     if check.kind == "item" then
         local text = (check.quantity > 1 and (check.quantity .. " x ") or "") .. check.name
-        -- `picture` puts the item's picture beside the line on the activity page.
-        -- (Not display_items, the icon grid bundled activities use: every icon
-        -- there has a tooltip, and a custom page at its row limits has no room
-        -- left for 25 more. The line already names the item, so no tooltip.)
+        -- picture draws the item without a tooltip; the line already names it.
+        -- Using the bundled display_items grid would exceed the custom page
+        -- tooltip budget.
         return { kind = "item", itemId = check.item_id, quantity = check.quantity, text = text, picture = true }
     end
 
@@ -616,10 +597,9 @@ local function requirementNode(check)
             names[index] = children[index].text
         end
 
-        -- One text line that names every item, e.g. "Pickaxe (any one of: Rune
-        -- pickaxe, Dragon pickaxe)". `listed` tells the activity page the items
-        -- are already in the wording, so it skips the hover list: that's a
-        -- tooltip per line, and a custom page at its limits can't afford 25.
+        -- List item alternatives in the line. listed suppresses the extra hover
+        -- list, keeping a full custom requirements page within the tooltip
+        -- budget.
         local joined = check.mode == "any" and " (any one of: " or " (all of: "
 
         return { kind = check.mode, text = check.name .. joined .. table.concat(names, ", ") .. ")",
@@ -653,10 +633,9 @@ function CustomMethods.difficultyBand(level)
     return "Elite"
 end
 
--- Builds the method the rest of the plugin understands from a VALID record (call
--- validate first). Only counted rows go into the income model: rows switched off
--- are left out, and any row still waiting for a number makes the model incomplete,
--- so there's no total profit until the player fills it in or removes it.
+-- Convert a validated record to the shared activity model. Leave off rows out;
+-- rows needing a quantity keep the estimate incomplete until corrected or
+-- removed.
 function CustomMethods.toMethod(record)
     local outputs, inputs = {}, {}
     local coverage = "complete"
@@ -811,13 +790,9 @@ function CustomMethods.store(db)
         return records, warning
     end
 
-    -- Saves a new activity. `record` is everything but the ID; we give it the next
-    -- unused one. Returns the saved record, or nil plus a message (or the list of
-    -- validation problems).
-    --
-    -- Order matters: the record is written first, then the index. If the index
-    -- write fails, the record is just an unlisted leftover under an ID the index
-    -- hasn't handed out yet, so the next save simply writes over it.
+    -- Assign a new ID and save the record before its index entry. If the index
+    -- write fails, the unlisted record can be overwritten by the next create.
+    -- Returns the saved record or an error/validation problems.
     function self:create(record)
         local index, warning, writable = loadIndex()
 
@@ -903,10 +878,9 @@ function CustomMethods.store(db)
         return record
     end
 
-    -- Deletes one activity. It leaves the index first (so it's gone even if the
-    -- record delete then fails), then its record. Its ID is never handed out again.
-    -- Favourites, rates and history that mention it are left alone: they belong to
-    -- each profile, and a deleted ID matches nothing.
+    -- Remove the index entry before deleting the record, so a failed record
+    -- delete cannot leave it listed. Never reuse its ID; leftover profile
+    -- favourites, rates and history then match nothing.
     function self:delete(id)
         local index, warning, writable = loadIndex()
 

@@ -71,10 +71,8 @@ function Browser.new(methods, preferences, estimateMethod)
         message = warning,
     }
 
-    -- Favourites belong to the character's profile, just like saved rates. Reload
-    -- them when the window opens or after a method, in case the character changed.
-    -- The methods hidden from recommendations are per profile too, so they come
-    -- along in the same reload.
+    -- Reload profile favourites and recommendation exclusions on opening or
+    -- returning from an activity, in case the character changed.
     function self:loadFavourites()
         -- A profile switch also changes every personal rate. Old list estimates
         -- must go even when this reload came from the detail's favourite button.
@@ -176,12 +174,8 @@ function Browser.new(methods, preferences, estimateMethod)
         return list
     end
 
-    -- Opening/reopening refreshes the catalogue once. Search, sorting and skill
-    -- events only reuse these estimates; there is no repeating price timer.
-    --
-    -- Hundreds of methods share the same items (coins, potions, runes), so one
-    -- price snapshot is shared across the whole refresh: each item is looked up
-    -- once, not once per method that uses it.
+    -- Refresh estimates on opening/reopening. Share one quote per item across
+    -- activities; search, sorting and skill events reuse those estimates.
     function self:refreshEstimates()
         self.estimates = {}
         local shared = {}
@@ -249,10 +243,8 @@ function Browser.new(methods, preferences, estimateMethod)
 
         for _, method in ipairs(methods) do
             local matchesCategory = self.category == "all" or method.category == self.category
-            -- Hidden methods aren't filtered out here on purpose: they stay
-            -- browsable (and favouritable). Only recommendations skip them.
-            -- Custom activities sit in the same lists as bundled ones; Show:
-            -- Custom only narrows to the player's own.
+            -- Recommendation exclusions remain browsable and favouritable. Custom
+            -- activities share these lists; Show: Custom only filters by origin.
             local matchesSection = self.section ~= "favourites" or self.favourites[method.id]
             local matchesOrigin = self.origin ~= "custom" or method.origin == "custom"
 

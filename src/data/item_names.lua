@@ -1,13 +1,7 @@
--- Names of every Grand Exchange item, for the custom activity editor's item search.
---
--- The list (data/ge_items.lua) is built by src/tools/catalogue.py from
--- catalogue-source/ge-items.json, which src/tools/wiki_drop_sources.py imports from
--- the RuneScape Wiki. It holds only items with a GE page, because those are the ones
--- GE Prices Library can price. Labels are unique: when two items share a name, the
--- label is the Wiki page name instead, e.g. "Monk's robe (top)".
---
--- It's two parallel lists, ids[i] and labels[i], sorted by label. That's the
--- smallest plain format for ~7,500 entries, and needs no unpacking step.
+-- Searches bundled GE item names for the editor. catalogue.py builds
+-- data/ge_items.lua from wiki_drop_sources.py's ge-items.json snapshot.
+-- Only items with GE pages are included. Unique labels use the Wiki page name
+-- when display names clash. Parallel ids/labels lists are sorted by label.
 local ItemNames = {}
 
 -- Loaded on first use, like the other data readers.
@@ -80,11 +74,8 @@ function ItemNames.rank(label, needle)
     return 3
 end
 
--- Items whose label contains `query` (ignoring case), best matches first (see
--- rank), then in label order, at most `limit` of them. Returns a list of
--- { id, label } plus the total number of matches, so the editor can say
--- "showing 5 of 143". A blank query matches nothing: listing all 7,500 items
--- at once would be no help to anyone.
+-- Return up to limit matching { id, label } entries, best matches first, plus the
+-- total match count. Matching ignores case; a blank query returns nothing.
 function ItemNames.search(query, limit)
     load()
 

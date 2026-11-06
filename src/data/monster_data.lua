@@ -1,18 +1,8 @@
--- Reads drop tables from a packed snapshot. By default that's the monster
--- snapshot (data/monsters.lua); thieving targets (data/thieving.lua) use exactly
--- the same format, so src/data/thieving_data.lua opens that file with this code.
---
--- How the data is packed: lots of monsters share the same text ("Coins", "1/128")
--- and even whole drop rows, so the generator stores each string, drop row and
--- section once and refers to them by number. A monster row is just a list of those
--- numbers. This reader turns one monster back into normal named fields when asked.
---
--- Important: the field positions (row[1], row[2]...) must match the *_FIELDS lists
--- in src/tools/catalogue.py. Change one and you must change the other; the catalogue
--- `verify` command round-trips every record to catch any mismatch.
---
--- Every call returns brand-new tables, so one caller editing a result can't
--- accidentally change what another caller sees.
+-- Reads packed monster or thieving drop tables. The snapshot shares strings, drop
+-- rows and sections by numeric reference. Each lookup returns fresh tables so
+-- callers can safely edit the result.
+-- Field positions must match catalogue.py's *_FIELDS lists. catalogue verify
+-- round-trips every record to catch mismatches.
 
 -- Builds a reader for one packed data module. Each reader keeps its own data.
 local function open(moduleName)
@@ -132,11 +122,9 @@ local function open(moduleName)
         return { schema = packed.schema, built = packed.built, monsters = #packed.monsters }
     end
 
-    -- Looks a record up by its exact title. Exact matching matters: some monsters
-    -- have several pages for different encounters, and we mustn't mix them.
-    -- An unknown title returns nil, "unknown". We never go online to look it up.
-    --
-    -- `level` is only set for thieving targets: the Thieving level to steal from it.
+    -- Find an exact title so encounter variants stay separate. Returns nil,
+    -- "unknown" for an absent title. Thieving results also include the required
+    -- level.
     function reader.find(title)
         load()
 

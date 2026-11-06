@@ -1,15 +1,10 @@
--- Reads the bundled method catalogue (data/methods.lua) back into normal tables.
---
--- How the data is packed (see pack_methods in src/tools/catalogue.py):
---   - every distinct piece of text is stored once in `strings` and used by number
---   - every distinct set of record keys (a "shape") is stored once in `shapes`
---   - a record is {shape number, value, value, ...}, in its shape's key order
---   - a list is {0, value, ...}, or {-1, text number, ...} for a list of text
--- A shape key starting with "$" means that value is a text number, not a number.
---
--- The result has the same fields everyone used before: items, methods, equipment
--- and toolbelt, plus icons and find(id). The catalogue `verify` command reads every method
--- back through this file and compares it with the source, so the two can't drift.
+-- Unpacks data/methods.lua into items, methods, equipment, toolbelt and icons,
+-- with find(id) for activity lookup.
+-- The packer shares strings and key sets (shapes). Records store a shape number
+-- followed by values in key order; a $ key marks a string reference. Lists start
+-- with 0, or -1 for string references.
+-- Keep this format in sync with catalogue.py: catalogue verify round-trips every
+-- activity against its source.
 local data = require("data/methods")
 assert(data.schema == 1 and data.packing == 1, "Unsupported Profit Path method data")
 

@@ -1,18 +1,9 @@
--- Everything Profit Path saves: personal rates, favourites, methods hidden from
--- recommendations, Recommend for me's settings and history, which character uses
--- which profile, and the browser's sort choice.
---
--- How profiles work: PersistentDB is shared by every character on this computer,
--- so saved rates and favourites live under a "profile". When a window opens we
--- read the character's display name and look up (or create) its profile.
---
--- Why not the tracking ID (trackingAccess), which would survive a rename? In
--- this client Player.GetTrackingID() crashes the whole game every time it's
--- called (traced in 0.8.32-dev; see CHANGELOG), so it isn't used at all.
---
--- Each rate lives under its own key rather than in one big record, so a failed save
--- or a reset can only ever touch that one rate. Treat the key formats below as a
--- contract: changing them would silently lose everyone's saved settings.
+-- Owns profile preferences: rates, favourites, recommendation
+-- exclusions/settings/history, character bindings and browser sort.
+-- Bind profiles by display name. GetTrackingID crashes this client, so a rename
+-- starts a new binding and leaves the old settings saved.
+-- Each rate has its own key to isolate saves and resets. Keep the versioned key
+-- formats stable so updates preserve settings.
 local Preferences = {}
 
 -- Storage keys. Profile-specific keys add "/<length>:<profile>" on the end.
@@ -59,19 +50,16 @@ local function validProfile(name)
         and name:match("^[%w _-]+$") ~= nil and name:find("%S") ~= nil
 end
 
--- Character display names aren't manually chosen profile labels. Keep their
--- native text (including non-breaking spaces) rather than applying the old ASCII
--- whitelist. We don't decode it: the client doesn't expose Lua's utf8 library.
--- Profiles are flat database keys with byte-length prefixes, not paths.
+-- Keep native display-name text, including non-breaking spaces. The client has no
+-- utf8 library. These are database key components with byte-length prefixes, not
+-- file paths.
 local function validCharacterText(value)
     return type(value) == "string" and value:find("%S") ~= nil
         and not value:find("%c")
 end
 
--- Anything read back from storage is untrusted: it could be from an older version,
--- hand-edited or corrupted. Check the shape and that the units still match this
--- method's (a rate saved as kills/hour means nothing if the method now uses trips).
--- `value == value` is the standard Lua trick for rejecting NaN.
+-- Validate stored rates and their units; a rate for a different unit cannot be
+-- reused. value == value rejects NaN.
 local function validStoredRate(stored, unit)
     if type(stored) ~= "table" or stored.schema ~= 1 or stored.unit ~= unit then
         return false
@@ -104,11 +92,8 @@ function Preferences.new(db)
         end
     end
 
-    -- Builds the storage key for one method's rate under the current profile, e.g.
-    -- "profit-path.rate.v1/7:Default/smelting-steel-bars.basic/smelts_per_hour".
-    -- The "7:" is the profile name's length. That keeps each key unambiguous
-    -- (where the profile ends and the method starts) even if the allowed profile
-    -- characters change later.
+    -- Build a rate key under the current profile. Prefix the profile with its
+    -- byte length so separators in a name cannot make the key ambiguous.
     local function rateKey(method)
         return "profit-path.rate.v1/" .. #self.profile .. ":" .. self.profile
             .. "/" .. method.id .. "/" .. method.income.rate.key
@@ -119,14 +104,10 @@ function Preferences.new(db)
         return base .. "/" .. #self.profile .. ":" .. self.profile
     end
 
-    -- Favourites and hidden methods are both just a set of method IDs, saved as
-    -- { schema = 1, ids = { [id] = true } }. These two helpers load and save one.
-    -- `what` names the list in messages ("Favourites", "Hidden activities").
-    --
-    -- Loading keeps valid IDs even if they aren't in this bundle, so an update
-    -- won't erase choices. It returns ids, warning, writable. `writable` is false
-    -- when what's stored couldn't be read or understood; saving then refuses to
-    -- write, so a glitch can never replace a real list with an empty one.
+    -- Load a profile ID set ({ schema = 1, ids = { [id] = true } }). Preserve
+    -- valid IDs missing from this bundle so updates do not erase choices.
+    -- Returns ids, warning, writable. Refuse saves after an unreadable or
+    -- unknown-schema record rather than replacing it with an empty set.
     local function loadIds(base, what)
         local key = profileKey(base)
 
@@ -221,12 +202,9 @@ function Preferences.new(db)
         end))
     end
 
-    -- Switches to the profile for this character, creating one if it's new. No
-    -- saved rate is ever rewritten here: we only decide which profile to read from.
-    --
-    -- CHARACTERS_KEY holds { schema = 1, owner = <first character>, bindings =
-    -- { [folded name] = profile } }. A renamed character looks new: its old
-    -- settings stay saved under the old name.
+    -- Bind the character to its existing or new profile without rewriting rates.
+    -- CHARACTERS_KEY stores { schema, owner, bindings = { [folded name] = profile
+    -- } }. A rename leaves the old binding and settings intact.
     function self:bindCharacter(name)
         if not validCharacterText(name) then
             return false, "Character name is unavailable or contains invalid text. Try opening again."
@@ -404,13 +382,10 @@ function Preferences.new(db)
         return true
     end
 
-    -- Recommend for me's record for this profile: settings plus, per activity,
-    -- the rotation history { shown = { id, ... }, last = id }. "shown" is every
-    -- method suggested in the current cycle, so unseen ones come first; "last" is
-    -- the latest suggestion, so a new request doesn't repeat it straight away.
-    --
-    -- Returns record, warning, writable, like loadIds: valid fields survive a
-    -- partly broken record, and an unreadable one is never written over.
+    -- Load recommendation settings and per-activity rotation history. shown
+    -- tracks this cycle; last prevents an immediate repeat.
+    -- Returns record, warning, writable. Keep valid fields from partly damaged
+    -- records and do not overwrite unreadable ones.
     function self:loadRecommend()
         local key = profileKey(RECOMMEND_KEY)
         local record = recommendDefaults()

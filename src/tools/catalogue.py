@@ -3,22 +3,10 @@
 No network access. Source JSON stays readable; generated Lua interns repeated strings,
 drop rows and sections. Only import needs an existing Monster Lookup checkout.
 """
-# Developer tool, never shipped with the plugin. The flow is:
-#
-#   import-monsters  copy monster/drop data out of a local Monster Lookup checkout
-#                    into catalogue-source/monsters.json (readable, reviewable)
-#   format           tidy a hand-edited catalogue-source/methods.json into its standard
-#                    one-row-per-line layout (build and verify refuse any other layout)
-#   build            turn the JSON sources into data/monsters.lua, data/methods.lua and
-#                    data/recipes.lua (recipes come from src/tools/wiki_recipes.py),
-#                    plus data/ge_items.lua and data/thieving.lua when their sources
-#                    exist (from src/tools/wiki_drop_sources.py), and data/unlocks.lua
-#                    (quests and unlocks for custom activities, from catalogue-source/research)
-#   verify           rebuild in memory and check the files on disk still match, then
-#                    load every monster back through the real Lua reader
-#
-# The idea: humans edit and review the JSON, the plugin loads the generated Lua, and
-# this script makes sure those two never drift apart.
+# Offline maintainer tool. import-monsters captures local source data; format
+# normalises curated JSON; build generates Lua bundles; verify rebuilds and
+# round-trips the readers.
+# Edit source JSON rather than generated Lua. Keep packing and readers in sync.
 from __future__ import annotations
 
 import argparse
@@ -45,9 +33,8 @@ RECIPE_OUTPUT = ROOT / "data" / "recipes.lua"
 # This file is plain reference data, so loading it needs no game globals.
 ICON_NAMES = set(LuaRuntime().execute((ROOT / "data" / "icons.lua").read_text(encoding="utf-8")).keys())
 
-# Reviewed research: what each non-item requirement (an ability, spell, prayer,
-# relic, perk...) is, and the rsprite sprite that shows it. Drafted by
-# `catalogue.py match-sprites`, then checked by hand.
+# Reviewed capability kinds and native UI sprite names. match-sprites drafts
+# candidates from the reference list; review them before building.
 CAPABILITIES = ROOT / "catalogue-source" / "research" / "capabilities.json"
 
 

@@ -4,28 +4,11 @@ Writes catalogue-source/recipes.json. Run by hand when the recipes need refreshi
 the plugin never talks to the Wiki. `catalogue.py build` then turns the JSON into
 data/recipes.lua offline, just like the monster and method data.
 """
-# Developer tool, never shipped with the plugin.
-#
-# Why this exists: some supplies (Perfect plus potion, Overload, most summoning
-# pouches) can't be traded, so GE Prices Library has no price for them. Instead we
-# price them by what it costs to MAKE them: add up the ingredients at GE prices.
-#
-# Where the data comes from: the Wiki keeps structured "buckets" next to its pages.
-#   recipe        every recipe's ingredients, outputs and doses ("production_json").
-#                 Each ingredient says how the Wiki prices it:
-#                   gemw     a Grand Exchange price
-#                   estcost  untradeable, priced from its own recipe
-#                   no       no price at all (e.g. Crystal tree blossom)
-#                   smuggler only sold by the Daemonheim smuggler
-#   infobox_item  item names -> item IDs, which GEPL needs to look up prices.
-#
-# What we keep:
-#   1. every Herblore and Summoning recipe whose main output can't be traded;
-#   2. the recipes for any untradeable ingredient those need (and theirs, and so on);
-#   3. item IDs for every output and every GE-priced ingredient.
-#
-# Everything fetched is treated as untrusted data: it's parsed as JSON, checked for
-# the shapes we expect, and nothing in it is ever run.
+# Maintainer-only import of untradeable Herblore/Summoning recipes and their
+# nested ingredients. Keep item IDs, output amounts and dose units.
+# Use the Wiki recipe bucket: gemw marks GE ingredients, estcost nested recipes,
+# no unpriced ingredients, and smuggler Daemonheim-only purchases. infobox_item
+# supplies IDs. Validate response shapes before building.
 from __future__ import annotations
 
 import argparse

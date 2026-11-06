@@ -1,33 +1,12 @@
--- Sharing custom activities between players (Phase 9, slice 7): turning a saved
--- record into one line of text someone can copy, and checking a pasted line before
--- it becomes a new activity.
---
--- The game gives plugins no clipboard or file API, so sharing goes through a text
--- box: the player copies the line out with Ctrl+C, and the other player pastes it
--- into Import with Ctrl+V. The text box probe (5 Nov 2026, dev_plugins/
--- text-box-probe) found what that box can carry:
---   * at most 9,999 characters, whatever maxLength asks for; longer text is cut;
---   * a line break cuts everything after it, so the line has none;
---   * copy and paste keep the text exactly, symbols included.
---
--- The line looks like this:
---
---   PP1:{t'Mining rocks',c'skilling',...}*1a2b3c4d
---
---   PP1:      the format and its version. A later format gets PP2: and this
---             reader refuses it, rather than half-reading it.
---   {...}     the activity's data (see "The body" below).
---   *1a2b3c4d a checksum of everything before the *, so a line that got cut
---             off or changed on the way is caught instead of imported wrong.
---
--- What's in it: only the recipe. The name, category, notes, rate, rows (by item
--- ID; a GE item's name is left out when it's the bundled list's, see "Item
--- names"), requirements and drop source. Never the profile, favourites, saved rates,
--- account details, the player's own GE prices or any profit figures.
---
--- A pasted line is untrusted: anyone could have typed it. So the reader only
--- builds plain tables of known fields, never runs anything, and the result still
--- goes through CustomMethods.validate like any stored record.
+-- Encodes custom recipes as one copyable line and validates pasted lines before
+-- import. The parser builds only known fields; it never executes text. Parsed
+-- records also pass CustomMethods.validate.
+-- Format: PP1:{...}*<8 hex FNV-1a checksum>. The checksum detects changed or
+-- truncated text; unknown versions are refused.
+-- The client text box truncates at 9,999 characters and at line breaks. Keep
+-- codes to 9,998 printable ASCII characters on one line.
+-- Share only the recipe, requirements and drop source. Exclude profiles, account
+-- evidence, favourites, personal rates, GE price overrides and profit figures.
 local CustomShare = {}
 
 local CustomMethods = require("src/methods/custom_methods")
@@ -111,8 +90,8 @@ for _, field in ipairs(FIELDS) do
     SHAPE[field[1]] = field[3]
 end
 
--- Builds before 0.8.36 saved notes as one plain string. It still loads, so it can
--- still be shared: "lines" fields may also be a single string.
+-- Share a legacy string note as one step so older saved activities still
+-- export.
 
 -- ---- Checksum --------------------------------------------------------------------
 
@@ -201,12 +180,8 @@ writeValue = function(value, shape)
     return "T"
 end
 
--- ---- Item names ------------------------------------------------------------------
--- Most of a big activity's line would be item names: a row's label, or an item
--- requirement's name. A GE item's name is already in Profit Path's bundled GE list
--- (data/ge_items.lua), so when it's exactly the list's name the line leaves it out,
--- and the reader puts it back from the same list. A name the player changed, or a
--- row with a fixed GP value, keeps its own name in the line.
+-- Omit GE names that exactly match the bundled list and restore them on import.
+-- Keep custom names and fixed-GP row labels in the share code.
 
 -- Calls fn(entry, field) for every row and requirement item whose name could be
 -- the list's: GE rows (field "label"), item checks and the items in a group

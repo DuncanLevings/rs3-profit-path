@@ -1,11 +1,7 @@
--- The two sharing screens (Phase 9, slice 7):
---   * Export: one custom activity as a line of text in a box, to copy out with Ctrl+C;
---   * Import: a box to paste someone's line into, a review of what it holds, and
---     "Add as new activity".
--- custom_share.lua does the writing and checking; this file only draws.
---
--- Both screens sit under the workbench's header row (its Back arrow is at the top
--- left), in a scrolling nested view, like the editor.
+-- Draws Export and Import beneath the workbench header. Export holds a line to
+-- copy; Import reviews a pasted line before saving a new activity.
+-- custom_share.lua handles encoding and validation. This file owns the scrolling
+-- child views and input timers.
 local CustomShare = require("src/methods/custom_share")
 local Style = require("src/ui/view_style")
 

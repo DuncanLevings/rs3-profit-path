@@ -4,44 +4,17 @@ Writes catalogue-source/wiki/guides.jsonl (one guide per line) and
 catalogue-source/wiki/meta.json (retrieval details and item IDs). Run by hand when
 the catalogue needs refreshing; the plugin never talks to the Wiki.
 """
-# Developer tool, never shipped with the plugin.
-#
-# This is step 2 of outputs/profit-path-catalogue-scoping.md. It only takes a
-# snapshot: nothing here changes what the plugin shows. A later step merges this
-# snapshot with our hand research (catalogue-source/methods.json and friends).
-#
-# Where the data comes from (all through api.php, one request per second):
-#   money_making_guide bucket   every guide: income rows, kills per hour, recurring
-#                               runs, and requirements as HTML with data-mmg-* tags
-#   prop=revisions              each guide page's current revision number, so every
-#                               line says exactly which page version it came from
-#   infobox_item bucket         item names -> item IDs, which GEPL needs for prices
-#   {{MMGWarning}} (--warnings) the Wiki's risk warning on some guides, read from
-#                               each guide's snapshot revision into warnings.json
-#
-# Everything fetched is treated as untrusted data: it's parsed as JSON or HTML,
-# checked for the shapes we expect, and nothing in it is ever run.
-#
-# What one line of guides.jsonl looks like (wrapped here to fit):
-#
-#   {"page": "Money making guide/Killing abyssal demons", "version": "Melee",
-#    "revision": 37017140, "activity": "Killing abyssal demons", "category": "Combat/Mid",
-#    "intensity": "Low", "members": true, "kph": 900, "wiki_profit": 1278642.22,
-#    "inputs": [["Spring", 0.21875, "action", "ge", 4835], ...],
-#    "outputs": [["Abyssal whip", 0.0009765625, "action", "ge", 69578], ...],
-#    "requirements": {"required": ["skill:SLAYER:85", ["any", "item:Gem bag (upgraded)",
-#                     "item:Artificer's measure"], ...], "recommended": [...]}}
-#
-# Income rows are [name, quantity, basis, pricing, Wiki value] and sometimes a sixth
-# entry, the Wiki's own note on how it worked a calculated value out.
-#   basis    action  per kill/action (multiply by kph)
-#            hour    a fixed amount each hour
-#            run     per run of a recurring guide (a daily or weekly task)
-#   pricing  ge      a Grand Exchange price
-#            value   a fixed value the Wiki sets (coins, clue scrolls, ...)
-#            calc    worked out by the Wiki, e.g. an untradeable potion's creation cost
-# The Wiki value is the unit price the Wiki showed when we took the snapshot. It's
-# a reference for sanity checks, never a live price.
+# Maintainer-only snapshot collection through api.php, at most one request per
+# second. money_making_guide supplies recipes/requirements, infobox_item
+# resolves IDs, and revisions pin source pages. --warnings collects MMGWarning
+# text from those revisions.
+# merge_methods.py combines this snapshot with curated research; runtime never
+# reads Wiki responses.
+# Income rows are [name, quantity, basis, pricing, Wiki value, optional note].
+# basis is action (scale by kph), hour (fixed), or run (recurring). pricing is
+# ge, value (fixed), or calc (Wiki-calculated). Wiki values are snapshot
+# references, never live quotes.
+# Validate fetched JSON/HTML; never execute collected content.
 from __future__ import annotations
 
 import argparse

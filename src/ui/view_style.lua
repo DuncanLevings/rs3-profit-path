@@ -1,12 +1,7 @@
--- Shared look-and-feel for the Browse and method screens: colours, number
--- formatting, and a few small decorations (icons, coin, boxed icon buttons).
---
--- Ownership: every control made here is a child of the `parent` passed in, so it
--- gets cleaned up when that parent view is destroyed. Missing-icon warnings
--- are remembered for this session so a redraw does not repeat them.
--- Icon aliases -> native sprite names: our hand-picked list first, then the
--- capability sprites (relics, abilities, perks...) that ship with the catalogue.
--- Copied into a new table so neither source is changed.
+-- Shared colours, formatting and icon helpers. Controls belong to their parent
+-- view; missing-icon warnings are kept for the session.
+-- Copy the catalogue and hand-picked sprite aliases into one lookup without
+-- changing either source.
 local iconNames = {}
 
 for alias, sprite in pairs(require("src/data/method_data").icons or {}) do
@@ -49,10 +44,8 @@ local COIN_GAP = 4
 -- coin, a big stack looks like the full pile. Any amount this big gets the pile.
 local COIN_PILE_QUANTITY = 1000000
 
--- A heads-up on `parent.content`: PrettyUI views expose their native component
--- layer as `.content`, and we draw a few plain native shapes (rectangles, the coin)
--- straight onto it. The rest of the app already parents native children there.
--- Those shapes die with the view, just like PrettyUI's own controls.
+-- PrettyUI exposes its native layer as parent.content. Native rectangles and
+-- coins attached there are destroyed with the view.
 
 -- Native rectangles give tables their quiet row bands and item slots a coloured
 -- border. Clickthrough keeps them from stealing hovers and clicks.
@@ -68,18 +61,10 @@ function Style.rectangle(parent, options)
     return rectangle
 end
 
--- Keeps panels the right width when their page grows a scrollbar.
---
--- The problem: a panel works out its inner width once, when it's created. If the
--- page later gets taller than the window, PrettyUI adds a scrollbar and the page
--- gets narrower. The panel's outline shrinks with it, but its insides keep the old
--- width, so right-aligned text (like the ROI) gets cut off at the panel's edge.
---
--- The fix PrettyUI documents is Panel:SetSize. So a screen registers its panels
--- here while it builds, then calls fit() once everything is added (by then we
--- know whether a scrollbar appeared) and every panel is sized to the page's final
--- width. `padding` is the page's side padding; `gap` is the space between two
--- half-width panels sitting side by side.
+-- Resize registered panels after all content is added. A scrollbar narrows the
+-- page, but panel contents keep their original width until SetSize is called.
+-- padding is the page inset; gap separates half-width panels. fit() uses the
+-- final page width to keep right-aligned labels inside their panels.
 function Style.panelFitter(host, padding, gap)
     local panels = {}
     local fitter = {}
@@ -137,8 +122,8 @@ local function resolveIcon(alias)
         return nil
     end
 
-    -- The previous library's client observations identify FLOORSHADOWS (1243)
-    -- as crash-prone. Keep that exclusion even though none of our icons use it.
+    -- FLOORSHADOWS (1243) is known to crash this client. Keep the exclusion even
+    -- though none of our configured icons use it.
     if name == "FLOORSHADOWS" then
         return nil
     end
@@ -183,13 +168,9 @@ function Style.iconButtonWidth(name)
     return resolveIcon(name) and 28 or 64
 end
 
--- A small boxed button showing a native sprite, like the Save and Reset buttons by
--- the rate box. If the sprite is missing in this client build we show a plain text
--- button instead, so the action never disappears.
---
--- Without `place` the button flows inline after the previous item. With it, the
--- button goes at place.y, `place.right` in from the right edge of its parent.
--- place = "line" puts it on a line of its own in a flowing page.
+-- Draw a boxed icon, falling back to text if the sprite is missing.
+-- With no place, flow inline. A position table sets y and the right inset; "line"
+-- starts a separate row.
 function Style.iconButton(parent, name, fallbackText, tooltip, action, place)
     local sprite = resolveIcon(name)
     local width = Style.iconButtonWidth(name)
@@ -243,21 +224,12 @@ local function coinStep(step, action)
     return ok
 end
 
--- Draws the Coins item on `parent` as a big pile and returns the native sprite.
--- The client picks Coins art from the stack size, so we give it a huge quantity
--- and hide the quantity label so no number shows.
---
--- Heads-up: the docs list SetAssociatedObject(id, quantity), but this client
--- rejects the two-argument form ("no matching function call"). Attaching the item
--- and setting `associatedObjectQuantity` as a property does give the pile, so
--- that's what we do.
---
--- Each native step is tried on its own. Worst case we still show the Coins item
--- itself (the plain one-coin art); only if the item can't be drawn at all do we
--- fall back to the COINS sprite.
---
--- It's a native sprite rather than a PrettyUI one so callers can slide it with
--- SetPos when the number beside it changes length; see Style.placeCoin.
+-- Draw a Coins pile without its quantity label. Return the native sprite so
+-- placeCoin can move it beside the total.
+-- This client rejects the two-argument SetAssociatedObject call. Set the quantity
+-- separately, before and after attaching the item, to get the pile graphic.
+-- Try each native step separately. If the item picture fails, hide the partial
+-- result and use the COINS sprite.
 function Style.coins(parent, options)
     local x = options.x or 0
     local y = options.y or 0
@@ -345,10 +317,8 @@ function Style.coins(parent, options)
     return fallbackDrawn and fallback or nil
 end
 
--- Switches a text label to a named client font (e.g. Style.HEADLINE_FONT). Give
--- more names to fall back through, biggest first. If this client build has none
--- of them, the label just keeps PrettyUI's default, so the text still shows,
--- only smaller.
+-- Use the first available named client font. If none exists, leave PrettyUI's
+-- default font in place.
 function Style.setFont(label, ...)
     for _, name in ipairs({ ... }) do
         local ok, font = pcall(function()
@@ -382,12 +352,10 @@ function Style.textWidth(text, title)
     return width
 end
 
--- Slides a coin so it sits just left of a right-aligned number, instead of at a
--- fixed spot with a big gap when the number is short. `rightEdge` is the label's
--- right edge measured from the parent's right side (a negative x with xAnchor 1).
---
--- Text width comes from the client's own font measurement. If that fails for some
--- reason we guess about 8 units per character: worst case the gap is a bit off.
+-- Place the coin just left of a right-aligned total. rightEdge is a negative
+-- offset from the parent's right edge (xAnchor 1).
+-- Measure with the client font, or estimate eight units per character if
+-- measurement fails.
 function Style.placeCoin(coin, text, options)
     if not coin then
         return
