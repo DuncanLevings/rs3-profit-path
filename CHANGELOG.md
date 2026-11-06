@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.57-dev - 2026-11-05
+
+- Code cleanup before submission: removed unused helpers and the loading paths for pre-release save formats (typed profile names, single-string custom notes, unrated custom PvM, old comfort bands and the first item-snapshot format). Custom PvM activities now always need a difficulty.
+- Saving and loading share one small storage helper, and a refused save now says the client didn't accept it.
+- Simpler coin icon drawing and closed-bank handling, with the same results.
+
 ## 0.8.56-dev - 2026-11-05
 
 - Smaller install (about 3.3 MB, down from about 4.3 MB). The bundled data stores repeated requirement checks, drop rows and text once, and leaves out fields the plugin never reads, such as Wiki page URLs and NPC IDs. No activities, recipes, unlocks, drop tables or item names were removed.

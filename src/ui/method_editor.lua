@@ -84,14 +84,13 @@ local RECURRENCES = {
 local BASES = { "action", "trip", "hour" }
 
 -- Draft fields that hold a list of lines (steps, income notes, directions).
--- Older saves had a single note string, so normaliseNotes turns them all into lists.
+-- A saved activity leaves an empty list out, so normaliseNotes gives each one an
+-- empty list to add lines to.
 local LINE_LISTS = { "notes", "income_notes", "getting_there" }
 
 local function normaliseNotes(draft)
     for _, key in ipairs(LINE_LISTS) do
-        if type(draft[key]) == "string" then
-            draft[key] = { draft[key] }
-        elseif type(draft[key]) ~= "table" then
+        if type(draft[key]) ~= "table" then
             draft[key] = {}
         end
     end
@@ -208,8 +207,8 @@ local function parseNumber(text, fraction)
 end
 
 -- "kill", "action" or "run": what one of this activity's counts is. The rate's
--- unit decides (not the category), so an older Skilling activity that was saved
--- counting kills still says "kill".
+-- unit decides (not the category), so a Skilling activity saved counting kills
+-- still says "kill".
 local function actionWord(draft)
     if draft.category == "recurring" then
         return "run"

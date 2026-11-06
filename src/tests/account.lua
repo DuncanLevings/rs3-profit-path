@@ -51,7 +51,7 @@ return function(test, equal, client, pretty)
 
     test("corrupt snapshots recover valid containers but protect the stored record", function()
         local state = client()
-        local original = { schema = 1, containers = { INV = { ["42"] = 2 }, BANK = { ["43"] = -1 } } }
+        local original = { schema = 2, containers = { INV = { counts = { ["42"] = 2 } }, BANK = { counts = { ["43"] = -1 } } } }
         state.db[key("First")] = original
         local snapshot = Snapshot.new(PersistentDB)
         snapshot:bind("First")
@@ -62,7 +62,7 @@ return function(test, equal, client, pretty)
         snapshot:observe("INV", { [42] = 8 })
         snapshot:flush()
         equal(state.db[key("First")], original)
-        equal(original.containers.INV["42"], 2)
+        equal(original.containers.INV.counts["42"], 2)
 
         state.db[key("Future")] = { schema = 9, containers = {} }
         snapshot:bind("Future")
@@ -77,7 +77,7 @@ return function(test, equal, client, pretty)
             huge[tostring(i)] = 1
         end
 
-        state.db[key("Huge")] = { schema = 1, containers = { BANK = huge } }
+        state.db[key("Huge")] = { schema = 2, containers = { BANK = { counts = huge } } }
         local snapshot = Snapshot.new(PersistentDB)
         snapshot:bind("Huge")
         equal(snapshot.writable, false)
@@ -128,23 +128,6 @@ return function(test, equal, client, pretty)
         equal(restored.data.BANK[1000], 0)
         equal(restored.data.BANK[4999], 0)
         equal(restored.data.BANK[5000], nil)
-    end)
-
-    -- Records saved by earlier versions (every count as its own key) still load,
-    -- and the next save rewrites them in the compact layout.
-    test("schema 1 snapshots still load and are rewritten compactly", function()
-        local state = client()
-        state.db[key("Old")] = { schema = 1, containers = { BANK = { ["42"] = 3, ["43"] = 0 } } }
-        local snapshot = Snapshot.new(PersistentDB)
-        snapshot:bind("Old")
-        equal(snapshot.writable, true)
-        equal(snapshot.data.BANK[42], 3)
-        equal(snapshot.data.BANK[43], 0)
-
-        snapshot:observe("BANK", { [42] = 3, [43] = 1 })
-        snapshot:flush()
-        equal(state.db[key("Old")].schema, 2)
-        equal(state.db[key("Old")].containers.BANK.counts["43"], 1)
     end)
 
     -- If the client's storage gives numeric-looking keys back as numbers, that

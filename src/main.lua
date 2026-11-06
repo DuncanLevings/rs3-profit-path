@@ -171,7 +171,6 @@ function App.start()
     -- Loads the saved rate for this method (or the source default) and recalculates.
     function calculator:loadRate()
         self.rate, self.saved, self.message = preferences:loadRate(self.method)
-        self.message = self.message or preferences.warning
 
         -- committedRate is "what's saved right now", so we can tell if a draft differs.
         self.committedRate = self.rate

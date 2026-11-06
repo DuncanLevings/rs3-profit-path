@@ -183,14 +183,6 @@ return function(test, equal, client, pretty)
         equal(CustomShare.encode(full()), CustomShare.encode(full()))
     end)
 
-    test("share: notes saved before steps existed still share", function()
-        local record = full()
-        record.notes = "One old plain note."
-
-        local back = assert(CustomShare.decode((CustomShare.encode(record))))
-        equal(back.notes, "One old plain note.")
-    end)
-
     test("share: a custom activity at the size limits fits the text box", function()
         local record = full()
         local limits = CustomMethods.LIMITS

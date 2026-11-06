@@ -880,21 +880,20 @@ test("logged-out player never reads skills or identity", function()
     account:destroy()
 end)
 
--- Settings are keyed by display name (folded A-Z), first character on the
--- existing profile, later ones numbered.
+-- Settings are keyed by display name (folded A-Z): the first character gets
+-- Default, later ones are numbered.
 test("the display name picks the profile, and bad names or failed writes change nothing", function()
     local state = client()
     local Preferences = require("src/storage/preferences")
     local steel = require("src/data/method_data").find("smelting-steel-bars.basic")
     local prefs = Preferences.new(PersistentDB)
 
-    -- The first character keeps the existing (Default) profile; a different
-    -- capitalisation is the same character.
+    -- The first character gets Default; a different capitalisation is the
+    -- same character.
     assert(prefs:bindCharacter("Fixture"))
     equal(prefs.profile, "Default")
     assert(prefs:saveRate(steel, 1000))
     equal(state.db["profit-path.characters.v1"].bindings["fixture"], "Default")
-    equal(state.db["profit-path.characters.v1"].owner, "fixture")
 
     assert(prefs:bindCharacter("FIXTURE"))
     equal(prefs.profile, "Default")
@@ -904,7 +903,7 @@ test("the display name picks the profile, and bad names or failed writes change 
     equal(prefs.profile, "Character 2")
     equal(prefs:loadRate(steel), steel.income.rate.default)
 
-    -- Profiles older builds named after a character still count as taken.
+    -- A profile number that's already taken is skipped.
     state.db["profit-path.characters.v1"].bindings["third"] = "Character 3"
     assert(prefs:bindCharacter("Fourth"))
     equal(prefs.profile, "Character 4")
@@ -1304,7 +1303,7 @@ test("missing and loading GE dependency do not invent a price", function()
 
     -- While GEPL isn't ready we mustn't even ask it for a price.
     local library = { isReady = function(endpoint)
-        equal(endpoint, "latest")
+        assert(endpoint == "latest" or endpoint == "1h", "Unexpected endpoint " .. tostring(endpoint))
         return false
     end, getLatest = function()
         error("Not ready: getter must not be called")

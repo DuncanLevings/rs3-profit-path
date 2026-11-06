@@ -623,7 +623,7 @@ function Draft.preview(draft, quotes)
     local record = Draft.withPlaceholderId(draft)
 
     -- The save rules, so the preview says what Save would refuse.
-    local ok, problems = CustomMethods.validate(record, { saving = true })
+    local ok, problems = CustomMethods.validate(record)
     local preview = { problems = ok and {} or problems }
 
     -- Price only a valid draft: an invalid one has nothing trustworthy to add up.

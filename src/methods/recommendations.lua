@@ -125,11 +125,10 @@ function Recommendations.pool(methods, activity, settings, context)
             local estimate = context.estimates[method.id]
             local priced = estimate and estimate.status == "available"
 
-            -- Use the player's difficulty rating for custom PvM. Older unrated
-            -- records count as within comfort until edited and rated.
+            -- Only PvM is matched against comfort (custom PvM uses the player's
+            -- own difficulty rating). Everything else always fits.
             local custom = method.origin == "custom"
-            local unrated = custom and Recommendations.levelOf(method) == nil
-            local fit = (activity ~= "pvm" or unrated) and "within" or difficultyFit(method, settings)
+            local fit = activity ~= "pvm" and "within" or difficultyFit(method, settings)
 
             -- One reason per method, checked in the order the player is most
             -- likely to care about.

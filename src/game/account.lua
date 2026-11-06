@@ -251,49 +251,39 @@ function Account.new(onChanged, snapshot, toolbeltBindings)
                 return { configId = definition.id, counts = counts, all = all }
             end)
 
-            -- Use the latest session or saved bank read while closed. It must
-            -- cover every wanted item, including zeros, to establish last-seen
-            -- absence. Cache this coverage check until the bank or wanted set
-            -- changes.
+            -- The bank is closed: use this login's last open-bank read, or else
+            -- the saved one. It only counts if it covers every wanted item
+            -- (zeros included); otherwise a missing item might just be one we
+            -- never looked for.
             local lastBank
 
             if not (ok and read) and name == "BANK" then
-                local saved = self.snapshot and self.snapshot.data.BANK
-                local counts = self.sessionBank and self.sessionBank.counts or saved
-                local known = self.bankCoverage
+                local counts = self.sessionBank and self.sessionBank.counts or (self.snapshot and self.snapshot.data.BANK)
 
-                if counts and not (known and known.counts == counts and known.wanted == wanted) then
-                    local covered = true
+                -- This login's visit saw the whole bank, so a newly watched item is
+                -- either there or known absent. A saved read only covers what was
+                -- watched when it was saved.
+                local all = self.sessionBank and self.sessionBank.all
+                local covered, filled = counts ~= nil, false
 
-                    -- The session snapshot includes the whole bank, so a newly
-                    -- watched item is present or known absent. Older saved
-                    -- snapshots cover only their watched set.
-                    local all = self.sessionBank and self.sessionBank.counts == counts and self.sessionBank.all
-
-                    local filled = false
-
-                    for itemId in pairs(wanted) do
-                        if counts[itemId] == nil then
-                            if all then
-                                counts[itemId] = all[itemId] or 0
-                                filled = true
-                            else
-                                covered = false
-                                break
-                            end
+                for itemId in pairs(covered and wanted or {}) do
+                    if counts[itemId] == nil then
+                        if not all then
+                            covered = false
+                            break
                         end
-                    end
 
-                    -- Save the answers too, so the next login knows them.
-                    if filled and self.snapshot then
-                        self.snapshot:observe(name, counts)
+                        counts[itemId] = all[itemId] or 0
+                        filled = true
                     end
-
-                    known = { counts = counts, wanted = wanted, covered = covered }
-                    self.bankCoverage = known
                 end
 
-                if counts and known.covered then
+                -- Save the filled-in answers too, so the next login knows them.
+                if filled and self.snapshot then
+                    self.snapshot:observe(name, counts)
+                end
+
+                if covered then
                     lastBank = { counts = counts }
                 end
             end

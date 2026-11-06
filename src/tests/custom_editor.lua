@@ -93,7 +93,9 @@ return function(test, equal, client, pretty)
         equal(ok, false)
         assert(problems[1]:find("at least one Required", 1, true), problems[1])
 
+        -- PvM also needs the player's difficulty rating.
         draft.requirements.required[1] = { kind = "skill", skill = "SLAYER", level = 85 }
+        draft.difficulty_level = 4
         equal(valid(draft), true)
 
         equal(Draft.fromSource("monster", "Not a real monster"), nil)
@@ -686,25 +688,6 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
-    test("editor: an older save's single note opens as step 1", function()
-        local record = {
-            schema = 1, id = "custom.1", title = "Old one", category = "production", no_requirements = true,
-            rate = { unit = "actions/hour", default = 10 }, notes = "Bank at the chest.",
-            outputs = { { label = "Other loot", pricing = "fixed", unit_value = 5, quantity = 1, basis = "action", state = "included" } },
-            supplies = {}, requirements = { required = {}, recommended = {} },
-        }
-
-        open({ [INDEX] = { schema = 1, next = 2, ids = { "custom.1" } }, ["profit-path.custom.v1/custom.1"] = record })
-        prettyui:findMethod("Old one")()
-        button("Edit this custom activity")()
-        prettyui.views[#prettyui.views].tabs[1]:SetActive(5)
-
-        assert(field("Bank at the chest."), (everything()))
-        assert(button("Remove step 1"))
-
-        PluginShutdown()
-    end)
-
     test("Duplicate as custom brings the activity's steps along", function()
         open()
 
@@ -936,7 +919,7 @@ return function(test, equal, client, pretty)
         local draft = Draft.blank("skilling")
         equal(draft.rate.unit, "actions/hour")
 
-        -- An older save could count kills under Skilling; it keeps that...
+        -- A saved Skilling activity can count kills; it keeps that...
         draft.rate.unit = "kills/hour"
         draft.outputs[1] = { label = "Bones", pricing = "fixed", unit_value = 1, quantity = 1, basis = "action" }
         draft.rate.default = 50
@@ -1358,6 +1341,7 @@ return function(test, equal, client, pretty)
         local draft = Draft.blank()
         draft.title = "Soul splitting"
         draft.category = "pvm"
+        draft.difficulty_level = 5
         draft.rate.default = 10
         draft.outputs[1] = { label = "Loot", pricing = "fixed", unit_value = 5, quantity = 1, basis = "action", state = "included" }
 

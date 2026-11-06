@@ -125,8 +125,9 @@ return function(test, equal, client, pretty)
         local methods = catalogue()
         local seen = context()
 
+        -- The player rates their own PvM 1 to 10 in the editor; 1 is within any comfort.
         local function custom(id, status, profit, team)
-            local record = method(id, { team = team })
+            local record = method(id, { team = team, difficulty_level = 1 })
             record.origin = "custom"
             record.intensity = "Unclassified"
             methods[#methods + 1] = record
@@ -139,7 +140,7 @@ return function(test, equal, client, pretty)
         custom("mine-missing", "unmet", 8000)
         custom("mine-loser", "met", -1)
 
-        -- Comfort 2 would drop a bundled Hard boss, but not the player's own.
+        -- Only met (and profitable) custom activities count.
         local pool, skipped = Recommendations.pool(methods, "pvm", { comfort = 2, learning = false, group = "solo-preferred" }, seen)
 
         equal(ids(pool), "mine-met,easy,unpriced,duo")
@@ -157,9 +158,8 @@ return function(test, equal, client, pretty)
         pool = Recommendations.pool(methods, "pvm", { comfort = 2, learning = false, group = "solo-only" }, seen)
         equal(ids(pool), "easy,unpriced")
 
-        -- Rated in the editor: checked against comfort like a bundled boss,
-        -- including the one learning step above it. (The unrated ones above
-        -- are older saves: they still count as within comfort.)
+        -- Checked against comfort like a bundled boss, including the one
+        -- learning step above it.
         seen.hidden = {}
         custom("mine-rated-3", "met", 6000)
         methods[#methods].difficulty_level = 3
@@ -309,10 +309,7 @@ return function(test, equal, client, pretty)
         assert(warning, "The invalid fields are reported")
         equal(writable, true)
 
-        -- Builds before the 1-10 ladder saved a band; it becomes the top of that
-        -- band. A stored float level reads back as a whole number.
-        state.db["profit-path.recommend.v1/7:Default"] = { schema = 1, comfort = "Medium" }
-        equal(prefs:loadRecommend().comfort, 4)
+        -- A stored float level reads back as a whole number.
         state.db["profit-path.recommend.v1/7:Default"] = { schema = 1, comfort = 6.0 }
         equal(math.type(prefs:loadRecommend().comfort), "integer")
         state.db["profit-path.recommend.v1/7:Default"] = { schema = 1, comfort = 11 }

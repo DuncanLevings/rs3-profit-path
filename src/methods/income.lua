@@ -25,11 +25,11 @@ local function drift(price, reference)
     return math.max(price / reference, reference / price)
 end
 
--- The last hour's averages for one item, or nil if GEPL can't give them (an older
--- GEPL without the getter, the hourly data not loaded yet, or no entry for the
--- item). Missing averages are fine: we just use the latest trades instead.
+-- The last hour's averages for one item, or nil if GEPL can't give them (the
+-- hourly data isn't loaded yet, or there's no entry for the item). Missing
+-- averages are fine: we just use the latest trades instead.
 local function hourlyAverage(library, itemId)
-    if type(library.getOneHourAverage) ~= "function" or not library.isReady("1h") then
+    if not library.isReady("1h") then
         return nil
     end
 

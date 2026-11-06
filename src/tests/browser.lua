@@ -547,7 +547,7 @@ return function(test, equal, client, pretty)
         PluginShutdown()
     end)
 
-    test("character bindings preserve legacy choices and separate later characters", function()
+    test("the first character keeps the Default choices and later characters get their own", function()
         local state = client()
         local prefs = Preferences.new(PersistentDB)
         local steel = require("src/data/method_data").find("smelting-steel-bars.basic")
@@ -1985,7 +1985,7 @@ return function(test, equal, client, pretty)
         local prefs = Preferences.new(PersistentDB)
         assert(prefs:bindCharacter("First"))
         assert(prefs:bindCharacter("Default"))
-        assert(prefs.profile ~= "Default", "Do not reuse the legacy owner's profile")
+        assert(prefs.profile ~= "Default", "A character named Default still gets its own profile")
         local previous = prefs.profile
         state.failRead = true
         equal(prefs:bindCharacter("Third"), false)

@@ -4,18 +4,18 @@
 -- starts a new binding and leaves the old settings saved.
 -- Each rate has its own key to isolate saves and resets. Keep the versioned key
 -- formats stable so updates preserve settings.
+local Database = require("src/storage/database")
+
 local Preferences = {}
 
 -- Storage keys. Profile-specific keys add "/<length>:<profile>" on the end.
-local PROFILE_KEY = "profit-path.profile.v1"
 local BROWSER_KEY = "profit-path.browser.v1"
 local CHARACTERS_KEY = "profit-path.characters.v1"
 local FAVOURITES_KEY = "profit-path.favourites.v1"
 local HIDDEN_KEY = "profit-path.hidden.v1"
 local RECOMMEND_KEY = "profit-path.recommend.v1"
 
--- Difficulty and intensity used to be sorts too; they're filters now, so an old
--- saved "difficulty"/"intensity" sort just falls back to the profit default.
+-- The sorts Browse offers. Anything else saved falls back to the profit default.
 local sortKeys = { profit = true, roi = true }
 
 -- Recommend for me's settings, and what a fresh profile starts with. Comfort is
@@ -27,9 +27,6 @@ local function validComfort(level)
     return type(level) == "number" and level == math.floor(level) and level >= 1 and level <= 10
 end
 
--- Builds before the 1-10 ladder saved one of four bands. Each becomes the top
--- of its band, so "GWD2-level bosses" still means what the player picked.
-local oldComfort = { Easy = 2, Medium = 4, Hard = 7, Elite = 10 }
 local groupChoices = { ["solo-preferred"] = true, ["solo-only"] = true, either = true }
 local activities = { pvm = true, skilling = true, production = true, recurring = true }
 
@@ -40,14 +37,6 @@ end
 -- The same rule as favourites use for a stored method ID.
 local function validId(id)
     return type(id) == "string" and id:match("^[a-z0-9][a-z0-9._-]*$") ~= nil
-end
-
--- Older builds let players type a profile name, stored at PROFILE_KEY. We only
--- read it now, so the first character keeps those settings. It was limited to
--- 1-40 letters, digits, spaces, _ or -, and not all spaces.
-local function validProfile(name)
-    return type(name) == "string" and #name <= 40
-        and name:match("^[%w _-]+$") ~= nil and name:find("%S") ~= nil
 end
 
 -- Display names are kept byte for byte, non-breaking spaces and all (the client has
@@ -72,24 +61,9 @@ end
 -- `db` is the client's PersistentDB. It's passed in rather than used as a global so
 -- tests can hand in a fake one.
 function Preferences.new(db)
-    local self = { profile = "Default", warning = nil }
-
-    -- Restore the profile an older build last had selected. If it can't be read, or
-    -- it's junk, fall back to Default and keep a warning for the UI. bindCharacter()
-    -- picks the real profile once the window opens.
-    local ok, savedProfile, exists = pcall(function()
-        return db:GetString(PROFILE_KEY), db:CheckExists(PROFILE_KEY)
-    end)
-
-    if not ok then
-        self.warning = "Profile could not be loaded: " .. tostring(savedProfile)
-    elseif savedProfile ~= nil or exists then
-        if validProfile(savedProfile) then
-            self.profile = savedProfile
-        else
-            self.warning = "Saved profile name is invalid; using Default."
-        end
-    end
+    -- "Default" until bindCharacter() picks this character's profile when the
+    -- window opens.
+    local self = { profile = "Default" }
 
     -- Build a rate key under the current profile. Prefix the profile with its
     -- byte length so separators in a name cannot make the key ambiguous.
@@ -110,12 +84,10 @@ function Preferences.new(db)
     local function loadIds(base, what)
         local key = profileKey(base)
 
-        local success, stored, exists = pcall(function()
-            return db:GetStructuredData(key), db:CheckExists(key)
-        end)
+        local success, stored, exists = Database.read(db, key)
 
         if not success then
-            return {}, what .. " could not be loaded: " .. tostring(stored), false
+            return {}, what .. " could not be loaded: " .. stored, false
         end
 
         if stored == nil and not exists then
@@ -155,12 +127,10 @@ function Preferences.new(db)
 
         ids[id] = selected or nil
 
-        local success, written = pcall(function()
-            return db:SetStructuredData(profileKey(base), { schema = 1, ids = ids })
-        end)
+        local success, written = Database.write(db, profileKey(base), { schema = 1, ids = ids })
 
-        if not success or written ~= true then
-            return false, what .. " could not be saved: " .. tostring(written)
+        if not success then
+            return false, what .. " could not be saved: " .. written
         end
 
         return true
@@ -172,13 +142,10 @@ function Preferences.new(db)
     function self:loadRate(method)
         local definition = method.income.rate
 
-        local success, stored, exists = pcall(function()
-            local key = rateKey(method)
-            return db:GetStructuredData(key), db:CheckExists(key)
-        end)
+        local success, stored, exists = Database.read(db, rateKey(method))
 
         if not success then
-            return definition.default, false, "Saved rate could not be loaded: " .. tostring(stored)
+            return definition.default, false, "Saved rate could not be loaded: " .. stored
         end
 
         if stored == nil and not exists then
@@ -202,36 +169,28 @@ function Preferences.new(db)
     end
 
     -- Bind the character to its existing or new profile without rewriting rates.
-    -- CHARACTERS_KEY stores { schema, owner, bindings = { [folded name] = profile
-    -- } }. A rename leaves the old binding and settings intact.
+    -- CHARACTERS_KEY stores { schema, bindings = { [folded name] = profile } }.
+    -- A rename leaves the old binding and settings intact.
     function self:bindCharacter(name)
         if not validCharacterText(name) then
             return false, "Character name is unavailable or contains invalid text. Try opening again."
         end
 
-        local ok, stored, exists = pcall(function()
-            return db:GetStructuredData(CHARACTERS_KEY), db:CheckExists(CHARACTERS_KEY)
-        end)
+        local ok, stored, exists = Database.read(db, CHARACTERS_KEY)
 
         if not ok then
-            return false, "Character settings could not be read: " .. tostring(stored)
+            return false, "Character settings could not be read: " .. stored
         end
 
         -- Load and check the existing bindings. If anything looks off we stop and
         -- write nothing, rather than risk overwriting the player's real setup.
         local invalid = "Saved character bindings are invalid; existing settings were left untouched."
         local bindings = {}
-        local owner
 
         if stored ~= nil or exists then
-            local validRecord = type(stored) == "table" and stored.schema == 1
-                and type(stored.bindings) == "table" and validCharacterText(stored.owner)
-
-            if not validRecord then
+            if type(stored) ~= "table" or stored.schema ~= 1 or type(stored.bindings) ~= "table" then
                 return false, invalid
             end
-
-            owner = stored.owner
 
             for character, profile in pairs(stored.bindings) do
                 if not validCharacterText(character) or not validCharacterText(profile) then
@@ -247,9 +206,9 @@ function Preferences.new(db)
 
         -- New character: work out its profile and save the binding.
         if not profile then
-            -- The very first character keeps the settings older builds saved
-            -- (the typed profile, usually "Default"). Everyone after that gets
-            -- "Character 2", "Character 3"... (older builds used the name).
+            -- The first character gets "Default"; everyone after that gets
+            -- "Character 2", "Character 3"... Profiles are numbered, not named after
+            -- the character, so a rename can't collide with another profile.
             local used = {}
 
             for _, existing in pairs(bindings) do
@@ -257,7 +216,7 @@ function Preferences.new(db)
             end
 
             if not next(used) then
-                profile = self.profile
+                profile = "Default"
             else
                 local number = 2
 
@@ -270,12 +229,10 @@ function Preferences.new(db)
 
             bindings[normalized] = profile
 
-            local success, written = pcall(function()
-                return db:SetStructuredData(CHARACTERS_KEY, { schema = 1, owner = owner or normalized, bindings = bindings })
-            end)
+            local success, written = Database.write(db, CHARACTERS_KEY, { schema = 1, bindings = bindings })
 
-            if not success or written ~= true then
-                return false, "Character settings could not be saved: " .. tostring(written)
+            if not success then
+                return false, "Character settings could not be saved: " .. written
             end
         end
 
@@ -292,14 +249,12 @@ function Preferences.new(db)
         -- our code, so fail loudly instead of writing garbage to storage.
         assert(type(rate) == "number" and rate >= 0 and rate < math.huge, "Invalid internal rate")
 
-        local success, written = pcall(function()
-            return db:SetStructuredData(rateKey(method), {
+        local success, written = Database.write(db, rateKey(method), {
                 schema = 1, unit = method.income.rate.unit, value = rate,
             })
-        end)
 
-        if not success or written ~= true then
-            return false, "Rate could not be saved: " .. tostring(written)
+        if not success then
+            return false, "Rate could not be saved: " .. written
         end
 
         return true
@@ -329,12 +284,10 @@ function Preferences.new(db)
     -- and rates).
     function self:loadBrowser()
         local defaults = { sort = "profit", descending = true }
-        local success, stored, exists = pcall(function()
-            return db:GetStructuredData(BROWSER_KEY), db:CheckExists(BROWSER_KEY)
-        end)
+        local success, stored, exists = Database.read(db, BROWSER_KEY)
 
         if not success then
-            return defaults, "Browser settings could not be loaded: " .. tostring(stored)
+            return defaults, "Browser settings could not be loaded: " .. stored
         end
 
         if stored == nil and not exists then
@@ -368,14 +321,12 @@ function Preferences.new(db)
     function self:saveBrowser(settings)
         assert(sortKeys[settings.sort] and type(settings.descending) == "boolean", "Invalid internal sort")
 
-        local success, written = pcall(function()
-            return db:SetStructuredData(BROWSER_KEY, {
+        local success, written = Database.write(db, BROWSER_KEY, {
                 schema = 1, sort = settings.sort, descending = settings.descending,
             })
-        end)
 
-        if not success or written ~= true then
-            return false, "Browser settings could not be saved: " .. tostring(written)
+        if not success then
+            return false, "Browser settings could not be saved: " .. written
         end
 
         return true
@@ -389,12 +340,10 @@ function Preferences.new(db)
         local key = profileKey(RECOMMEND_KEY)
         local record = recommendDefaults()
 
-        local success, stored, exists = pcall(function()
-            return db:GetStructuredData(key), db:CheckExists(key)
-        end)
+        local success, stored, exists = Database.read(db, key)
 
         if not success then
-            return record, "Recommendation settings could not be loaded: " .. tostring(stored), false
+            return record, "Recommendation settings could not be loaded: " .. stored, false
         end
 
         if stored == nil and not exists then
@@ -411,8 +360,6 @@ function Preferences.new(db)
         if stored.comfort ~= nil then
             if validComfort(stored.comfort) then
                 record.comfort = math.floor(stored.comfort)
-            elseif oldComfort[stored.comfort] then
-                record.comfort = oldComfort[stored.comfort]
             else
                 invalid = true
             end
@@ -486,15 +433,13 @@ function Preferences.new(db)
             history[activity] = { shown = shown, last = entry.last }
         end
 
-        local success, written = pcall(function()
-            return db:SetStructuredData(profileKey(RECOMMEND_KEY), {
+        local success, written = Database.write(db, profileKey(RECOMMEND_KEY), {
                 schema = 1, comfort = record.comfort, learning = record.learning,
                 group = record.group, history = history,
             })
-        end)
 
-        if not success or written ~= true then
-            return false, "Recommendation settings could not be saved: " .. tostring(written)
+        if not success then
+            return false, "Recommendation settings could not be saved: " .. written
         end
 
         return true

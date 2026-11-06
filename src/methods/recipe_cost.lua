@@ -1,7 +1,6 @@
 -- Prices untradeable supplies from their ingredients, using the validated
 -- data/recipes.lua bundle. GE ingredients use instant-buy prices; nested recipes
--- are priced recursively. Free ingredients count as 0 and are listed by
--- freeNames().
+-- are priced recursively. Free ingredients count as 0.
 -- Convert doses explicitly: an Overload (4) uses 4/3 of a recipe that produces
 -- Overload (3).
 local recipes = require("data/recipes")
@@ -11,11 +10,6 @@ local RecipeCost = {}
 -- True for real numbers from 0 upwards (same check as income.lua).
 local function nonNegativeFinite(value)
     return type(value) == "number" and value >= 0 and value < math.huge
-end
-
--- Is there a recipe we can price this item by?
-function RecipeCost.has(page)
-    return recipes[page] ~= nil
 end
 
 -- Collects every GE item ID anywhere in this recipe's ingredient tree into `ids`
@@ -32,29 +26,6 @@ function RecipeCost.itemIds(page, ids)
     end
 
     return ids
-end
-
--- Names of every "free" ingredient anywhere in the tree, sorted and without
--- repeats, e.g. { "Crystal tree blossom" }. Doesn't need prices, so the screen can
--- show it straight away.
-function RecipeCost.freeNames(page)
-    local seen, names = {}, {}
-
-    local function walk(current)
-        for _, material in ipairs(recipes[current].materials) do
-            if material.pricing == "free" and not seen[material.name] then
-                seen[material.name] = true
-                names[#names + 1] = material.name
-            elseif material.pricing == "recipe" then
-                walk(material.page)
-            end
-        end
-    end
-
-    walk(page)
-    table.sort(names)
-
-    return names
 end
 
 -- The cost of one item made by `page`'s recipe, counted in `portion` doses (nil
@@ -95,7 +66,7 @@ function RecipeCost.price(page, portion, quotes)
 
             unitPrice, timestamp = subPrice, subInfo
         else
-            -- Free: no price exists, so it adds nothing. freeNames() reports it.
+            -- Free (no GE price exists, e.g. Crystal tree blossom): it adds nothing.
             unitPrice = 0
         end
 

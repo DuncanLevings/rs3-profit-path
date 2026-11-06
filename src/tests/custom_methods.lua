@@ -73,8 +73,7 @@ return function(test, equal, client, pretty)
         equal(CustomMethods.validate(record()), true)
     end)
 
-    -- PvM difficulty: 1-10, PvM only, and needed to save (but an older save
-    -- without one still loads).
+    -- PvM difficulty: 1-10, PvM only, and always needed.
     test("custom records: a PvM difficulty is 1 to 10 and needed to save", function()
         rejected({ difficulty_level = 0 }, "from 1 to 10")
         rejected({ difficulty_level = 11 }, "from 1 to 10")
@@ -82,18 +81,16 @@ return function(test, equal, client, pretty)
         rejected({ category = "skilling", rate = { unit = "actions/hour", default = 30 }, difficulty_level = 3 },
             "Only PvM activities have a difficulty")
 
-        -- Loading an older save: fine without one. Saving: not.
+        -- PvM without one is refused.
         local unrated = record({ difficulty_level = false })
         unrated.difficulty_level = nil
-        equal(CustomMethods.validate(unrated), true)
 
-        local ok, problems = CustomMethods.validate(unrated, { saving = true })
+        local ok, problems = CustomMethods.validate(unrated)
         equal(ok, false)
         assert(mentions(problems, "Pick how hard it is"), table.concat(problems, " | "))
 
         -- Skilling never needs one.
-        equal(CustomMethods.validate(record({ category = "skilling", rate = { unit = "actions/hour", default = 30 } }),
-            { saving = true }), true)
+        equal(CustomMethods.validate(record({ category = "skilling", rate = { unit = "actions/hour", default = 30 } })), true)
 
         -- On the activity: the level, the same once practised, and Browse's band.
         local method = CustomMethods.toMethod(record({ difficulty_level = 6 }))
@@ -105,8 +102,6 @@ return function(test, equal, client, pretty)
             [7] = "Hard", [8] = "Elite", [10] = "Elite" }) do
             equal(CustomMethods.difficultyBand(level), band)
         end
-
-        equal(CustomMethods.toMethod(unrated).difficulty, nil)
     end)
 
     test("drafts: only PvM keeps a difficulty, and Duplicate brings a boss's along", function()
@@ -145,7 +140,7 @@ return function(test, equal, client, pretty)
         rejected({ category = "minigame" }, "category")
         rejected({ rate = { unit = "laps/hour", default = 30 } }, "Throughput")
         rejected({ rate = { unit = "kills/hour", default = 0 / 0 } }, "Throughput")
-        rejected({ notes = string.rep("x", 301) }, "Notes")
+        rejected({ notes = { string.rep("x", 301) } }, "Step 1 can be at most")
 
         -- Rows: pricing, item, value, quantity, basis and state.
         rejected({ supplies = { { label = "Food", pricing = "ge", quantity = 1, basis = "action" } } }, "needs an item")
@@ -598,7 +593,7 @@ return function(test, equal, client, pretty)
         -- A saved activity, read back at start-up like after a reload.
         client({
             [INDEX] = { schema = 1, next = 2, ids = { "custom.1" } },
-            ["profit-path.custom.v1/custom.1"] = record({ notes = "Bank at the chest." }),
+            ["profit-path.custom.v1/custom.1"] = record({ notes = { "Bank at the chest." } }),
         })
         prettyui = pretty()
 

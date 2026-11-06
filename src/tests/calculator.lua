@@ -254,11 +254,6 @@ return function(test, equal, client, pretty)
         equal(RecipeCost.price("Overload", 3, quotes), 66000)
         equal(RecipeCost.price("Overload", 4, quotes), 88000)
 
-        -- Only the blossom has no price; it's counted as free and named.
-        local free = RecipeCost.freeNames("Perfect plus potion")
-        equal(#free, 1)
-        equal(free[1], "Crystal tree blossom")
-
         -- All nine GE ingredients (through Overload) are fetched up front.
         local count = 0
 

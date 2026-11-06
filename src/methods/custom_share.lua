@@ -90,9 +90,6 @@ for _, field in ipairs(FIELDS) do
     SHAPE[field[1]] = field[3]
 end
 
--- Share a legacy string note as one step so older saved activities still
--- export.
-
 -- ---- Checksum --------------------------------------------------------------------
 
 -- FNV-1a, 32 bits, as 8 hex digits. It isn't security (anyone can make a valid
@@ -594,7 +591,7 @@ function CustomShare.review(pasted)
 
     candidate.id = "custom.0"
 
-    local valid, problems = CustomMethods.validate(candidate, { saving = true })
+    local valid, problems = CustomMethods.validate(candidate)
     local warnings = CustomShare.warnings(record)
 
     for _, message in ipairs(unnamed) do

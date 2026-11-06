@@ -10,6 +10,7 @@ local CustomMethods = {}
 
 -- The quests and unlocks a requirement can name (loaded on first use).
 local UnlockData = require("src/data/unlock_data")
+local Database = require("src/storage/database")
 
 local INDEX_KEY = "profit-path.custom.v1/index"
 local RECORD_PREFIX = "profit-path.custom.v1/"
@@ -82,25 +83,9 @@ function CustomMethods.skillName(skill)
     return skill:sub(1, 1) .. skill:sub(2):lower()
 end
 
--- The client's skill name for what a player typed ("slayer", "Constitution",
--- "hitpoints"), or nil if it isn't a skill.
-function CustomMethods.skillFromName(typed)
-    local name = type(typed) == "string" and typed:match("^%s*(.-)%s*$"):upper() or ""
-
-    if name == "CONSTITUTION" then
-        name = "HITPOINTS"
-    end
-
-    return SKILLS[name] and name or nil
-end
-
--- The non-blank lines of a list (or of one string, as a list of one).
+-- The non-blank lines of a saved list (steps, income notes, directions).
 function CustomMethods.lines(list)
     local lines = {}
-
-    if type(list) == "string" then
-        list = { list }
-    end
 
     for _, line in ipairs(type(list) == "table" and list or {}) do
         if type(line) == "string" and line:find("%S") then
@@ -109,11 +94,6 @@ function CustomMethods.lines(list)
     end
 
     return lines
-end
-
--- A record's notes as a list of non-blank steps (an old single note is one step).
-function CustomMethods.steps(record)
-    return CustomMethods.lines(record.notes)
 end
 
 -- GE sale tax: 2%, rounded down per item, the same as bundled outputs.
@@ -346,11 +326,8 @@ local function checkRequirement(check, where, problems)
 end
 
 -- Return true, or false and all validation problems for the editor/import review.
--- options.saving adds current save rules: PvM needs a difficulty, while older
--- unrated records may still load.
-function CustomMethods.validate(record, options)
+function CustomMethods.validate(record)
     local problems = {}
-    local saving = options and options.saving
 
     if type(record) ~= "table" or record.schema ~= 1 then
         return false, { "Unsupported custom activity format." }
@@ -388,15 +365,8 @@ function CustomMethods.validate(record, options)
         end
     end
 
-    -- Notes are numbered steps on How to do it. Load a legacy string note as
-    -- one step.
-    if type(record.notes) == "string" then
-        if #record.notes > CustomMethods.LIMITS.notes then
-            problems[#problems + 1] = "Notes can be at most " .. CustomMethods.LIMITS.notes .. " characters."
-        end
-    else
-        checkLines(record.notes, CustomMethods.LIMITS.steps, "Step")
-    end
+    -- Notes are the numbered steps on How to do it.
+    checkLines(record.notes, CustomMethods.LIMITS.steps, "Step")
 
     -- The Income tab's notes, and the Getting there tab's directions.
     checkLines(record.income_notes, CustomMethods.LIMITS.incomeNotes, "Income note")
@@ -522,7 +492,7 @@ function CustomMethods.validate(record, options)
         elseif not wholeNumber(record.difficulty_level, 1, 10) then
             problems[#problems + 1] = "The difficulty must be a whole number from 1 to 10."
         end
-    elseif saving and record.category == "pvm" then
+    elseif record.category == "pvm" then
         problems[#problems + 1] = "Pick how hard it is (1 to 10) on the Income tab."
     end
 
@@ -699,7 +669,7 @@ function CustomMethods.toMethod(record)
         record = record,
 
         -- The player's own steps and directions (How to do it, Getting there).
-        instructions = CustomMethods.steps(record),
+        instructions = CustomMethods.lines(record.notes),
         location = { coverage = "complete", text = "", routes = CustomMethods.lines(record.getting_there) },
         source = { title = "Your custom activity" },
     }
@@ -715,12 +685,10 @@ function CustomMethods.store(db)
     -- an index we can't read or understand is never written over: that could
     -- lose every custom activity at once.
     local function loadIndex()
-        local ok, stored, exists = pcall(function()
-            return db:GetStructuredData(INDEX_KEY), db:CheckExists(INDEX_KEY)
-        end)
+        local ok, stored, exists = Database.read(db, INDEX_KEY)
 
         if not ok then
-            return nil, "Custom activities could not be loaded: " .. tostring(stored), false
+            return nil, "Custom activities could not be loaded: " .. stored, false
         end
 
         if stored == nil and not exists then
@@ -750,11 +718,7 @@ function CustomMethods.store(db)
     end
 
     local function writeIndex(index)
-        local ok, written = pcall(function()
-            return db:SetStructuredData(INDEX_KEY, { schema = 1, next = index.next, ids = index.ids })
-        end)
-
-        return ok and written == true, written
+        return Database.write(db, INDEX_KEY, { schema = 1, next = index.next, ids = index.ids })
     end
 
     -- Every valid custom activity, in the order they were made, plus a warning if
@@ -770,9 +734,7 @@ function CustomMethods.store(db)
         local records, skipped = {}, 0
 
         for _, id in ipairs(index.ids) do
-            local ok, stored = pcall(function()
-                return db:GetStructuredData(RECORD_PREFIX .. id)
-            end)
+            local ok, stored = Database.read(db, RECORD_PREFIX .. id)
 
             if ok and type(stored) == "table" and stored.id == id and CustomMethods.validate(stored) then
                 records[#records + 1] = stored
@@ -812,18 +774,16 @@ function CustomMethods.store(db)
 
         saved.id = "custom." .. index.next
 
-        local valid, problems = CustomMethods.validate(saved, { saving = true })
+        local valid, problems = CustomMethods.validate(saved)
 
         if not valid then
             return nil, problems
         end
 
-        local ok, written = pcall(function()
-            return db:SetStructuredData(RECORD_PREFIX .. saved.id, saved)
-        end)
+        local ok, written = Database.write(db, RECORD_PREFIX .. saved.id, saved)
 
-        if not ok or written ~= true then
-            return nil, "The custom activity could not be saved: " .. tostring(written)
+        if not ok then
+            return nil, "The custom activity could not be saved: " .. written
         end
 
         local ids = {}
@@ -837,7 +797,7 @@ function CustomMethods.store(db)
         local listed, problem = writeIndex({ next = index.next + 1, ids = ids })
 
         if not listed then
-            return nil, "The custom activity could not be saved: " .. tostring(problem)
+            return nil, "The custom activity could not be saved: " .. problem
         end
 
         return saved
@@ -851,7 +811,7 @@ function CustomMethods.store(db)
             return nil, warning
         end
 
-        local valid, problems = CustomMethods.validate(record, { saving = true })
+        local valid, problems = CustomMethods.validate(record)
 
         if not valid then
             return nil, problems
@@ -867,12 +827,10 @@ function CustomMethods.store(db)
             return nil, "That custom activity no longer exists."
         end
 
-        local ok, written = pcall(function()
-            return db:SetStructuredData(RECORD_PREFIX .. record.id, record)
-        end)
+        local ok, written = Database.write(db, RECORD_PREFIX .. record.id, record)
 
-        if not ok or written ~= true then
-            return nil, "The changes could not be saved: " .. tostring(written)
+        if not ok then
+            return nil, "The changes could not be saved: " .. written
         end
 
         return record
@@ -905,7 +863,7 @@ function CustomMethods.store(db)
         local listed, problem = writeIndex({ next = index.next, ids = ids })
 
         if not listed then
-            return false, "The custom activity could not be deleted: " .. tostring(problem)
+            return false, "The custom activity could not be deleted: " .. problem
         end
 
         -- Best effort: if this fails the record is an unlisted leftover that

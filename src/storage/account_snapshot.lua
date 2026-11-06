@@ -1,6 +1,8 @@
 -- Saves last-seen item counts per profile (backpack, worn gear and bank), so the
 -- next login knows what was in the bank. Saved backpack and worn counts are only
 -- hints, since those can always be read live.
+local Database = require("src/storage/database")
+
 local Snapshot = {}
 local containers = { "INV", "WORN", "BANK" }
 
@@ -10,8 +12,8 @@ local containers = { "INV", "WORN", "BANK" }
 local MAX_ITEMS = 4096
 local MAX_CHECKED = 20000
 
--- Schema 2 stores held counts by item ID and packs checked zeros into one
--- comma-separated absent string. Schema 1's individual zero entries still load.
+-- Each container stores held counts by item ID, and packs checked zeros into
+-- one comma-separated absent string (tiered gear checks thousands of IDs).
 local SCHEMA = 2
 
 local function validCount(value)
@@ -36,17 +38,13 @@ end
 
 -- Reads one saved container into a plain { [itemId] = count } table, zeros
 -- included. Returns nil if anything in it looks wrong.
-local function readContainer(record, schema)
-    if type(record) ~= "table" then
+local function readContainer(record)
+    if type(record) ~= "table" or type(record.counts) ~= "table" then
         return nil
     end
 
     local counts, size = {}, 0
-    local held = schema == 1 and record or record.counts
-
-    if type(held) ~= "table" then
-        return nil
-    end
+    local held = record.counts
 
     for key, quantity in pairs(held) do
         size = size + 1
@@ -59,8 +57,8 @@ local function readContainer(record, schema)
         counts[itemId] = quantity
     end
 
-    -- Schema 2: the zeros, as one comma-separated string.
-    if schema == 2 and record.absent ~= nil then
+    -- The zeros, as one comma-separated string.
+    if record.absent ~= nil then
         if type(record.absent) ~= "string" then
             return nil
         end
@@ -95,17 +93,13 @@ function Snapshot.new(db)
         self.key = "profit-path.account.v1/" .. #profile .. ":" .. profile
         self.data, self.dirty, self.writable, self.message = {}, false, true, nil
 
-        local ok, stored, exists = pcall(function()
-            return db:GetStructuredData(self.key), db:CheckExists(self.key)
-        end)
+        local ok, stored, exists = Database.read(db, self.key)
 
         if ok and stored == nil and not exists then
             return
         end
 
-        local schema = type(stored) == "table" and stored.schema
-
-        if not ok or (schema ~= 1 and schema ~= SCHEMA) or type(stored.containers) ~= "table" then
+        if not ok or type(stored) ~= "table" or stored.schema ~= SCHEMA or type(stored.containers) ~= "table" then
             self.writable = false
             self.message = "Saved item evidence could not be read; it will not be overwritten."
             return
@@ -115,7 +109,7 @@ function Snapshot.new(db)
             local record = stored.containers[name]
 
             if record ~= nil then
-                local counts = readContainer(record, schema)
+                local counts = readContainer(record)
 
                 if counts then
                     self.data[name] = counts
@@ -186,11 +180,7 @@ function Snapshot.new(db)
             end
         end
 
-        local ok, written = pcall(function()
-            return db:SetStructuredData(self.key, record)
-        end)
-
-        if ok and written == true then
+        if Database.write(db, self.key, record) then
             self.dirty = false
             self.message = nil
         else

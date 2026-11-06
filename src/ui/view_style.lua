@@ -139,7 +139,7 @@ local function resolveIcon(alias)
 
     if not reportedSprites[name] then
         reportedSprites[name] = true
-        pcall(print, "[Profit Path] UI sprite unavailable: " .. name
+        print("[Profit Path] UI sprite unavailable: " .. name
             .. (ok and "" or (" - " .. tostring(sprite))))
     end
 
@@ -199,95 +199,63 @@ function Style.middle(textY, textHeight, size)
     return textY + math.floor((textHeight - size) / 2)
 end
 
--- Problems hit while drawing the coin, reported once per session so a fallback
--- never happens silently. Keyed by step, e.g. "quantity".
+-- Coin drawing problems already reported, so each is printed once per session
+-- rather than on every redraw. Keyed by which sprite failed.
 local reportedCoinProblems = {}
 
-local function reportCoinProblem(step, problem)
-    if reportedCoinProblems[step] then
-        return
+-- Makes one native sprite at the given spot and lets `setup` finish it. Returns
+-- the sprite, or nil if any native step threw; a half-made sprite is hidden so it
+-- can't show a stray number or blank box.
+local function coinSprite(parent, place, what, setup)
+    local sprite
+
+    local ok, problem = pcall(function()
+        sprite = ui.Sprite.new(parent.content)
+        sprite:SetPos(place.x, place.y, place.xAnchor, 0)
+        sprite:SetSize(place.size, place.size)
+
+        -- Coins are decoration: hovers and clicks go to whatever is underneath.
+        sprite.clickthrough = true
+        setup(sprite)
+    end)
+
+    if ok then
+        return sprite
     end
 
-    reportedCoinProblems[step] = true
-
-    pcall(print, "[Profit Path] coin icon: " .. step .. " failed: " .. tostring(problem))
-end
-
--- Runs one native step and reports it if it throws. Returns true on success.
-local function coinStep(step, action)
-    local ok, problem = pcall(action)
-
-    if not ok then
-        reportCoinProblem(step, problem)
+    if sprite then
+        pcall(function()
+            sprite.hidden = true
+        end)
     end
 
-    return ok
+    if not reportedCoinProblems[what] then
+        reportedCoinProblems[what] = true
+        print("[Profit Path] coin icon: " .. what .. " failed: " .. tostring(problem))
+    end
+
+    return nil
 end
 
 -- Draws a Coins pile with no quantity number, and returns the native sprite so
--- placeCoin can move it beside the total. Each native step is tried on its own;
--- if the item picture fails we hide it and use the plain COINS sprite instead.
--- (This client rejects the two-argument SetAssociatedObject call, so step 2
--- sets the quantity separately.)
+-- placeCoin can move it beside the total. If the item picture fails we use the
+-- plain COINS sprite instead. Either way the parent owns the sprite.
 function Style.coins(parent, options)
-    local x = options.x or 0
-    local y = options.y or 0
-    local xAnchor = options.xAnchor or 0
-    local size = options.size or 20
+    local place = { x = options.x or 0, y = options.y or 0, xAnchor = options.xAnchor or 0, size = options.size or 20 }
 
-    -- Step 1: make and place the sprite. Without this there's nothing to draw on.
-    local coin
-    local created = coinStep("create", function()
-        coin = ui.Sprite.new(parent.content)
-        coin:SetPos(x, y, xAnchor, 0)
-        coin:SetSize(size, size)
+    -- The Coins item at pile size, with its quantity number hidden. The quantity
+    -- is set both before and after attaching: that combination is what worked in
+    -- game, and we don't know which one the client uses to pick the art. (This
+    -- client rejects the two-argument SetAssociatedObject call.)
+    local coin = coinSprite(parent, place, "item picture", function(sprite)
+        sprite.associatedObjectQuantity = COIN_PILE_QUANTITY
+        sprite:SetAssociatedObject(COINS_ITEM_ID)
+        sprite.associatedObjectQuantity = COIN_PILE_QUANTITY
+        sprite.associatedObjectQuantityMode = ui.ObjectQuantityDisplayMode.NEVER
     end)
 
-    -- Coins are decoration: hovers and clicks should go to whatever is underneath.
-    if created then
-        coinStep("clickthrough", function()
-            coin.clickthrough = true
-        end)
-    end
-
-    -- Step 2: attach the Coins item at pile size. The quantity is set both before
-    -- and after attaching: this combination is what worked in game, and we don't
-    -- know which of the two the client actually uses to pick the art.
-    local drawn = false
-
-    if created then
-        coinStep("quantity before item", function()
-            coin.associatedObjectQuantity = COIN_PILE_QUANTITY
-        end)
-
-        drawn = coinStep("item", function()
-            coin:SetAssociatedObject(COINS_ITEM_ID)
-        end)
-
-        if drawn then
-            coinStep("quantity after item", function()
-                coin.associatedObjectQuantity = COIN_PILE_QUANTITY
-            end)
-        end
-    end
-
-    -- Step 3: hide the quantity number. If this fails we'd show "1,000,000" on the
-    -- icon, so treat it as "can't draw the item" and use the fallback sprite.
-    if drawn then
-        drawn = coinStep("hide quantity", function()
-            coin.associatedObjectQuantityMode = ui.ObjectQuantityDisplayMode.NEVER
-        end)
-    end
-
-    if drawn then
-        return coin
-    end
-
-    -- Half-made sprite? Hide it so it can't show a stray number or blank box.
     if coin then
-        pcall(function()
-            coin.hidden = true
-        end)
+        return coin
     end
 
     local spriteId = resolveIcon("coins")
@@ -296,24 +264,9 @@ function Style.coins(parent, options)
         return nil
     end
 
-    -- The fallback is a plain client sprite. Like the item picture above, its
-    -- parent owns it and it can be moved when the money label changes width.
-    local fallback
-    local fallbackDrawn = coinStep("fallback sprite", function()
-        fallback = ui.Sprite.new(parent.content)
-        fallback:SetPos(x, y, xAnchor, 0)
-        fallback:SetSize(size, size)
-        fallback.clickthrough = true
-        fallback.sprite = spriteId
+    return coinSprite(parent, place, "fallback sprite", function(sprite)
+        sprite.sprite = spriteId
     end)
-
-    if not fallbackDrawn and fallback then
-        pcall(function()
-            fallback.hidden = true
-        end)
-    end
-
-    return fallbackDrawn and fallback or nil
 end
 
 -- Use the first available named client font. If none exists, leave PrettyUI's
@@ -419,7 +372,7 @@ function Style.quantity(value)
         return Style.number(value)
     end
 
-    return Style.number(value, 2):gsub("0+$", ""):gsub("%.$", "")
+    return (Style.number(value, 2):gsub("0+$", ""):gsub("%.$", ""))
 end
 
 -- Green for met, red for unmet, grey for unknown. The text always says the same
